@@ -1,20 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@700;800&family=Inter:wght@400;600;700;800&display=swap');
+
 :root {
-  color-scheme: dark;
-  --bg0: #03070c;
-  --bg1: #050a11;
-  --bg2: #07111c;
-  --card: rgba(3, 8, 14, 0.78);
-  --card-2: rgba(8, 15, 24, 0.88);
-  --line: rgba(90, 160, 220, 0.18);
-  --line-strong: rgba(110, 180, 235, 0.28);
-  --text: #f3f5f7;
-  --muted: rgba(243, 245, 247, 0.68);
-  --muted-2: rgba(243, 245, 247, 0.52);
-  --accent: #7fd7ff;
-  --accent-soft: rgba(127, 215, 255, 0.12);
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
-  --radius: 22px;
-  --page-max: 1520px;
+  --ink: #f4f4f4;
+  --mute: rgba(244, 244, 244, 0.68);
+  --line: rgba(120, 200, 255, 0.14);
+  --bg0: #05060a;
+  --bg1: #070a10;
+  --card: rgba(0, 0, 0, 0.44);
+  --card2: rgba(0, 0, 0, 0.54);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+  --custom-primary: rgb(120, 215, 255);
 }
 
 * {
@@ -24,18 +19,17 @@
 html,
 body,
 #root {
-  margin: 0;
   min-height: 100%;
-  color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
-  background:
-    radial-gradient(1200px 520px at 18% -10%, rgba(120, 200, 255, 0.10), transparent 60%),
-    radial-gradient(1200px 520px at 110% 15%, rgba(120, 200, 255, 0.07), transparent 62%),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
+  margin: 0;
 }
 
 body {
-  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 520px at 18% -10%, rgba(120, 200, 255, 0.08), transparent 60%),
+    radial-gradient(1200px 520px at 110% 15%, rgba(120, 200, 255, 0.05), transparent 62%),
+    linear-gradient(180deg, rgb(5, 6, 10), rgb(7, 10, 16));
+  font: 16px/1.6 'Inter', system-ui, sans-serif;
 }
 
 a {
@@ -48,206 +42,191 @@ input {
   font: inherit;
 }
 
-.vw-shell {
+.vw-app-shell {
   min-height: 100vh;
 }
 
-.vw-topbar {
+.vw-navbar {
   position: sticky;
   top: 0;
-  z-index: 20;
-  backdrop-filter: blur(18px);
-  background: linear-gradient(180deg, rgba(2, 7, 13, 0.92), rgba(2, 7, 13, 0.78));
-  border-bottom: 1px solid rgba(120, 200, 255, 0.12);
+  z-index: 10;
+  border-bottom: 1px solid rgba(120, 200, 255, 0.14);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  min-height: 84px;
 }
 
-.vw-topbar-inner {
-  max-width: 1680px;
+.vw-navbar-inner {
+  width: min(1200px, calc(100% - 32px));
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 48px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 28px;
 }
 
 .vw-brand {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 34px;
-  font-weight: 700;
+  font-family: 'Crimson Text', serif;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: #f2f4f7;
+  text-transform: uppercase;
+  color: #f4f4f4;
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
   white-space: nowrap;
 }
 
-.vw-nav {
+.vw-nav-links {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 10px;
+  margin-left: auto;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .vw-nav-link {
-  color: rgba(243, 245, 247, 0.86);
-  font-weight: 700;
-  font-size: 16px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #f4f4f4;
 }
 
-.vw-nav-link.is-active,
-.vw-nav-link:hover {
+.vw-nav-link:hover,
+.vw-nav-link:focus {
+  color: #78d7ff;
+}
+
+.vw-nav-link.is-active {
   background: rgba(255, 255, 255, 0.03);
 }
 
 .vw-main {
-  max-width: var(--page-max);
+  width: min(1200px, calc(100% - 32px));
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 28px 42px 42px;
+  padding-top: 24px;
+  padding-bottom: 48px;
 }
 
-.vw-main-editor {
-  max-width: 1720px;
+.vw-page-wrap {
+  display: block;
 }
 
-.page-frame {
-  display: grid;
-  gap: 22px;
+.vw-section-card {
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  padding: clamp(16px, 2.5vw, 28px);
+  background: rgba(0, 0, 0, 0.44);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  margin-bottom: 18px;
+  overflow: visible;
 }
 
-.panel {
-  border: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(6, 12, 20, 0.86), rgba(3, 8, 14, 0.92));
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.kicker {
-  margin: 0 0 10px;
+.vw-kicker {
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 12px;
-  color: var(--accent);
+  letter-spacing: 0.28em;
+  color: rgba(244, 244, 244, 0.68);
+  font-size: 0.8rem;
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+}
+
+.vw-page-title {
+  font-family: 'Crimson Text', serif;
   font-weight: 800;
-}
-
-.serif-display {
-  margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(42px, 5vw, 66px);
-  line-height: 0.95;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  line-height: 1.04;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  margin: 0 0 12px;
 }
 
-.hero-banner {
-  padding: 34px 34px;
+.vw-page-note {
+  color: rgba(244, 244, 244, 0.72);
+  font-size: 1.08rem;
+  max-width: 920px;
+  margin: 0;
+}
+
+.vw-actions-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28px;
-  min-height: 220px;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
 }
 
-.hero-copy {
-  max-width: 900px;
-}
-
-.hero-text,
-.page-subtext,
-.dashboard-card p,
-.new-sheet-card p,
-.editor-subtext,
-.muted-copy {
-  color: var(--muted);
-}
-
-.hero-text {
-  margin-top: 18px;
-  max-width: 58ch;
-  font-size: 20px;
-}
-
-.hero-cta {
-  display: flex;
-  align-items: center;
-}
-
-.primary-pill,
-.secondary-pill,
-.ghost-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 52px;
-  padding: 0 20px;
-  border-radius: 16px;
-  border: 1px solid var(--line-strong);
+.vw-btn {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  font-weight: 800;
+  transition: .25s;
+  color: var(--ink);
   cursor: pointer;
 }
 
-.primary-pill {
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(237,240,245,0.95));
-  color: #111;
-  font-weight: 800;
-  box-shadow: 0 0 40px rgba(127, 215, 255, 0.10);
+.vw-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow);
 }
 
-.secondary-pill,
-.ghost-btn {
-  background: rgba(255,255,255,0.03);
-  color: var(--text);
+.vw-btn-primary {
+  background: #ffffff;
+  color: #0b0b0b;
+  border-color: #ffffff;
 }
 
-.dashboard-grid,
-.new-sheet-grid {
+.vw-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.new-sheet-grid {
-  grid-template-columns: repeat(2, 1fr);
+.vw-card-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-card,
-.new-sheet-card {
-  padding: 26px;
-  min-height: 210px;
+.vw-mini-card {
+  min-height: 230px;
 }
 
-.dashboard-card h2,
-.new-sheet-card h2,
-.preview-title,
-.editor-title,
-.sidebar-title,
-.builder-form h2 {
+.vw-card-title {
   margin: 0 0 10px;
   font-size: 22px;
   line-height: 1.1;
+  font-weight: 800;
 }
 
-.page-header {
-  padding: 10px 4px 2px;
+.vw-card-copy {
+  margin: 0;
+  color: rgba(244, 244, 244, 0.72);
+  font-size: 1.08rem;
 }
 
 .editor-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
 }
 
 .editor-sidebar {
   padding: 22px;
   position: sticky;
-  top: 110px;
+  top: 108px;
   align-self: start;
 }
 
 .sidebar-title {
-  font-size: 26px;
-  margin-bottom: 18px;
+  font-size: 24px;
+  margin: 0 0 18px;
 }
 
 .sidebar-list {
@@ -264,19 +243,19 @@ input {
   padding: 0 14px;
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 14px;
-  color: var(--muted);
+  color: var(--mute);
   background: rgba(255,255,255,0.015);
 }
 
 .sidebar-item.is-active {
-  color: var(--text);
-  border-color: var(--line-strong);
-  background: linear-gradient(180deg, rgba(127,215,255,0.08), rgba(255,255,255,0.02));
+  color: var(--ink);
+  border-color: rgba(120, 200, 255, 0.22);
+  background: rgba(255,255,255,0.03);
 }
 
 .sidebar-index {
   font-weight: 800;
-  color: var(--accent);
+  color: var(--custom-primary);
 }
 
 .editor-main {
@@ -286,11 +265,23 @@ input {
 }
 
 .editor-header {
-  padding: 24px 26px;
+  padding: 20px 24px;
   display: flex;
   justify-content: space-between;
   gap: 20px;
   align-items: center;
+}
+
+.editor-title {
+  margin: 0 0 8px;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.editor-subtext,
+.muted-copy {
+  color: rgba(244, 244, 244, 0.72);
+  margin: 0;
 }
 
 .editor-actions {
@@ -301,13 +292,17 @@ input {
 
 .builder-grid {
   display: grid;
-  grid-template-columns: minmax(440px, 0.92fr) minmax(520px, 1.08fr);
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.08fr);
   gap: 18px;
   align-items: start;
 }
 
 .builder-form {
   padding: 24px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.44);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
 }
 
 .form-section + .form-section {
@@ -316,7 +311,7 @@ input {
 
 .field-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 14px;
 }
@@ -328,7 +323,7 @@ input {
 
 .field span {
   font-size: 13px;
-  color: var(--muted);
+  color: var(--mute);
   font-weight: 700;
 }
 
@@ -337,7 +332,7 @@ input {
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.025);
-  color: var(--text);
+  color: var(--ink);
   padding: 0 14px;
 }
 
@@ -355,14 +350,14 @@ input {
   padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.07);
-  color: var(--muted);
+  color: var(--mute);
   background: rgba(255,255,255,0.02);
 }
 
 .section-chip.is-active {
-  color: var(--text);
-  border-color: var(--line-strong);
-  background: rgba(127, 215, 255, 0.09);
+  color: var(--ink);
+  border-color: rgba(120, 200, 255, 0.22);
+  background: rgba(255,255,255,0.04);
 }
 
 .preview-wrap {
@@ -377,10 +372,21 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.44);
+}
+
+.preview-title {
+  margin: 0;
+  font-size: 22px;
 }
 
 .pdf-preview {
   padding: 18px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.44);
   overflow: auto;
 }
 
@@ -401,10 +407,11 @@ input {
 }
 
 .pdf-brand {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Crimson Text', serif;
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .pdf-doc-title {
@@ -500,13 +507,10 @@ input {
   background: #f5f6f8;
 }
 
-@media (max-width: 1180px) {
-  .dashboard-grid,
-  .new-sheet-grid,
-  .builder-grid {
-    grid-template-columns: 1fr;
-  }
-
+@media (max-width: 991px) {
+  .vw-card-grid,
+  .vw-card-grid-two,
+  .builder-grid,
   .editor-layout {
     grid-template-columns: 1fr;
   }
@@ -520,28 +524,24 @@ input {
   }
 }
 
-@media (max-width: 900px) {
-  .vw-topbar-inner {
-    padding: 20px 20px;
-    flex-direction: column;
+@media (max-width: 767.98px) {
+  .vw-navbar-inner {
+    gap: 12px;
     align-items: flex-start;
+    flex-direction: column;
+    width: min(1200px, calc(100% - 24px));
+  }
+
+  .vw-nav-links {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .vw-nav-link {
+    padding-inline: 10px;
   }
 
   .vw-main {
-    padding: 20px;
-  }
-
-  .hero-banner,
-  .editor-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .vw-brand {
-    font-size: 28px;
-  }
-
-  .serif-display {
-    font-size: 38px;
+    width: min(1200px, calc(100% - 24px));
   }
 }

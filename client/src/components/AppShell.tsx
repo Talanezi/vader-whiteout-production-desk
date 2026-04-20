@@ -1,18 +1,15 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 
 function AppShell() {
-  const location = useLocation()
-  const inEditor = location.pathname.startsWith('/callsheets/')
-
   return (
-    <div className="vw-shell">
-      <header className="vw-topbar">
-        <div className="vw-topbar-inner">
+    <div className="vw-app-shell d-flex flex-column">
+      <header className="vw-navbar">
+        <div className="vw-navbar-inner">
           <Link to="/" className="vw-brand">
-            VADER: WHITEOUT
+            Vader: Whiteout
           </Link>
 
-          <nav className="vw-nav">
+          <nav className="vw-nav-links">
             <NavLink to="/" end className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
               Dashboard
             </NavLink>
@@ -26,7 +23,7 @@ function AppShell() {
         </div>
       </header>
 
-      <main className={inEditor ? 'vw-main vw-main-editor' : 'vw-main'}>
+      <main className="app-main-container vw-main">
         <Outlet />
       </main>
     </div>
