@@ -14,19 +14,19 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.usersRepo.findOneBy({
+      Email: email.trim(),
+    });
 
-    const user = await this.usersRepo
-      .createQueryBuilder('user')
-      .where('LOWER(user.Email) = :email', { email: normalizedEmail })
-      .getOne();
-
-    if (!user || !user.PasswordHash) {
+    if (user === null) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const ok = await bcrypt.compare(password, user.PasswordHash);
-    if (!ok) {
+    if (!user.PasswordHash) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!(await bcrypt.compare(password, user.PasswordHash))) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -53,7 +53,7 @@ export class AuthService {
   }
 
   async me(userID: number) {
-    const user = await this.usersRepo.findOne({ where: { ID: userID } });
+    const user = await this.usersRepo.findOneBy({ ID: userID });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
