@@ -1,77 +1,92 @@
-import { Injectable, InternalServerErrorException, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
-type SchedulerLoginResponse = {
-  userID?: number;
+type SchedulerJwtPayload = {
+  sub?: number;
   email?: string;
   name?: string;
-  token?: string;
+  iat?: number;
+  exp?: number;
+};
+
+type SchedulerUserRow = {
+  ID: number;
+  Email: string;
+  Name: string;
 };
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+  private cachedSigningKey: string | null = null;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  private getSchedulerApiBaseUrl() {
-    return (
-      process.env.SCHEDULER_API_BASE_URL ||
-      'https://api-scheduler.vaderwhiteout.com'
-    ).replace(/\/$/, '');
+  private async getSchedulerJwtSigningKey() {
+    if (this.cachedSigningKey) {
+      return this.cachedSigningKey;
+    }
+
+    if (process.env.SCHEDULER_JWT_SIGNING_KEY) {
+      this.cachedSigningKey = process.env.SCHEDULER_JWT_SIGNING_KEY;
+      return this.cachedSigningKey;
+    }
+
+    const rows = await this.dataSource.query(
+      'SELECT "Value" FROM "Config" WHERE "Key" = $1 LIMIT 1',
+      ['JWT_SIGNING_KEY'],
+    );
+
+    const key = rows?.[0]?.Value;
+    if (!key || typeof key !== 'string') {
+      throw new UnauthorizedException('Scheduler JWT signing key not found');
+    }
+
+    this.cachedSigningKey = key;
+    return key;
   }
 
-  async login(email: string, password: string) {
-    const url = `${this.getSchedulerApiBaseUrl()}/api/login`;
-    this.logger.log(`Proxy login request to ${url} for email="${email.trim()}"`);
+  private async findUserByID(userID: number): Promise<SchedulerUserRow | null> {
+    const rows = await this.dataSource.query(
+      'SELECT "ID", "Email", "Name" FROM "User" WHERE "ID" = $1 LIMIT 1',
+      [userID],
+    );
+    return rows?.[0] ?? null;
+  }
 
-    let response: Response;
+  async verifySchedulerToken(token: string) {
+    const signingKey = await this.getSchedulerJwtSigningKey();
+
+    let payload: SchedulerJwtPayload;
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+      payload = await this.jwtService.verifyAsync<SchedulerJwtPayload>(token, {
+        secret: signingKey,
       });
-    } catch (error) {
-      this.logger.error(`Scheduler login fetch failed`, error instanceof Error ? error.stack : String(error));
-      throw new InternalServerErrorException('Scheduler auth request failed');
-    }
-
-    const rawText = await response.text();
-    this.logger.log(`Scheduler login response status=${response.status} body=${rawText.slice(0, 500)}`);
-
-    if (!response.ok) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    let schedulerUser: SchedulerLoginResponse;
-    try {
-      schedulerUser = JSON.parse(rawText) as SchedulerLoginResponse;
     } catch {
-      throw new InternalServerErrorException('Scheduler auth returned non-JSON response');
+      throw new UnauthorizedException('Invalid scheduler session');
     }
 
-    if (!schedulerUser.userID || !schedulerUser.email || !schedulerUser.name) {
-      throw new InternalServerErrorException('Scheduler auth returned unexpected response shape');
+    if (!payload?.sub || typeof payload.sub !== 'number') {
+      throw new UnauthorizedException('Invalid scheduler session');
     }
 
-    const token = await this.jwtService.signAsync({
-      sub: schedulerUser.userID,
-      email: schedulerUser.email,
-      name: schedulerUser.name,
-    });
+    const user = await this.findUserByID(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
 
     return {
-      token,
-      user: {
-        id: schedulerUser.userID,
-        email: schedulerUser.email,
-        name: schedulerUser.name,
-      },
+      userID: user.ID,
+      email: user.Email,
+      name: user.Name,
     };
   }
 
-  async me(user: { userID: number; email: string; name: string }) {
+  async meFromToken(token: string) {
+    const user = await this.verifySchedulerToken(token);
     return {
       id: user.userID,
       email: user.email,

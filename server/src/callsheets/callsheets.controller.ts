@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SchedulerAuthGuard } from '../auth/scheduler-auth.guard';
 import { CallsheetsService } from './callsheets.service';
 import { CallSheetDraft } from './callsheet.types';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(SchedulerAuthGuard)
 @Controller('api/callsheets')
 export class CallsheetsController {
   constructor(private readonly callsheetsService: CallsheetsService) {}
