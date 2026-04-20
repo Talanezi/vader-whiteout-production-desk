@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,6 +7,8 @@ import { UserEntity } from '../users/user.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepo: Repository<UserEntity>,
@@ -14,19 +16,30 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
+    const trimmedEmail = email.trim();
+
     const user = await this.usersRepo.findOneBy({
-      Email: email.trim(),
+      Email: trimmedEmail,
     });
+
+    this.logger.log(`login attempt email="${trimmedEmail}" foundUser=${!!user}`);
 
     if (user === null) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    this.logger.log(
+      `login user id=${user.ID} email="${user.Email}" hasPasswordHash=${!!user.PasswordHash}`,
+    );
+
     if (!user.PasswordHash) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    if (!(await bcrypt.compare(password, user.PasswordHash))) {
+    const ok = await bcrypt.compare(password, user.PasswordHash);
+    this.logger.log(`bcrypt result for user id=${user.ID}: ${ok}`);
+
+    if (!ok) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
