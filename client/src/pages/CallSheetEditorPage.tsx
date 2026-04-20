@@ -254,7 +254,7 @@ function CallSheetEditorPage() {
 
         <div className="builder-grid">
           <section className="builder-form panel">
-            <div className="form-section">
+            <div className="form-section" id="overview">
               <p className="kicker">Overview</p>
               <h2>Production day basics</h2>
 
@@ -281,7 +281,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="contacts">
               <div className="section-head">
                 <div>
                   <p className="kicker">Header Cards</p>
@@ -338,7 +338,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="weather">
               <p className="kicker">Header Cards</p>
               <h2>Weather and timing</h2>
 
@@ -370,7 +370,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="locations">
               <p className="kicker">Header Cards</p>
               <h2>Main set</h2>
 
@@ -432,7 +432,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="scenes">
               <div className="section-head">
                 <div>
                   <p className="kicker">Scenes</p>
@@ -480,7 +480,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="cast">
               <div className="section-head">
                 <div>
                   <p className="kicker">Cast Calls</p>
@@ -524,7 +524,7 @@ function CallSheetEditorPage() {
               </div>
             </div>
 
-            <div className="form-section">
+            <div className="form-section" id="crew">
               <div className="section-head">
                 <div>
                   <p className="kicker">Crew Calls</p>
