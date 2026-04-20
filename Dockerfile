@@ -1,14 +1,15 @@
 FROM node:18-alpine
 
-WORKDIR /app/server
+WORKDIR /app
 
-COPY server/package*.json ./
+COPY server/package*.json ./server/
+WORKDIR /app/server
 RUN npm install
 
-COPY server/ ./
+COPY server/ /app/server/
 
 RUN npm run build
 
 ENV NODE_ENV=production
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/main.js"]
