@@ -13,9 +13,6 @@ function AppShell() {
             <NavLink to="/" end className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
               Dashboard
             </NavLink>
-            <NavLink to="/callsheets/new" className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
-              New Call Sheet
-            </NavLink>
             <a className="vw-nav-link" href="/scheduler/">
               Scheduler
             </a>

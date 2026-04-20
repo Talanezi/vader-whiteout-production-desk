@@ -4,11 +4,10 @@ function CallSheetNewPage() {
   return (
     <div className="vw-page-wrap">
       <section className="vw-section-card">
-        <p className="vw-kicker">Phase One</p>
+        <p className="vw-kicker">Call Sheets</p>
         <h1 className="vw-page-title">Create a New Call Sheet</h1>
         <p className="vw-page-note">
-          This will become the quick-starting entry point for ADs. For now, use the editor
-          shell to shape the workflow and preview layout.
+          Start a blank production day or open the current builder shell.
         </p>
       </section>
 
@@ -28,7 +27,7 @@ function CallSheetNewPage() {
         <article className="vw-section-card vw-mini-card">
           <h2 className="vw-card-title">Duplicate previous format</h2>
           <p className="vw-card-copy">
-            Later this will duplicate a recent day, preserving structure and contacts.
+            Duplicate a recent day later once saved drafts are wired to the backend.
           </p>
           <div className="vw-actions-row">
             <button className="vw-btn" type="button">

@@ -4,45 +4,77 @@ function DashboardPage() {
   return (
     <div className="vw-page-wrap">
       <section className="vw-section-card">
-        <p className="vw-kicker">AD Console</p>
-        <h1 className="vw-page-title">Assistant Director Workspace</h1>
+        <p className="vw-kicker">Production Desk</p>
+        <h1 className="vw-page-title">Production Workspace</h1>
         <p className="vw-page-note">
-          Call sheet creation comes first, but this app is being built as a broader
-          production-operations tool for document workflows, revisions, and day-of control.
+          Internal production document workspace for call sheets, shot lists, and related set paperwork.
         </p>
-
-        <div className="vw-actions-row">
-          <Link className="vw-btn vw-btn-primary" to="/callsheets/new">
-            New Call Sheet
-          </Link>
-        </div>
       </section>
 
-      <section className="vw-card-grid">
-        <article className="vw-section-card vw-mini-card">
-          <p className="vw-kicker">Phase One</p>
-          <h2 className="vw-card-title">Call sheet builder</h2>
+      <section className="vw-dashboard-grid">
+        <article className="vw-section-card vw-module-card">
+          <div className="vw-module-header">
+            <div>
+              <p className="vw-kicker">Documents</p>
+              <h2 className="vw-card-title">Call Sheets</h2>
+            </div>
+            <Link className="vw-btn vw-btn-primary" to="/callsheets/new">
+              New
+            </Link>
+          </div>
+
           <p className="vw-card-copy">
-            Structured sections for header cards, scenes, cast calls, crew calls, notes,
-            revisions, and PDF export.
+            Build, edit, preview, and export production call sheets.
+          </p>
+
+          <div className="vw-list-block">
+            <div className="vw-list-row">
+              <div>
+                <div className="vw-list-title">Test Shoot Call Sheet</div>
+                <div className="vw-list-meta">Sunday, April 19, 2026</div>
+              </div>
+              <Link className="vw-inline-link" to="/callsheets/draft-test-shoot/edit">
+                Open
+              </Link>
+            </div>
+          </div>
+        </article>
+
+        <article className="vw-section-card vw-module-card">
+          <div className="vw-module-header">
+            <div>
+              <p className="vw-kicker">Planning</p>
+              <h2 className="vw-card-title">Shot Lists</h2>
+            </div>
+            <button className="vw-btn" type="button">
+              Soon
+            </button>
+          </div>
+
+          <p className="vw-card-copy">
+            Shot planning and coverage organization will live here next.
+          </p>
+
+          <div className="vw-empty-block">
+            Shot list workspace not added yet.
+          </div>
+        </article>
+      </section>
+
+      <section className="vw-dashboard-grid vw-dashboard-grid-secondary">
+        <article className="vw-section-card vw-mini-card">
+          <p className="vw-kicker">Library</p>
+          <h2 className="vw-card-title">Contacts</h2>
+          <p className="vw-card-copy">
+            Saved cast, crew, emergency contacts, and department references later.
           </p>
         </article>
 
         <article className="vw-section-card vw-mini-card">
-          <p className="vw-kicker">Planned</p>
-          <h2 className="vw-card-title">Revision workflow</h2>
+          <p className="vw-kicker">Library</p>
+          <h2 className="vw-card-title">Locations</h2>
           <p className="vw-card-copy">
-            Save drafts, duplicate previous days, preserve version history, and track
-            published outputs cleanly.
-          </p>
-        </article>
-
-        <article className="vw-section-card vw-mini-card">
-          <p className="vw-kicker">Planned</p>
-          <h2 className="vw-card-title">On-set tools</h2>
-          <p className="vw-card-copy">
-            Check-ins, departmental tracking, utility references, and printable operations
-            docs later in the same product.
+            Main set addresses, hospitals, parking notes, and location packets later.
           </p>
         </article>
       </section>

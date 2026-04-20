@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/ADConsole/',
+  base: '/productiondesk/',
   server: {
     port: 5173
   }

@@ -12,7 +12,7 @@ let AppService = class AppService {
     getHealth() {
         return {
             ok: true,
-            service: 'vader-whiteout-ad-console-api',
+            service: 'vader-whiteout-production-desk-api',
         };
     }
     getCallSheets() {
