@@ -14,9 +14,12 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersRepo.findOne({
-      where: { Email: email.trim().toLowerCase() },
-    });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await this.usersRepo
+      .createQueryBuilder('user')
+      .where('LOWER(user.Email) = :email', { email: normalizedEmail })
+      .getOne();
 
     if (!user || !user.PasswordHash) {
       throw new UnauthorizedException('Invalid email or password');
