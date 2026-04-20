@@ -40,8 +40,9 @@ export class CallsheetsService {
     return this.normalizeDraft(entity.id, entity.payload as Partial<CallSheetDraft>);
   }
 
-  async list() {
+  async list(userID: number) {
     const rows = await this.callsheetsRepo.find({
+      where: { CreatedByUserID: userID },
       order: { updatedAt: 'DESC' },
     });
 
@@ -51,20 +52,23 @@ export class CallsheetsService {
     };
   }
 
-  async getById(id: string) {
-    const row = await this.callsheetsRepo.findOne({ where: { id } });
+  async getById(userID: number, id: string) {
+    const row = await this.callsheetsRepo.findOne({
+      where: { id, CreatedByUserID: userID },
+    });
     if (!row) {
       throw new NotFoundException('Call sheet not found');
     }
     return this.entityToDraft(row);
   }
 
-  async create(payload?: Partial<CallSheetDraft>) {
+  async create(userID: number, payload?: Partial<CallSheetDraft>) {
     const id = payload?.id?.trim() || `draft-${randomUUID().slice(0, 8)}`;
     const draft = this.normalizeDraft(id, payload);
 
     const row = this.callsheetsRepo.create({
       id: draft.id,
+      CreatedByUserID: userID,
       title: draft.title,
       productionDate: draft.productionDate,
       payload: draft,
@@ -74,8 +78,10 @@ export class CallsheetsService {
     return this.entityToDraft(saved);
   }
 
-  async update(id: string, payload: Partial<CallSheetDraft>) {
-    const existing = await this.callsheetsRepo.findOne({ where: { id } });
+  async update(userID: number, id: string, payload: Partial<CallSheetDraft>) {
+    const existing = await this.callsheetsRepo.findOne({
+      where: { id, CreatedByUserID: userID },
+    });
     if (!existing) {
       throw new NotFoundException('Call sheet not found');
     }

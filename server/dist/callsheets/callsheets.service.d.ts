@@ -6,11 +6,11 @@ export declare class CallsheetsService {
     constructor(callsheetsRepo: Repository<CallSheetDraftEntity>);
     private normalizeDraft;
     private entityToDraft;
-    list(): Promise<{
+    list(userID: number): Promise<{
         items: CallSheetDraft[];
         total: number;
     }>;
-    getById(id: string): Promise<CallSheetDraft>;
-    create(payload?: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
-    update(id: string, payload: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
+    getById(userID: number, id: string): Promise<CallSheetDraft>;
+    create(userID: number, payload?: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
+    update(userID: number, id: string, payload: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
 }

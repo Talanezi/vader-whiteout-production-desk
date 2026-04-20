@@ -14,54 +14,60 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CallsheetsController = void 0;
 const common_1 = require("@nestjs/common");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const callsheets_service_1 = require("./callsheets.service");
 let CallsheetsController = class CallsheetsController {
     constructor(callsheetsService) {
         this.callsheetsService = callsheetsService;
     }
-    list() {
-        return this.callsheetsService.list();
+    list(req) {
+        return this.callsheetsService.list(req.user.userID);
     }
-    getById(id) {
-        return this.callsheetsService.getById(id);
+    getById(req, id) {
+        return this.callsheetsService.getById(req.user.userID, id);
     }
-    create(payload) {
-        return this.callsheetsService.create(payload);
+    create(req, payload) {
+        return this.callsheetsService.create(req.user.userID, payload);
     }
-    update(id, payload) {
-        return this.callsheetsService.update(id, payload);
+    update(req, id, payload) {
+        return this.callsheetsService.update(req.user.userID, id, payload);
     }
 };
 exports.CallsheetsController = CallsheetsController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], CallsheetsController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], CallsheetsController.prototype, "getById", null);
 __decorate([
     (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], CallsheetsController.prototype, "create", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Object, String, Object]),
     __metadata("design:returntype", void 0)
 ], CallsheetsController.prototype, "update", null);
 exports.CallsheetsController = CallsheetsController = __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('api/callsheets'),
     __metadata("design:paramtypes", [callsheets_service_1.CallsheetsService])
 ], CallsheetsController);

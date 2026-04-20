@@ -1,28 +1,41 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CallsheetsService } from './callsheets.service';
 import { CallSheetDraft } from './callsheet.types';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/callsheets')
 export class CallsheetsController {
   constructor(private readonly callsheetsService: CallsheetsService) {}
 
   @Get()
-  list() {
-    return this.callsheetsService.list();
+  list(@Req() req: Request & { user: { userID: number } }) {
+    return this.callsheetsService.list(req.user.userID);
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.callsheetsService.getById(id);
+  getById(
+    @Req() req: Request & { user: { userID: number } },
+    @Param('id') id: string,
+  ) {
+    return this.callsheetsService.getById(req.user.userID, id);
   }
 
   @Post()
-  create(@Body() payload: Partial<CallSheetDraft>) {
-    return this.callsheetsService.create(payload);
+  create(
+    @Req() req: Request & { user: { userID: number } },
+    @Body() payload: Partial<CallSheetDraft>,
+  ) {
+    return this.callsheetsService.create(req.user.userID, payload);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() payload: Partial<CallSheetDraft>) {
-    return this.callsheetsService.update(id, payload);
+  update(
+    @Req() req: Request & { user: { userID: number } },
+    @Param('id') id: string,
+    @Body() payload: Partial<CallSheetDraft>,
+  ) {
+    return this.callsheetsService.update(req.user.userID, id, payload);
   }
 }

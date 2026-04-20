@@ -6,8 +6,4 @@ export declare class AppController {
         ok: boolean;
         service: string;
     };
-    getCallSheets(): {
-        items: never[];
-        total: number;
-    };
 }

@@ -19,9 +19,6 @@ let AppController = class AppController {
     getHealth() {
         return this.appService.getHealth();
     }
-    getCallSheets() {
-        return this.appService.getCallSheets();
-    }
 };
 exports.AppController = AppController;
 __decorate([
@@ -30,12 +27,6 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AppController.prototype, "getHealth", null);
-__decorate([
-    (0, common_1.Get)('callsheets'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], AppController.prototype, "getCallSheets", null);
 exports.AppController = AppController = __decorate([
     (0, common_1.Controller)('api'),
     __metadata("design:paramtypes", [app_service_1.AppService])

@@ -851,3 +851,27 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+
+.vw-nav-user {
+  padding: 10px 6px;
+  color: rgba(244, 244, 244, 0.72);
+  font-weight: 700;
+}
+
+.vw-nav-button {
+  appearance: none;
+  font: inherit;
+}
+
+.vw-auth-card {
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.vw-auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}

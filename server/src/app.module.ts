@@ -3,8 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { CallsheetsModule } from './callsheets/callsheets.module';
 import { CallSheetDraftEntity } from './callsheets/entities/callsheet-draft.entity';
+import { UserEntity } from './users/user.entity';
 
 @Module({
   imports: [
@@ -21,10 +23,11 @@ import { CallSheetDraftEntity } from './callsheets/entities/callsheet-draft.enti
         ssl: configService.get<string>('DATABASE_URL')?.includes('railway')
           ? { rejectUnauthorized: false }
           : false,
+        entities: [CallSheetDraftEntity, UserEntity],
       }),
     }),
-    TypeOrmModule.forFeature([CallSheetDraftEntity]),
     CallsheetsModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
