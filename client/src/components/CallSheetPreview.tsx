@@ -1,0 +1,124 @@
+import type { CallSheetDraft } from '../data/mockCallSheet'
+
+type Props = {
+  draft: CallSheetDraft
+}
+
+function CallSheetPreview({ draft }: Props) {
+  return (
+    <section className="preview-wrap">
+      <div className="preview-toolbar panel">
+        <div>
+          <p className="kicker">Preview</p>
+          <h3 className="preview-title">Document preview</h3>
+        </div>
+
+        <button className="ghost-btn">Generate PDF</button>
+      </div>
+
+      <div className="pdf-preview panel">
+        <div className="pdf-page">
+          <div className="pdf-header">
+            <div>
+              <div className="pdf-brand">VADER: WHITEOUT</div>
+              <div className="pdf-doc-title">{draft.title.toUpperCase()}</div>
+              <div className="pdf-subline">
+                {draft.productionDate} • Primary Crew Call: {draft.primaryCallTime}
+              </div>
+            </div>
+          </div>
+
+          <div className="pdf-card-grid">
+            <div className="pdf-card">
+              <div className="pdf-card-title">Emergency Contact</div>
+              {draft.emergencyContacts.map((contact) => (
+                <div key={contact.id} className="pdf-line">
+                  <span>{contact.label}</span>
+                  <span>{contact.name}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pdf-card center">
+              <div className="pdf-card-title">Call</div>
+              <div className="pdf-call-big">{draft.primaryCallTime}</div>
+              <div className="pdf-date-small">{draft.productionDate}</div>
+            </div>
+
+            <div className="pdf-card">
+              <div className="pdf-card-title">Weather</div>
+              <div className="pdf-stack-line">At call: {draft.weatherTempAtCall}</div>
+              <div className="pdf-stack-line">High: {draft.weatherHigh}</div>
+              <div className="pdf-stack-line">Low: {draft.weatherLow}</div>
+              <div className="pdf-stack-line">{draft.weatherSummary}</div>
+            </div>
+
+            <div className="pdf-card">
+              <div className="pdf-card-title">Main Set</div>
+              <div className="pdf-stack-line strong">{draft.mainSetName}</div>
+              {draft.mainSetAddress.map((line) => (
+                <div key={line} className="pdf-stack-line">{line}</div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pdf-table-block">
+            <div className="pdf-section-title">Scenes / Set Breakdown</div>
+            <table className="pdf-table">
+              <thead>
+                <tr>
+                  <th>Scene</th>
+                  <th>Set and Description</th>
+                  <th>Cast</th>
+                  <th>D/N</th>
+                  <th>Pages</th>
+                  <th>Location / Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft.scenes.map((scene) => (
+                  <tr key={scene.id}>
+                    <td>{scene.sceneNumber}</td>
+                    <td>{scene.setDescription}</td>
+                    <td>{scene.castSummary}</td>
+                    <td>{scene.dayNight}</td>
+                    <td>{scene.pageCount}</td>
+                    <td>{scene.locationNotes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pdf-table-block">
+            <div className="pdf-section-title">Cast Calls</div>
+            <table className="pdf-table">
+              <thead>
+                <tr>
+                  <th>Cast</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Call</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft.castCalls.map((cast) => (
+                  <tr key={cast.id}>
+                    <td>{cast.castName}</td>
+                    <td>{cast.roleName}</td>
+                    <td>{cast.email}</td>
+                    <td>{cast.callTime}</td>
+                    <td>{cast.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export default CallSheetPreview
