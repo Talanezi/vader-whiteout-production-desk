@@ -5,8 +5,8 @@ export class CallSheetDraftEntity {
   @PrimaryColumn({ type: 'varchar', length: 64 })
   id!: string;
 
-  @Column({ type: 'integer' })
-  CreatedByUserID!: number;
+  @Column({ type: 'integer', nullable: true })
+  CreatedByUserID!: number | null;
 
   @Column({ type: 'varchar', length: 255, default: '' })
   title!: string;
