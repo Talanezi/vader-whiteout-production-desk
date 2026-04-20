@@ -1,10 +1,9 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { clearAuthSession, getAuthToken, getStoredUser } from '../lib/api'
+import { clearAuthSession, getAuthToken } from '../lib/api'
 
 function AppShell() {
   const navigate = useNavigate()
   const token = getAuthToken()
-  const user = getStoredUser()
 
   const handleLogout = () => {
     clearAuthSession()
@@ -25,7 +24,6 @@ function AppShell() {
                 <NavLink to="/" end className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
                   Dashboard
                 </NavLink>
-                <span className="vw-nav-user">{user?.name || user?.email || 'Logged in'}</span>
                 <button className="vw-nav-link vw-nav-button" type="button" onClick={handleLogout}>
                   Log Out
                 </button>
@@ -35,9 +33,9 @@ function AppShell() {
                 <a className="vw-nav-link" href="/scheduler/#/signup">
                   Sign Up
                 </a>
-                <NavLink to="/login" className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
+                <a className="vw-nav-link" href="/scheduler/#/login">
                   Log In
-                </NavLink>
+                </a>
               </>
             )}
 

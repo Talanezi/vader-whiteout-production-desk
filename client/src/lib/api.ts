@@ -4,36 +4,19 @@ const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
   'http://localhost:3001/api'
 
-const TOKEN_KEY = 'production_desk_token'
-const USER_KEY = 'production_desk_user'
+const SCHEDULER_TOKEN_KEY = 'token'
 
 export function getAuthToken() {
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-export function setAuthSession(token: string, user: { id: number; email: string; name: string }) {
-  localStorage.setItem(TOKEN_KEY, token)
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  return localStorage.getItem(SCHEDULER_TOKEN_KEY)
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
-}
-
-export function getStoredUser(): { id: number; email: string; name: string } | null {
-  const raw = localStorage.getItem(USER_KEY)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  localStorage.removeItem(SCHEDULER_TOKEN_KEY)
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
   if (response.status === 401) {
-    clearAuthSession()
+    throw new Error('UNAUTHORIZED')
   }
   if (!response.ok) {
     const text = await response.text()
@@ -52,15 +35,6 @@ async function authFetch(input: string, init?: RequestInit) {
     ...init,
     headers,
   })
-}
-
-export async function login(email: string, password: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  return parseJson<{ token: string; user: { id: number; email: string; name: string } }>(response)
 }
 
 export async function me() {
