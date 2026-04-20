@@ -1,6 +1,29 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createCallSheet } from '../lib/api'
 
 function CallSheetNewPage() {
+  const navigate = useNavigate()
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleCreate = async () => {
+    try {
+      setCreating(true)
+      setError(null)
+
+      const draft = await createCallSheet({
+        title: 'Untitled Call Sheet',
+      })
+
+      navigate(`/callsheets/${draft.id}/edit`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create call sheet')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <div className="vw-page-wrap">
       <section className="vw-section-card">
@@ -18,10 +41,11 @@ function CallSheetNewPage() {
             Start from a clean draft with empty structured sections.
           </p>
           <div className="vw-actions-row">
-            <Link className="vw-btn vw-btn-primary" to="/callsheets/draft-test-shoot/edit">
-              Open builder shell
-            </Link>
+            <button className="vw-btn vw-btn-primary" type="button" onClick={handleCreate} disabled={creating}>
+              {creating ? 'Creating...' : 'Create draft'}
+            </button>
           </div>
+          {error ? <p className="vw-inline-error">{error}</p> : null}
         </article>
 
         <article className="vw-section-card vw-mini-card">

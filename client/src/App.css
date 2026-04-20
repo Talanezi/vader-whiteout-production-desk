@@ -610,3 +610,9 @@ input {
     width: min(1200px, calc(100% - 24px));
   }
 }
+
+
+.vw-inline-error {
+  margin-top: 12px;
+  color: #ffb4b4;
+}

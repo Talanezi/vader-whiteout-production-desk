@@ -1,6 +1,36 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import type { CallSheetDraft } from '../data/mockCallSheet'
+import { listCallSheets } from '../lib/api'
 
 function DashboardPage() {
+  const [items, setItems] = useState<CallSheetDraft[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    listCallSheets()
+      .then((data) => {
+        if (!active) return
+        setItems(data.items)
+        setError(null)
+      })
+      .catch((err: unknown) => {
+        if (!active) return
+        setError(err instanceof Error ? err.message : 'Failed to load call sheets')
+      })
+      .finally(() => {
+        if (!active) return
+        setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   return (
     <div className="vw-page-wrap">
       <section className="vw-section-card">
@@ -28,15 +58,25 @@ function DashboardPage() {
           </p>
 
           <div className="vw-list-block">
-            <div className="vw-list-row">
-              <div>
-                <div className="vw-list-title">Test Shoot Call Sheet</div>
-                <div className="vw-list-meta">Sunday, April 19, 2026</div>
-              </div>
-              <Link className="vw-inline-link" to="/callsheets/draft-test-shoot/edit">
-                Open
-              </Link>
-            </div>
+            {loading ? (
+              <div className="vw-empty-block">Loading call sheets...</div>
+            ) : error ? (
+              <div className="vw-empty-block">Failed to load call sheets.</div>
+            ) : items.length === 0 ? (
+              <div className="vw-empty-block">No call sheets yet.</div>
+            ) : (
+              items.slice(0, 5).map((item) => (
+                <div key={item.id} className="vw-list-row">
+                  <div>
+                    <div className="vw-list-title">{item.title || 'Untitled Call Sheet'}</div>
+                    <div className="vw-list-meta">{item.productionDate || 'No date set'}</div>
+                  </div>
+                  <Link className="vw-inline-link" to={`/callsheets/${item.id}/edit`}>
+                    Open
+                  </Link>
+                </div>
+              ))
+            )}
           </div>
         </article>
 
