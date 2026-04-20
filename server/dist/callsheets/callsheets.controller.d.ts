@@ -3,11 +3,11 @@ import { CallSheetDraft } from './callsheet.types';
 export declare class CallsheetsController {
     private readonly callsheetsService;
     constructor(callsheetsService: CallsheetsService);
-    list(): {
+    list(): Promise<{
         items: CallSheetDraft[];
         total: number;
-    };
-    getById(id: string): CallSheetDraft;
-    create(payload: Partial<CallSheetDraft>): CallSheetDraft;
-    update(id: string, payload: Partial<CallSheetDraft>): CallSheetDraft;
+    }>;
+    getById(id: string): Promise<CallSheetDraft>;
+    create(payload: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
+    update(id: string, payload: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
 }

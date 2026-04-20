@@ -1,28 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CallSheetDraft } from './callsheet.types';
-import { callSheetStore } from './callsheets.store';
+import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
 
 @Injectable()
 export class CallsheetsService {
-  list() {
+  constructor(
+    @InjectRepository(CallSheetDraftEntity)
+    private readonly callsheetsRepo: Repository<CallSheetDraftEntity>,
+  ) {}
+
+  private normalizeDraft(id: string, payload?: Partial<CallSheetDraft>): CallSheetDraft {
     return {
-      items: Array.from(callSheetStore.values()),
-      total: callSheetStore.size,
-    };
-  }
-
-  getById(id: string) {
-    const item = callSheetStore.get(id);
-    if (!item) {
-      throw new NotFoundException('Call sheet not found');
-    }
-    return item;
-  }
-
-  create(payload?: Partial<CallSheetDraft>) {
-    const id = payload?.id?.trim() || `draft-${randomUUID().slice(0, 8)}`;
-    const item: CallSheetDraft = {
       id,
       title: payload?.title || 'Untitled Call Sheet',
       productionDate: payload?.productionDate || '',
@@ -43,19 +34,63 @@ export class CallsheetsService {
       crewCalls: payload?.crewCalls || [],
       generalNotes: payload?.generalNotes || '',
     };
-
-    callSheetStore.set(id, item);
-    return item;
   }
 
-  update(id: string, payload: Partial<CallSheetDraft>) {
-    const existing = this.getById(id);
-    const next: CallSheetDraft = {
-      ...existing,
+  private entityToDraft(entity: CallSheetDraftEntity): CallSheetDraft {
+    return this.normalizeDraft(entity.id, entity.payload as Partial<CallSheetDraft>);
+  }
+
+  async list() {
+    const rows = await this.callsheetsRepo.find({
+      order: { updatedAt: 'DESC' },
+    });
+
+    return {
+      items: rows.map((row) => this.entityToDraft(row)),
+      total: rows.length,
+    };
+  }
+
+  async getById(id: string) {
+    const row = await this.callsheetsRepo.findOne({ where: { id } });
+    if (!row) {
+      throw new NotFoundException('Call sheet not found');
+    }
+    return this.entityToDraft(row);
+  }
+
+  async create(payload?: Partial<CallSheetDraft>) {
+    const id = payload?.id?.trim() || `draft-${randomUUID().slice(0, 8)}`;
+    const draft = this.normalizeDraft(id, payload);
+
+    const row = this.callsheetsRepo.create({
+      id: draft.id,
+      title: draft.title,
+      productionDate: draft.productionDate,
+      payload: draft,
+    });
+
+    const saved = await this.callsheetsRepo.save(row);
+    return this.entityToDraft(saved);
+  }
+
+  async update(id: string, payload: Partial<CallSheetDraft>) {
+    const existing = await this.callsheetsRepo.findOne({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Call sheet not found');
+    }
+
+    const merged = this.normalizeDraft(id, {
+      ...(existing.payload as Partial<CallSheetDraft>),
       ...payload,
       id,
-    };
-    callSheetStore.set(id, next);
-    return next;
+    });
+
+    existing.title = merged.title;
+    existing.productionDate = merged.productionDate;
+    existing.payload = merged;
+
+    const saved = await this.callsheetsRepo.save(existing);
+    return this.entityToDraft(saved);
   }
 }

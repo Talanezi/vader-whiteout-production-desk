@@ -9,9 +9,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const typeorm_1 = require("@nestjs/typeorm");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const callsheets_module_1 = require("./callsheets/callsheets.module");
+const callsheet_draft_entity_1 = require("./callsheets/entities/callsheet-draft.entity");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -21,6 +23,19 @@ exports.AppModule = AppModule = __decorate([
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
             }),
+            typeorm_1.TypeOrmModule.forRootAsync({
+                inject: [config_1.ConfigService],
+                useFactory: (configService) => ({
+                    type: 'postgres',
+                    url: configService.get('DATABASE_URL'),
+                    autoLoadEntities: true,
+                    synchronize: true,
+                    ssl: configService.get('DATABASE_URL')?.includes('railway')
+                        ? { rejectUnauthorized: false }
+                        : false,
+                }),
+            }),
+            typeorm_1.TypeOrmModule.forFeature([callsheet_draft_entity_1.CallSheetDraftEntity]),
             callsheets_module_1.CallsheetsModule,
         ],
         controllers: [app_controller_1.AppController],
