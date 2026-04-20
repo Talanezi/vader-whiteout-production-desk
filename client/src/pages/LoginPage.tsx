@@ -55,9 +55,6 @@ function LoginPage() {
             <button className="vw-btn vw-btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Logging in…' : 'Log In'}
             </button>
-            <a className="vw-btn" href="/scheduler/#/signup">
-              Sign Up
-            </a>
           </div>
         </form>
       </section>
