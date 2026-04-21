@@ -1,18 +1,30 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft } from '../data/mockCallSheet'
-import { listCallSheets } from '../lib/api'
+import { getAuthToken, listCallSheets } from '../lib/api'
 
 function DashboardPage() {
+  const token = getAuthToken()
   const [items, setItems] = useState<CallSheetDraft[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
     let active = true
     listCallSheets()
       .then((data) => {
         if (!active) return
         setItems(data.items)
+        setError(null)
+      })
+      .catch((err: unknown) => {
+        if (!active) return
+        setError(err instanceof Error ? err.message : 'Failed to load call sheets')
       })
       .finally(() => {
         if (!active) return
@@ -22,7 +34,30 @@ function DashboardPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [token])
+
+  if (!token) {
+    return (
+      <div className="vw-page-wrap">
+        <section className="vw-section-card vw-auth-card">
+          <p className="vw-kicker">Production Desk</p>
+          <h1 className="vw-page-title">Please Log In</h1>
+          <p className="vw-page-note">
+            Production Desk uses the same scheduler session. Log in through scheduler, then come back here.
+          </p>
+
+          <div className="vw-actions-row">
+            <a className="vw-btn vw-btn-primary" href="/scheduler/#/login">
+              Log In
+            </a>
+            <a className="vw-btn" href="/apps/">
+              Apps
+            </a>
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="vw-page-wrap">
@@ -46,25 +81,26 @@ function DashboardPage() {
             </Link>
           </div>
 
-          <p className="vw-card-copy">
-            Build, edit, preview, and export production call sheets.
-          </p>
-
           <div className="vw-list-block">
             {loading ? (
               <div className="vw-empty-block">Loading call sheets...</div>
+            ) : error ? (
+              <div className="vw-empty-block">{error}</div>
             ) : items.length === 0 ? (
               <div className="vw-empty-block">No call sheets yet.</div>
             ) : (
-              items.slice(0, 6).map((item) => (
+              items.slice(0, 8).map((item) => (
                 <div key={item.id} className="vw-list-row">
-                  <div>
+                  <div className="vw-list-copy">
                     <div className="vw-list-title">{item.title || 'Untitled Call Sheet'}</div>
                     <div className="vw-list-meta">{item.productionDate || 'No date set'}</div>
                   </div>
-                  <Link className="vw-inline-link" to={`/callsheets/${item.id}/edit`}>
-                    Open
-                  </Link>
+
+                  <div className="vw-list-actions">
+                    <Link className="vw-inline-link" to={`/callsheets/${item.id}/edit`}>
+                      Open
+                    </Link>
+                  </div>
                 </div>
               ))
             )}
@@ -81,10 +117,6 @@ function DashboardPage() {
               Soon
             </button>
           </div>
-
-          <p className="vw-card-copy">
-            Shot planning and coverage organization will live here next.
-          </p>
 
           <div className="vw-empty-block">
             Shot list workspace not added yet.
