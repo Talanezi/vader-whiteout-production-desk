@@ -25,10 +25,7 @@ body,
 
 body {
   color: var(--ink);
-  background:
-    radial-gradient(1200px 520px at 18% -10%, rgba(120, 200, 255, 0.08), transparent 60%),
-    radial-gradient(1200px 520px at 110% 15%, rgba(120, 200, 255, 0.05), transparent 62%),
-    linear-gradient(180deg, rgb(5, 6, 10), rgb(7, 10, 16));
+  background: linear-gradient(180deg, var(--bg0), var(--bg1));
   font: 16px/1.6 'Inter', system-ui, sans-serif;
 }
 
@@ -44,17 +41,32 @@ input {
 
 .vw-app-shell {
   min-height: 100vh;
+  position: relative;
+}
+
+.vw-app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(1100px 420px at 15% 0%, rgba(120,200,255,.08), transparent 62%),
+    radial-gradient(900px 360px at 100% 10%, rgba(120,200,255,.05), transparent 60%);
 }
 
 .vw-navbar {
   position: sticky;
   top: 0;
   z-index: 10;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid rgba(120, 200, 255, 0.14);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.30);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   min-height: 84px;
+  box-shadow: 0 18px 70px rgba(0,0,0,.42);
 }
 
 .vw-navbar-inner {
@@ -863,4 +875,42 @@ input {
   display: grid;
   gap: 16px;
   margin-top: 20px;
+}
+
+
+.vw-dashboard-hero {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.vw-dashboard-hero .vw-page-title {
+  font-size: clamp(1.9rem, 4.6vw, 3rem);
+}
+
+.vw-module-card {
+  min-height: 280px;
+}
+
+.vw-module-card .vw-card-copy {
+  max-width: 38rem;
+}
+
+@media (max-width: 767.98px) {
+  .vw-dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .vw-section-card {
+    padding: 20px;
+  }
+
+  .vw-dashboard-hero .vw-page-title {
+    font-size: clamp(1.7rem, 8vw, 2.35rem);
+    max-width: 11ch;
+  }
+
+  .vw-module-header {
+    align-items: flex-start;
+  }
 }
