@@ -74,3 +74,10 @@ export async function updateCallSheet(
   })
   return parseJson(response)
 }
+
+export async function deleteCallSheet(id: string): Promise<{ ok: true; id: string }> {
+  const response = await authFetch(`${API_BASE_URL}/callsheets/${id}`, {
+    method: 'DELETE',
+  })
+  return parseJson(response)
+}

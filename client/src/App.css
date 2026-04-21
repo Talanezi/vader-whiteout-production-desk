@@ -914,3 +914,143 @@ input {
     align-items: flex-start;
   }
 }
+
+/* editor cleanup */
+.section-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.section-switcher-item {
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+  color: var(--ink);
+  padding: 14px 16px;
+  cursor: pointer;
+  min-height: 84px;
+}
+
+.section-switcher-item.is-active {
+  border-color: rgba(120, 200, 255, 0.24);
+  background: rgba(255,255,255,0.05);
+}
+
+.section-switcher-title {
+  display: block;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.section-switcher-blurb {
+  display: none !important;
+}
+
+.preview-wrap {
+  display: block;
+  min-width: 0;
+}
+
+.preview-toolbar {
+  display: none !important;
+}
+
+.pdf-preview {
+  margin-top: 0;
+}
+
+.compact-row-card {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  overflow: hidden;
+}
+
+.compact-row-toggle {
+  width: 100%;
+  border: 0;
+  background: rgba(255,255,255,0.02);
+  color: var(--ink);
+  text-align: left;
+  padding: 16px 18px;
+  cursor: pointer;
+}
+
+.compact-row-toggle.is-open {
+  background: rgba(255,255,255,0.04);
+}
+
+.compact-row-title {
+  display: block;
+  font-weight: 800;
+  font-size: 1.02rem;
+  line-height: 1.15;
+}
+
+.compact-row-meta {
+  display: none;
+}
+
+.compact-row-body {
+  padding: 18px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.field-grid-2,
+.field-grid-3 {
+  display: grid;
+  gap: 14px;
+}
+
+.field-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.field input,
+.inline-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.vw-btn-danger {
+  border-color: rgba(255, 150, 150, 0.18);
+  color: #ffd2d2;
+}
+
+.vw-btn-danger:hover {
+  background: rgba(255, 120, 120, 0.08);
+}
+
+@media (max-width: 991px) {
+  .section-switcher {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid-2,
+  .field-grid-3,
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+  }
+}

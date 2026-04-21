@@ -7,23 +7,14 @@ type Props = {
 function CallSheetPreview({ draft }: Props) {
   return (
     <section className="preview-wrap">
-      <div className="preview-toolbar panel">
-        <div>
-          <p className="kicker">Preview</p>
-          <h3 className="preview-title">Document preview</h3>
-        </div>
-
-        <button className="ghost-btn">Generate PDF</button>
-      </div>
-
       <div className="pdf-preview panel">
         <div className="pdf-page">
           <div className="pdf-header">
             <div>
               <div className="pdf-brand">VADER: WHITEOUT</div>
-              <div className="pdf-doc-title">{draft.title.toUpperCase()}</div>
+              <div className="pdf-doc-title">{(draft.title || 'UNTITLED CALL SHEET').toUpperCase()}</div>
               <div className="pdf-subline">
-                {draft.productionDate} • Primary Crew Call: {draft.primaryCallTime}
+                {draft.productionDate ? `${draft.productionDate} • ` : ''}Primary Crew Call: {draft.primaryCallTime || '—'}
               </div>
             </div>
           </div>
@@ -41,21 +32,21 @@ function CallSheetPreview({ draft }: Props) {
 
             <div className="pdf-card center">
               <div className="pdf-card-title">Call</div>
-              <div className="pdf-call-big">{draft.primaryCallTime}</div>
-              <div className="pdf-date-small">{draft.productionDate}</div>
+              <div className="pdf-call-big">{draft.primaryCallTime || '—'}</div>
+              <div className="pdf-date-small">{draft.productionDate || 'No date set'}</div>
             </div>
 
             <div className="pdf-card">
               <div className="pdf-card-title">Weather</div>
-              <div className="pdf-stack-line">At call: {draft.weatherTempAtCall}</div>
-              <div className="pdf-stack-line">High: {draft.weatherHigh}</div>
-              <div className="pdf-stack-line">Low: {draft.weatherLow}</div>
-              <div className="pdf-stack-line">{draft.weatherSummary}</div>
+              <div className="pdf-stack-line">At call: {draft.weatherTempAtCall || '—'}</div>
+              <div className="pdf-stack-line">High: {draft.weatherHigh || '—'}</div>
+              <div className="pdf-stack-line">Low: {draft.weatherLow || '—'}</div>
+              <div className="pdf-stack-line">{draft.weatherSummary || '—'}</div>
             </div>
 
             <div className="pdf-card">
               <div className="pdf-card-title">Main Set</div>
-              <div className="pdf-stack-line strong">{draft.mainSetName}</div>
+              <div className="pdf-stack-line strong">{draft.mainSetName || '—'}</div>
               {draft.mainSetAddress.map((line) => (
                 <div key={line} className="pdf-stack-line">{line}</div>
               ))}
@@ -110,6 +101,32 @@ function CallSheetPreview({ draft }: Props) {
                     <td>{cast.email}</td>
                     <td>{cast.callTime}</td>
                     <td>{cast.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pdf-table-block">
+            <div className="pdf-section-title">Crew Calls</div>
+            <table className="pdf-table">
+              <thead>
+                <tr>
+                  <th>Department / Role</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Call</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft.crewCalls.map((crew) => (
+                  <tr key={crew.id}>
+                    <td>{crew.departmentRole}</td>
+                    <td>{crew.crewName}</td>
+                    <td>{crew.email}</td>
+                    <td>{crew.callTime}</td>
+                    <td>{crew.notes}</td>
                   </tr>
                 ))}
               </tbody>
