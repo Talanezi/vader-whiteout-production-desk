@@ -119,7 +119,7 @@ function CallSheetEditorPage() {
     patch: Partial<T>,
   ) => {
     if (!draft) return
-    const next = (draft[field] as T[]).map((item) =>
+    const next = ((draft[field] as unknown) as T[]).map((item) =>
       item.id === idValue ? { ...item, ...patch } : item,
     )
     patchDraft({ [field]: next } as Partial<CallSheetDraft>)
