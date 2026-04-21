@@ -56,9 +56,11 @@ export class CallsheetsService {
     const row = await this.callsheetsRepo.findOne({
       where: { id, CreatedByUserID: userID },
     });
+
     if (!row) {
       throw new NotFoundException('Call sheet not found');
     }
+
     return this.entityToDraft(row);
   }
 
@@ -82,6 +84,7 @@ export class CallsheetsService {
     const existing = await this.callsheetsRepo.findOne({
       where: { id, CreatedByUserID: userID },
     });
+
     if (!existing) {
       throw new NotFoundException('Call sheet not found');
     }
