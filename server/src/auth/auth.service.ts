@@ -19,7 +19,7 @@ export class AuthService {
   }
 
   async verifySchedulerToken(token: string) {
-    const response = await fetch(`${this.getSchedulerApiBaseUrl()}/api/users/me`, {
+    const response = await fetch(`${this.getSchedulerApiBaseUrl()}/api/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
