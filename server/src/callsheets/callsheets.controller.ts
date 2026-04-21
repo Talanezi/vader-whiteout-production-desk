@@ -10,32 +10,25 @@ export class CallsheetsController {
   constructor(private readonly callsheetsService: CallsheetsService) {}
 
   @Get()
-  list(@Req() req: Request & { user: { userID: number } }) {
-    return this.callsheetsService.list(req.user.userID);
+  list() {
+    return this.callsheetsService.list();
   }
 
   @Get(':id')
-  getById(
-    @Req() req: Request & { user: { userID: number } },
-    @Param('id') id: string,
-  ) {
-    return this.callsheetsService.getById(req.user.userID, id);
+  getById(@Param('id') id: string) {
+    return this.callsheetsService.getById(id);
   }
 
   @Post()
   create(
-    @Req() req: Request & { user: { userID: number } },
+    @Req() req: Request & { user?: { userID: number } },
     @Body() payload: Partial<CallSheetDraft>,
   ) {
-    return this.callsheetsService.create(req.user.userID, payload);
+    return this.callsheetsService.create(req.user?.userID ?? null, payload);
   }
 
   @Put(':id')
-  update(
-    @Req() req: Request & { user: { userID: number } },
-    @Param('id') id: string,
-    @Body() payload: Partial<CallSheetDraft>,
-  ) {
-    return this.callsheetsService.update(req.user.userID, id, payload);
+  update(@Param('id') id: string, @Body() payload: Partial<CallSheetDraft>) {
+    return this.callsheetsService.update(id, payload);
   }
 }

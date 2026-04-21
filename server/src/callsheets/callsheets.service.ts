@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -7,6 +7,8 @@ import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
 
 @Injectable()
 export class CallsheetsService {
+  private readonly logger = new Logger(CallsheetsService.name);
+
   constructor(
     @InjectRepository(CallSheetDraftEntity)
     private readonly callsheetsRepo: Repository<CallSheetDraftEntity>,
@@ -40,9 +42,8 @@ export class CallsheetsService {
     return this.normalizeDraft(entity.id, entity.payload as Partial<CallSheetDraft>);
   }
 
-  async list(userID: number) {
+  async list() {
     const rows = await this.callsheetsRepo.find({
-      where: { CreatedByUserID: userID },
       order: { updatedAt: 'DESC' },
     });
 
@@ -52,9 +53,9 @@ export class CallsheetsService {
     };
   }
 
-  async getById(userID: number, id: string) {
+  async getById(id: string) {
     const row = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
     if (!row) {
       throw new NotFoundException('Call sheet not found');
@@ -62,25 +63,33 @@ export class CallsheetsService {
     return this.entityToDraft(row);
   }
 
-  async create(userID: number, payload?: Partial<CallSheetDraft>) {
+  async create(userID: number | null, payload?: Partial<CallSheetDraft>) {
     const id = payload?.id?.trim() || `draft-${randomUUID().slice(0, 8)}`;
     const draft = this.normalizeDraft(id, payload);
 
     const row = this.callsheetsRepo.create({
       id: draft.id,
-      CreatedByUserID: userID,
+      CreatedByUserID: userID ?? null,
       title: draft.title,
       productionDate: draft.productionDate,
       payload: draft,
     });
 
-    const saved = await this.callsheetsRepo.save(row);
-    return this.entityToDraft(saved);
+    try {
+      const saved = await this.callsheetsRepo.save(row);
+      return this.entityToDraft(saved);
+    } catch (error) {
+      this.logger.error(
+        `Failed to create call sheet id=${draft.id} createdBy=${userID ?? 'null'}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to save call sheet draft');
+    }
   }
 
-  async update(userID: number, id: string, payload: Partial<CallSheetDraft>) {
+  async update(id: string, payload: Partial<CallSheetDraft>) {
     const existing = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
     if (!existing) {
       throw new NotFoundException('Call sheet not found');
@@ -96,7 +105,15 @@ export class CallsheetsService {
     existing.productionDate = merged.productionDate;
     existing.payload = merged;
 
-    const saved = await this.callsheetsRepo.save(existing);
-    return this.entityToDraft(saved);
+    try {
+      const saved = await this.callsheetsRepo.save(existing);
+      return this.entityToDraft(saved);
+    } catch (error) {
+      this.logger.error(
+        `Failed to update call sheet id=${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to update call sheet draft');
+    }
   }
 }
