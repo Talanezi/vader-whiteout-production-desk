@@ -39,8 +39,8 @@ function AppShell() {
               </>
             )}
 
-            <a className="vw-nav-link" href="/scheduler/">
-              Scheduler
+            <a className="vw-nav-link" href="/apps/">
+              Apps
             </a>
           </nav>
         </div>
