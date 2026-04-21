@@ -1,6 +1,6 @@
 export declare class CallSheetDraftEntity {
     id: string;
-    CreatedByUserID: number;
+    CreatedByUserID: number | null;
     title: string;
     productionDate: string;
     payload: Record<string, unknown>;

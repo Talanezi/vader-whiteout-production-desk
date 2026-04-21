@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CallsheetsModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const auth_module_1 = require("../auth/auth.module");
 const callsheets_controller_1 = require("./callsheets.controller");
 const callsheets_service_1 = require("./callsheets.service");
 const callsheet_draft_entity_1 = require("./entities/callsheet-draft.entity");
@@ -17,7 +18,10 @@ let CallsheetsModule = class CallsheetsModule {
 exports.CallsheetsModule = CallsheetsModule;
 exports.CallsheetsModule = CallsheetsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([callsheet_draft_entity_1.CallSheetDraftEntity])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([callsheet_draft_entity_1.CallSheetDraftEntity]),
+            auth_module_1.AuthModule,
+        ],
         controllers: [callsheets_controller_1.CallsheetsController],
         providers: [callsheets_service_1.CallsheetsService],
         exports: [callsheets_service_1.CallsheetsService],

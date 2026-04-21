@@ -80,6 +80,20 @@ let CallsheetsService = class CallsheetsService {
         const saved = await this.callsheetsRepo.save(row);
         return this.entityToDraft(saved);
     }
+    async duplicate(userID, id) {
+        const existing = await this.callsheetsRepo.findOne({
+            where: { id, CreatedByUserID: userID },
+        });
+        if (!existing) {
+            throw new common_1.NotFoundException('Call sheet not found');
+        }
+        const draft = this.entityToDraft(existing);
+        return this.create(userID, {
+            ...draft,
+            id: undefined,
+            title: `${draft.title || 'Untitled Call Sheet'} Copy`,
+        });
+    }
     async update(userID, id, payload) {
         const existing = await this.callsheetsRepo.findOne({
             where: { id, CreatedByUserID: userID },
@@ -97,6 +111,16 @@ let CallsheetsService = class CallsheetsService {
         existing.payload = merged;
         const saved = await this.callsheetsRepo.save(existing);
         return this.entityToDraft(saved);
+    }
+    async remove(userID, id) {
+        const existing = await this.callsheetsRepo.findOne({
+            where: { id, CreatedByUserID: userID },
+        });
+        if (!existing) {
+            throw new common_1.NotFoundException('Call sheet not found');
+        }
+        await this.callsheetsRepo.remove(existing);
+        return { ok: true, id };
     }
 };
 exports.CallsheetsService = CallsheetsService;

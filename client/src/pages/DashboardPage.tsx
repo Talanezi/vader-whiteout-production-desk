@@ -10,12 +10,15 @@ function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
+
     if (!token) {
       setLoading(false)
+      setItems([])
+      setError(null)
       return
     }
 
-    let active = true
     listCallSheets()
       .then((data) => {
         if (!active) return
@@ -24,6 +27,7 @@ function DashboardPage() {
       })
       .catch((err: unknown) => {
         if (!active) return
+        setItems([])
         setError(err instanceof Error ? err.message : 'Failed to load call sheets')
       })
       .finally(() => {
@@ -35,29 +39,6 @@ function DashboardPage() {
       active = false
     }
   }, [token])
-
-  if (!token) {
-    return (
-      <div className="vw-page-wrap">
-        <section className="vw-section-card vw-auth-card">
-          <p className="vw-kicker">Production Desk</p>
-          <h1 className="vw-page-title">Please Log In</h1>
-          <p className="vw-page-note">
-            Production Desk uses the same scheduler session. Log in through scheduler, then come back here.
-          </p>
-
-          <div className="vw-actions-row">
-            <a className="vw-btn vw-btn-primary" href="/scheduler/#/login">
-              Log In
-            </a>
-            <a className="vw-btn" href="/apps/">
-              Apps
-            </a>
-          </div>
-        </section>
-      </div>
-    )
-  }
 
   return (
     <div className="vw-page-wrap">

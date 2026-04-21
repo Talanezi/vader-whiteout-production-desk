@@ -15,7 +15,6 @@ const app_service_1 = require("./app.service");
 const auth_module_1 = require("./auth/auth.module");
 const callsheets_module_1 = require("./callsheets/callsheets.module");
 const callsheet_draft_entity_1 = require("./callsheets/entities/callsheet-draft.entity");
-const user_entity_1 = require("./users/user.entity");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,7 +34,7 @@ exports.AppModule = AppModule = __decorate([
                     ssl: configService.get('DATABASE_URL')?.includes('railway')
                         ? { rejectUnauthorized: false }
                         : false,
-                    entities: [callsheet_draft_entity_1.CallSheetDraftEntity, user_entity_1.UserEntity],
+                    entities: [callsheet_draft_entity_1.CallSheetDraftEntity],
                 }),
             }),
             callsheets_module_1.CallsheetsModule,

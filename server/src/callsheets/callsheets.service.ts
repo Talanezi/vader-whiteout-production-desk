@@ -80,6 +80,23 @@ export class CallsheetsService {
     return this.entityToDraft(saved);
   }
 
+  async duplicate(userID: number, id: string) {
+    const existing = await this.callsheetsRepo.findOne({
+      where: { id, CreatedByUserID: userID },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Call sheet not found');
+    }
+
+    const draft = this.entityToDraft(existing);
+    return this.create(userID, {
+      ...draft,
+      id: undefined,
+      title: `${draft.title || 'Untitled Call Sheet'} Copy`,
+    });
+  }
+
   async update(userID: number, id: string, payload: Partial<CallSheetDraft>) {
     const existing = await this.callsheetsRepo.findOne({
       where: { id, CreatedByUserID: userID },

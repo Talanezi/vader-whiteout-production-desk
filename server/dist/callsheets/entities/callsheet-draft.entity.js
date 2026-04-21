@@ -19,8 +19,8 @@ __decorate([
     __metadata("design:type", String)
 ], CallSheetDraftEntity.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'integer' }),
-    __metadata("design:type", Number)
+    (0, typeorm_1.Column)({ type: 'integer', nullable: true }),
+    __metadata("design:type", Object)
 ], CallSheetDraftEntity.prototype, "CreatedByUserID", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 255, default: '' }),

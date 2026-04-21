@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:18-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -9,13 +9,22 @@ WORKDIR /app/server
 RUN npm install
 
 COPY server/src ./src
-
 RUN npm run build
 
-
-FROM node:18-alpine AS runner
+FROM node:18-bookworm-slim AS runner
 
 WORKDIR /app/server
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-latex-base \
+    texlive-latex-recommended \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    lmodern \
+    ghostscript \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/server/package.json ./package.json
 COPY --from=builder /app/server/package-lock.json ./package-lock.json

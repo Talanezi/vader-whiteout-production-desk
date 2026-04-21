@@ -12,5 +12,10 @@ export declare class CallsheetsService {
     }>;
     getById(userID: number, id: string): Promise<CallSheetDraft>;
     create(userID: number, payload?: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
+    duplicate(userID: number, id: string): Promise<CallSheetDraft>;
     update(userID: number, id: string, payload: Partial<CallSheetDraft>): Promise<CallSheetDraft>;
+    remove(userID: number, id: string): Promise<{
+        ok: boolean;
+        id: string;
+    }>;
 }

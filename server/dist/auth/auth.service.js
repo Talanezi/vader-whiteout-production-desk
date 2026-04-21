@@ -5,71 +5,47 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const jwt_1 = require("@nestjs/jwt");
-const bcrypt = require("bcrypt");
-const typeorm_2 = require("typeorm");
-const user_entity_1 = require("../users/user.entity");
 let AuthService = class AuthService {
-    constructor(usersRepo, jwtService) {
-        this.usersRepo = usersRepo;
-        this.jwtService = jwtService;
+    getSchedulerApiBaseUrl() {
+        return (process.env.SCHEDULER_API_BASE_URL ||
+            'https://vader-whiteout-scheduler-production.up.railway.app').replace(/\/$/, '');
     }
-    async validateUser(email, password) {
-        const user = await this.usersRepo.findOne({
-            where: { Email: email.trim().toLowerCase() },
-        });
-        if (!user || !user.PasswordHash) {
-            throw new common_1.UnauthorizedException('Invalid email or password');
-        }
-        const ok = await bcrypt.compare(password, user.PasswordHash);
-        if (!ok) {
-            throw new common_1.UnauthorizedException('Invalid email or password');
-        }
-        return user;
-    }
-    async login(email, password) {
-        const user = await this.validateUser(email, password);
-        const token = await this.jwtService.signAsync({
-            sub: user.ID,
-            email: user.Email,
-            name: user.Name,
-        });
-        return {
-            token,
-            user: {
-                id: user.ID,
-                email: user.Email,
-                name: user.Name,
+    async verifySchedulerToken(token) {
+        const response = await fetch(`${this.getSchedulerApiBaseUrl()}/api/me`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
             },
+        });
+        if (!response.ok) {
+            throw new common_1.UnauthorizedException('Invalid scheduler session');
+        }
+        const user = (await response.json());
+        const userID = user.userID ?? user.id ?? user.ID;
+        const email = user.email ?? user.Email;
+        const name = user.name ?? user.Name;
+        if (!userID || !email || !name) {
+            throw new common_1.UnauthorizedException('Invalid scheduler session');
+        }
+        return {
+            userID: Number(userID),
+            email,
+            name,
         };
     }
-    async me(userID) {
-        const user = await this.usersRepo.findOne({ where: { ID: userID } });
-        if (!user) {
-            throw new common_1.UnauthorizedException('User not found');
-        }
+    async meFromToken(token) {
+        const user = await this.verifySchedulerToken(token);
         return {
-            id: user.ID,
-            email: user.Email,
-            name: user.Name,
+            id: user.userID,
+            email: user.email,
+            name: user.name,
         };
     }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.UserEntity)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        jwt_1.JwtService])
+    (0, common_1.Injectable)()
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

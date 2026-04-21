@@ -1054,3 +1054,45 @@ input {
     justify-content: flex-start;
   }
 }
+
+.section-switcher-compact {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 0 14px;
+}
+
+.section-switcher-compact .section-switcher-item {
+  min-height: 64px;
+  padding: 10px 8px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  border-radius: 14px;
+}
+
+.section-switcher-icon {
+  display: block;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.section-switcher-compact .section-switcher-title {
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.1;
+}
+
+@media (max-width: 1200px) {
+  .section-switcher-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .section-switcher-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
