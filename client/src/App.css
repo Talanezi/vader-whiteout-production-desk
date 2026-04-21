@@ -73,7 +73,7 @@ input {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #f4f4f4;
-  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
   white-space: nowrap;
 }
 
