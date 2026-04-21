@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 
 function AppShell() {
   return (
@@ -10,11 +10,11 @@ function AppShell() {
           </Link>
 
           <nav className="vw-nav-links">
-            <Link to="/" className="vw-nav-link">
+            <NavLink to="/" end className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
               Dashboard
-            </Link>
-            <a className="vw-nav-link" href="/apps/">
-              Apps
+            </NavLink>
+            <a className="vw-nav-link" href="/scheduler/">
+              Scheduler
             </a>
           </nav>
         </div>
