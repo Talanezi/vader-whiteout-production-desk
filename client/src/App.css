@@ -54,14 +54,14 @@ input {
   background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
-  min-height: 82px;
+  min-height: 84px;
 }
 
 .vw-navbar-inner {
-  width: min(1320px, calc(100% - 28px));
-  max-width: 1320px;
+  width: min(1200px, calc(100% - 32px));
+  max-width: 1200px;
   margin: 0 auto;
-  min-height: 82px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -73,7 +73,7 @@ input {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #f4f4f4;
-  font-size: clamp(1.05rem, 2vw, 1.55rem);
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
   white-space: nowrap;
 }
 
@@ -101,12 +101,12 @@ input {
 }
 
 .vw-nav-link.is-active {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 .vw-main {
-  width: min(1320px, calc(100% - 28px));
-  max-width: 1320px;
+  width: min(1200px, calc(100% - 32px));
+  max-width: 1200px;
   margin: 0 auto;
   padding-top: 24px;
   padding-bottom: 48px;
@@ -852,17 +852,6 @@ input {
   }
 }
 
-
-.vw-nav-user {
-  padding: 10px 6px;
-  color: rgba(244, 244, 244, 0.72);
-  font-weight: 700;
-}
-
-.vw-nav-button {
-  appearance: none;
-  font: inherit;
-}
 
 .vw-auth-card {
   max-width: 560px;

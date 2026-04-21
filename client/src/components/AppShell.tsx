@@ -1,14 +1,8 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { clearAuthSession, getAuthToken } from '../lib/api'
+import { Link, Outlet } from 'react-router-dom'
+import { getAuthToken } from '../lib/api'
 
 function AppShell() {
-  const navigate = useNavigate()
   const token = getAuthToken()
-
-  const handleLogout = () => {
-    clearAuthSession()
-    navigate('/login')
-  }
 
   return (
     <div className="vw-app-shell d-flex flex-column">
@@ -21,12 +15,12 @@ function AppShell() {
           <nav className="vw-nav-links">
             {token ? (
               <>
-                <NavLink to="/" end className={({ isActive }) => isActive ? 'vw-nav-link is-active' : 'vw-nav-link'}>
+                <Link to="/" className="vw-nav-link">
                   Dashboard
-                </NavLink>
-                <button className="vw-nav-link vw-nav-button" type="button" onClick={handleLogout}>
-                  Log Out
-                </button>
+                </Link>
+                <a className="vw-nav-link" href="/apps/">
+                  Apps
+                </a>
               </>
             ) : (
               <>
@@ -36,12 +30,11 @@ function AppShell() {
                 <a className="vw-nav-link" href="/scheduler/#/login">
                   Log In
                 </a>
+                <a className="vw-nav-link" href="/apps/">
+                  Apps
+                </a>
               </>
             )}
-
-            <a className="vw-nav-link" href="/apps/">
-              Apps
-            </a>
           </nav>
         </div>
       </header>
