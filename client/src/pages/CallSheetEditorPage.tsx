@@ -8,7 +8,7 @@ import type {
   EmergencyContact,
   SceneRow,
 } from '../data/mockCallSheet'
-import { deleteCallSheet, getCallSheet, updateCallSheet } from '../lib/api'
+import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, updateCallSheet } from '../lib/api'
 
 type SectionKey =
   | 'overview'
@@ -31,6 +31,8 @@ function CallSheetEditorPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('overview')
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({})
@@ -61,14 +63,14 @@ function CallSheetEditorPage() {
 
   const title = useMemo(() => draft?.title || 'Untitled Call Sheet', [draft])
 
-  const sections: { key: SectionKey; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'contacts', label: 'Emergency Contacts' },
-    { key: 'weather', label: 'Weather' },
-    { key: 'locations', label: 'Locations' },
-    { key: 'scenes', label: 'Scenes' },
-    { key: 'cast', label: 'Cast Calls' },
-    { key: 'crew', label: 'Crew Calls' },
+  const sections: { key: SectionKey; label: string; icon: string }[] = [
+    { key: 'overview', label: 'Overview', icon: '◫' },
+    { key: 'contacts', label: 'Contacts', icon: '✆' },
+    { key: 'weather', label: 'Weather', icon: '☼' },
+    { key: 'locations', label: 'Locations', icon: '⌂' },
+    { key: 'scenes', label: 'Scenes', icon: '◈' },
+    { key: 'cast', label: 'Cast', icon: '★' },
+    { key: 'crew', label: 'Crew', icon: '☰' },
   ]
 
   const patchDraft = (patch: Partial<CallSheetDraft>) => {
@@ -229,6 +231,34 @@ function CallSheetEditorPage() {
       setError(err instanceof Error ? err.message : 'Failed to delete call sheet')
     } finally {
       setDeleting(false)
+    }
+  }
+
+
+  const handleDuplicate = async () => {
+    if (!draft) return
+    try {
+      setDuplicating(true)
+      setError(null)
+      const copied = await duplicateCallSheet(draft.id)
+      navigate(`/callsheets/${copied.id}/edit`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate call sheet')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!draft) return
+    try {
+      setDownloadingPdf(true)
+      setError(null)
+      await downloadPdfFile(draft.id, draft.title)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to download PDF')
+    } finally {
+      setDownloadingPdf(false)
     }
   }
 
@@ -646,8 +676,11 @@ function CallSheetEditorPage() {
             <button className="vw-btn" type="button" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save Draft'}
             </button>
-            <button className="vw-btn vw-btn-primary" type="button">
-              Generate PDF
+            <button className="vw-btn vw-btn-primary" type="button" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+              {downloadingPdf ? 'Preparing…' : 'Download PDF'}
+            </button>
+            <button className="vw-btn" type="button" onClick={handleDuplicate} disabled={duplicating}>
+              {duplicating ? 'Duplicating…' : 'Duplicate'}
             </button>
             <button className="vw-btn vw-btn-danger" type="button" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete'}
@@ -657,7 +690,7 @@ function CallSheetEditorPage() {
 
         {error ? <div className="vw-inline-error">{error}</div> : null}
 
-        <div className="section-switcher">
+        <div className="section-switcher section-switcher-compact">
           {sections.map((section) => (
             <button
               key={section.key}
@@ -665,6 +698,7 @@ function CallSheetEditorPage() {
               className={`section-switcher-item ${activeSection === section.key ? 'is-active' : ''}`}
               onClick={() => setActiveSection(section.key)}
             >
+              <span className="section-switcher-icon" aria-hidden="true">{section.icon}</span>
               <span className="section-switcher-title">{section.label}</span>
             </button>
           ))}
