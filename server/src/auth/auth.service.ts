@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 type SchedulerMeResponse = {
+  userID?: number;
   ID?: number;
   id?: number;
   Email?: string;
@@ -31,7 +32,7 @@ export class AuthService {
 
     const user = (await response.json()) as SchedulerMeResponse;
 
-    const userID = user.id ?? user.ID;
+    const userID = user.userID ?? user.id ?? user.ID;
     const email = user.email ?? user.Email;
     const name = user.name ?? user.Name;
 
