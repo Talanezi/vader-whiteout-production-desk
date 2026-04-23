@@ -40,9 +40,8 @@ export class CallsheetsService {
     return this.normalizeDraft(entity.id, entity.payload as Partial<CallSheetDraft>);
   }
 
-  async list(userID: number) {
+  async list(_userID: number) {
     const rows = await this.callsheetsRepo.find({
-      where: { CreatedByUserID: userID },
       order: { updatedAt: 'DESC' },
     });
 
@@ -52,9 +51,9 @@ export class CallsheetsService {
     };
   }
 
-  async getById(userID: number, id: string) {
+  async getById(_userID: number, id: string) {
     const row = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
 
     if (!row) {
@@ -82,7 +81,7 @@ export class CallsheetsService {
 
   async duplicate(userID: number, id: string) {
     const existing = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
 
     if (!existing) {
@@ -97,9 +96,9 @@ export class CallsheetsService {
     });
   }
 
-  async update(userID: number, id: string, payload: Partial<CallSheetDraft>) {
+  async update(_userID: number, id: string, payload: Partial<CallSheetDraft>) {
     const existing = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
 
     if (!existing) {
@@ -120,9 +119,9 @@ export class CallsheetsService {
     return this.entityToDraft(saved);
   }
 
-  async remove(userID: number, id: string) {
+  async remove(_userID: number, id: string) {
     const existing = await this.callsheetsRepo.findOne({
-      where: { id, CreatedByUserID: userID },
+      where: { id },
     });
 
     if (!existing) {
