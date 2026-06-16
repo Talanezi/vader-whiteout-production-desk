@@ -191,6 +191,13 @@ select {
   box-shadow: var(--shadow);
 }
 
+.vw-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: none;
+}
+
 .vw-btn-primary {
   background: #ffffff;
   color: #0b0b0b;
@@ -322,6 +329,7 @@ select {
 
 .editor-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -802,6 +810,43 @@ select {
   color: #d8f5ff;
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.save-state-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: rgba(244, 244, 244, 0.76);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.save-state-badge-unsaved {
+  border-color: rgba(255, 210, 120, 0.22);
+  background: rgba(255, 210, 120, 0.08);
+  color: #ffe2a4;
+}
+
+.save-state-badge-saving {
+  border-color: rgba(120, 200, 255, 0.24);
+  background: rgba(120, 200, 255, 0.08);
+  color: #d8f5ff;
+}
+
+.save-state-badge-saved {
+  border-color: rgba(150, 255, 205, 0.18);
+  background: rgba(150, 255, 205, 0.06);
+  color: #c8ffe2;
+}
+
+.save-state-badge-failed {
+  border-color: rgba(255, 150, 150, 0.24);
+  background: rgba(255, 120, 120, 0.08);
+  color: #ffd2d2;
 }
 
 .editor-header {

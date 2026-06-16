@@ -22,6 +22,15 @@ type SectionKey =
   | 'cast'
   | 'crew'
 
+type SaveState = 'saved' | 'unsaved' | 'saving' | 'failed'
+
+const saveStateLabels: Record<SaveState, string> = {
+  saved: 'Saved',
+  unsaved: 'Unsaved changes',
+  saving: 'Saving…',
+  failed: 'Save failed',
+}
+
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 }
@@ -33,6 +42,7 @@ function CallSheetEditorPage() {
   const [draft, setDraft] = useState<CallSheetDraft | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('saved')
   const [deleting, setDeleting] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
@@ -48,6 +58,7 @@ function CallSheetEditorPage() {
       .then((data) => {
         if (!active) return
         setDraft(data)
+        setSaveState('saved')
         setError(null)
       })
       .catch((err: unknown) => {
@@ -82,6 +93,7 @@ function CallSheetEditorPage() {
       ...draft,
       ...patch,
     })
+    setSaveState('unsaved')
   }
 
   const updateField = (field: keyof CallSheetDraft, value: string) => {
@@ -90,6 +102,7 @@ function CallSheetEditorPage() {
       ...draft,
       [field]: value,
     })
+    setSaveState('unsaved')
   }
 
   const updateStringArrayItem = (
@@ -210,11 +223,14 @@ function CallSheetEditorPage() {
     if (!draft) return
     try {
       setSaving(true)
+      setSaveState('saving')
       setError(null)
       const saved = await updateCallSheet(draft.id, draft)
       setDraft(saved)
+      setSaveState('saved')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save call sheet')
+      setSaveState('failed')
     } finally {
       setSaving(false)
     }
@@ -275,6 +291,7 @@ function CallSheetEditorPage() {
 
   const currentStatus = draft.status || 'draft'
   const statusLabel = callSheetStatusLabels[currentStatus]
+  const saveStateLabel = saveStateLabels[saveState]
 
   const renderSection = () => {
     if (!draft) return null
@@ -690,6 +707,9 @@ function CallSheetEditorPage() {
           </div>
 
           <div className="editor-actions">
+            <span className={`save-state-badge save-state-badge-${saveState}`} aria-live="polite">
+              {saveStateLabel}
+            </span>
             <button className="vw-btn" type="button" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save Draft'}
             </button>
