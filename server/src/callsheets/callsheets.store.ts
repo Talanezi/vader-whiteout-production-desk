@@ -53,7 +53,8 @@ export const seedCallSheet: CallSheetDraft = {
       notes: 'Equipment pickup team'
     }
   ],
-  generalNotes: 'Builder shell only for now. PDF generation and real persistence come next.'
+  generalNotes: 'Builder shell only for now. PDF generation and real persistence come next.',
+  distributionNotes: ''
 };
 
 export const callSheetStore = new Map<string, CallSheetDraft>([

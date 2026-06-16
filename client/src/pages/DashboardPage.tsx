@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft, CallSheetStatus } from '../data/mockCallSheet'
-import { callSheetStatusLabels } from '../data/mockCallSheet'
-import { downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets } from '../lib/api'
+import { callSheetStatusLabels, callSheetStatuses } from '../data/mockCallSheet'
+import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets } from '../lib/api'
 
 type DashboardGroup = {
   title: string
   statuses: CallSheetStatus[]
   emptyCopy: string
 }
+
+type SortMode = 'production_date' | 'title'
 
 const workflowGroups: DashboardGroup[] = [
   {
@@ -45,6 +47,10 @@ function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | CallSheetStatus>('all')
+  const [sortMode, setSortMode] = useState<SortMode>('production_date')
 
   useEffect(() => {
     let active = true
@@ -79,8 +85,39 @@ function DashboardPage() {
 
   const getStatus = (item: CallSheetDraft): CallSheetStatus => item.status || 'draft'
 
+  const getDateTime = (value: string) => {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+
+  const filteredItems = items
+    .filter((item) => {
+      const matchesSearch = (item.title || 'Untitled Call Sheet').toLowerCase().includes(searchQuery.trim().toLowerCase())
+      const matchesStatus = statusFilter === 'all' || getStatus(item) === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      if (sortMode === 'title') {
+        return (a.title || 'Untitled Call Sheet').localeCompare(b.title || 'Untitled Call Sheet')
+      }
+
+      const aTime = getDateTime(a.productionDate)
+      const bTime = getDateTime(b.productionDate)
+
+      if (aTime !== null && bTime !== null) return aTime - bTime
+      if (aTime !== null) return -1
+      if (bTime !== null) return 1
+      return (a.title || 'Untitled Call Sheet').localeCompare(b.title || 'Untitled Call Sheet')
+    })
+
   const getGroupItems = (statuses: CallSheetStatus[]) =>
-    items.filter((item) => statuses.includes(getStatus(item)))
+    filteredItems.filter((item) => statuses.includes(getStatus(item)))
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setSortMode('production_date')
+  }
 
   const handleDuplicate = async (item: CallSheetDraft) => {
     try {
@@ -107,15 +144,31 @@ function DashboardPage() {
     }
   }
 
+  const handleDelete = async (item: CallSheetDraft) => {
+    const ok = window.confirm(`Delete "${item.title || 'Untitled Call Sheet'}"?`)
+    if (!ok) return
+
+    try {
+      setDeletingId(item.id)
+      setError(null)
+      await deleteCallSheet(item.id)
+      setItems((prev) => prev.filter((candidate) => candidate.id !== item.id))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete call sheet')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const renderCallSheetRow = (item: CallSheetDraft) => {
     const status = getStatus(item)
 
     return (
       <div key={item.id} className="vw-list-row vw-call-sheet-row">
-        <div className="vw-list-copy">
+          <div className="vw-list-copy">
           <div className="vw-list-title">{item.title || 'Untitled Call Sheet'}</div>
           <div className="vw-list-meta">
-            {item.productionDate || 'No date set'} • Primary Call {item.primaryCallTime || 'Not set'}
+            {item.productionDate || 'No production date set'} • Primary Crew Call {item.primaryCallTime || 'Not set'}
           </div>
         </div>
 
@@ -131,6 +184,9 @@ function DashboardPage() {
           </button>
           <button className="vw-inline-action" type="button" onClick={() => handleDuplicate(item)} disabled={duplicatingId === item.id}>
             {duplicatingId === item.id ? 'Duplicating…' : 'Duplicate'}
+          </button>
+          <button className="vw-inline-action vw-inline-action-danger" type="button" onClick={() => handleDelete(item)} disabled={deletingId === item.id}>
+            {deletingId === item.id ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -159,8 +215,37 @@ function DashboardPage() {
       ) : error ? (
         <div className="vw-empty-block">{error}</div>
       ) : items.length === 0 ? (
-        <div className="vw-empty-block">No call sheets yet.</div>
+        <div className="vw-empty-block">No call sheets yet. Start with a template to build the first production day.</div>
       ) : null}
+
+      <section className="dashboard-controls panel">
+        <label className="dashboard-control">
+          <span>Search title</span>
+          <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search call sheets" />
+        </label>
+
+        <label className="dashboard-control">
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | CallSheetStatus)}>
+            <option value="all">All statuses</option>
+            {callSheetStatuses.map((status) => (
+              <option key={status} value={status}>{callSheetStatusLabels[status]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="dashboard-control">
+          <span>Sort</span>
+          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+            <option value="production_date">Production date</option>
+            <option value="title">Title</option>
+          </select>
+        </label>
+
+        <button className="vw-btn" type="button" onClick={clearFilters} disabled={!searchQuery && statusFilter === 'all' && sortMode === 'production_date'}>
+          Clear
+        </button>
+      </section>
 
       <section className="vw-dashboard-grid vw-workflow-grid">
         {workflowGroups.map((group) => {

@@ -48,6 +48,7 @@ export class CallsheetsService {
       castCalls: payload?.castCalls || [],
       crewCalls: payload?.crewCalls || [],
       generalNotes: payload?.generalNotes || '',
+      distributionNotes: payload?.distributionNotes || '',
     };
   }
 

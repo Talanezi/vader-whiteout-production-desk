@@ -61,4 +61,5 @@ export type CallSheetDraft = {
   castCalls: CastCallRow[];
   crewCalls: CrewCallRow[];
   generalNotes: string;
+  distributionNotes: string;
 };

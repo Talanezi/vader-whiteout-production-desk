@@ -27,6 +27,7 @@ type SaveState = 'saved' | 'unsaved' | 'manual-saving' | 'autosaving' | 'autosav
 type ReadinessItem = {
   label: string
   complete: boolean
+  severity: 'critical' | 'recommended'
 }
 
 const saveStateLabels: Record<SaveState, string> = {
@@ -82,18 +83,40 @@ function insertAfter<T extends { id: string }>(items: T[], idValue: string, item
   return next
 }
 
-function getReadinessItems(draft: CallSheetDraft): ReadinessItem[] {
+function getReadinessItems(draft: CallSheetDraft, status: CallSheetStatus): ReadinessItem[] {
   return [
-    { label: 'Title', complete: hasText(draft.title) },
-    { label: 'Production date', complete: hasText(draft.productionDate) },
-    { label: 'Primary crew call', complete: hasText(draft.primaryCallTime) },
-    { label: 'Main set name', complete: hasText(draft.mainSetName) },
-    { label: 'Nearest hospital name', complete: hasText(draft.nearestHospitalName) },
-    { label: 'Scenes', complete: draft.scenes.length > 0 },
-    { label: 'Cast calls', complete: draft.castCalls.length > 0 },
-    { label: 'Crew calls', complete: draft.crewCalls.length > 0 },
-    { label: 'Emergency contacts', complete: draft.emergencyContacts.length > 0 },
+    { label: 'Title', complete: hasText(draft.title), severity: 'critical' },
+    { label: 'Production date', complete: hasText(draft.productionDate), severity: 'critical' },
+    { label: 'Primary crew call', complete: hasText(draft.primaryCallTime), severity: 'critical' },
+    { label: 'Main set name', complete: hasText(draft.mainSetName), severity: 'critical' },
+    { label: 'Nearest hospital name', complete: hasText(draft.nearestHospitalName), severity: 'critical' },
+    { label: 'Emergency contacts', complete: draft.emergencyContacts.length > 0, severity: 'critical' },
+    { label: 'Scenes', complete: draft.scenes.length > 0, severity: 'recommended' },
+    { label: 'Cast calls', complete: draft.castCalls.length > 0, severity: 'recommended' },
+    { label: 'Crew calls', complete: draft.crewCalls.length > 0, severity: 'recommended' },
+    { label: 'General notes', complete: hasText(draft.generalNotes), severity: 'recommended' },
+    {
+      label: 'Revision / distribution notes',
+      complete: status === 'revised' || status === 'published' ? hasText(draft.distributionNotes) : true,
+      severity: 'recommended',
+    },
   ]
+}
+
+function parsePeopleLines(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separator = line.includes('|') ? '|' : ','
+      const [name = '', role = '', email = '', callTime = '', notes = ''] = line
+        .split(separator)
+        .map((part) => part.trim())
+
+      return { name, role, email, callTime, notes }
+    })
+    .filter((person) => person.name || person.role || person.email || person.callTime || person.notes)
 }
 
 function CallSheetEditorPage() {
@@ -113,6 +136,8 @@ function CallSheetEditorPage() {
   const [error, setError] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('overview')
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({})
+  const [castQuickAddText, setCastQuickAddText] = useState('')
+  const [crewQuickAddText, setCrewQuickAddText] = useState('')
   const dirtyRevisionRef = useRef(0)
   const lastAutosaveAttemptRevision = useRef(0)
 
@@ -398,6 +423,50 @@ function CallSheetEditorPage() {
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
+  const quickAddCastCalls = () => {
+    if (!draft) return
+    const rows = parsePeopleLines(castQuickAddText)
+    if (rows.length === 0) return
+
+    const nextRows: CastCallRow[] = rows.map((row) => ({
+      id: uid('cast'),
+      castName: row.name,
+      roleName: row.role,
+      email: row.email,
+      callTime: row.callTime,
+      notes: row.notes,
+    }))
+
+    patchDraft({ castCalls: [...draft.castCalls, ...nextRows] })
+    setCastQuickAddText('')
+    setOpenRows((prev) => ({
+      ...prev,
+      ...Object.fromEntries(nextRows.map((row) => [row.id, true])),
+    }))
+  }
+
+  const quickAddCrewCalls = () => {
+    if (!draft) return
+    const rows = parsePeopleLines(crewQuickAddText)
+    if (rows.length === 0) return
+
+    const nextRows: CrewCallRow[] = rows.map((row) => ({
+      id: uid('crew'),
+      departmentRole: row.role,
+      crewName: row.name,
+      email: row.email,
+      callTime: row.callTime,
+      notes: row.notes,
+    }))
+
+    patchDraft({ crewCalls: [...draft.crewCalls, ...nextRows] })
+    setCrewQuickAddText('')
+    setOpenRows((prev) => ({
+      ...prev,
+      ...Object.fromEntries(nextRows.map((row) => [row.id, true])),
+    }))
+  }
+
   const handleSave = () => {
     void saveDraft('manual')
   }
@@ -459,21 +528,77 @@ function CallSheetEditorPage() {
   const statusLabel = callSheetStatusLabels[currentStatus]
   const saveStateLabel = saveStateLabels[saveState]
   const workflowAction = workflowActions[currentStatus]
-  const readinessItems = getReadinessItems(draft)
+  const readinessItems = getReadinessItems(draft, currentStatus)
   const missingReadinessItems = readinessItems.filter((item) => !item.complete)
+  const missingCriticalItems = missingReadinessItems.filter((item) => item.severity === 'critical')
   const readinessCompleteCount = readinessItems.length - missingReadinessItems.length
 
-  const handleWorkflowAction = () => {
-    if (workflowAction.nextStatus === 'published' && missingReadinessItems.length > 0) {
-      const missingList = missingReadinessItems.map((item) => `- ${item.label}`).join('\n')
-      const ok = window.confirm(
-        `This call sheet is missing key publishing details:\n\n${missingList}\n\nPublish anyway?`,
-      )
-      if (!ok) return
+  const confirmStatusChange = (nextStatus: CallSheetStatus) => {
+    if (nextStatus === currentStatus) return false
+
+    if (nextStatus === 'published') {
+      const missingList = missingCriticalItems.map((item) => `- ${item.label}`).join('\n')
+      const message = missingCriticalItems.length > 0
+        ? `This call sheet is missing critical publishing details:\n\n${missingList}\n\nPublish anyway?`
+        : 'Publish this call sheet for distribution?'
+      const ok = window.confirm(message)
+      if (!ok) return false
     }
 
-    patchDraft({ status: workflowAction.nextStatus })
+    if (currentStatus === 'published' && nextStatus === 'revised') {
+      const note = hasText(draft.distributionNotes)
+        ? 'Create a revision from this published call sheet?'
+        : 'Create a revision from this published call sheet?\n\nConsider adding Revision / Distribution Notes so the crew can see what changed.'
+      const ok = window.confirm(
+        note,
+      )
+      if (!ok) return false
+    }
+
+    return true
   }
+
+  const handleStatusChange = (nextStatus: CallSheetStatus) => {
+    if (!confirmStatusChange(nextStatus)) return
+    patchDraft({ status: nextStatus })
+  }
+
+  const handleWorkflowAction = () => {
+    handleStatusChange(workflowAction.nextStatus)
+  }
+
+  const renderProductionSummary = () => (
+    <section className="production-summary panel">
+      <div className="summary-item">
+        <span>Status</span>
+        <strong>{statusLabel}</strong>
+      </div>
+      <div className="summary-item">
+        <span>Production Date</span>
+        <strong>{draft.productionDate || 'No production date set'}</strong>
+      </div>
+      <div className="summary-item">
+        <span>Primary Crew Call</span>
+        <strong>{draft.primaryCallTime || 'Not set'}</strong>
+      </div>
+      <div className="summary-item">
+        <span>Scenes</span>
+        <strong>{draft.scenes.length}</strong>
+      </div>
+      <div className="summary-item">
+        <span>Cast / Crew</span>
+        <strong>{draft.castCalls.length} / {draft.crewCalls.length}</strong>
+      </div>
+      <div className="summary-item">
+        <span>Readiness</span>
+        <strong>{readinessCompleteCount}/{readinessItems.length} complete</strong>
+      </div>
+      <div className="summary-item">
+        <span>Autosave</span>
+        <strong>{autosaveEnabled ? saveStateLabel : 'Off'}</strong>
+      </div>
+    </section>
+  )
 
   const renderReadinessCheck = () => (
     <section className="readiness-panel panel">
@@ -482,19 +607,32 @@ function CallSheetEditorPage() {
           <h2>Readiness Check</h2>
           <p>{readinessCompleteCount} of {readinessItems.length} essentials complete before publishing.</p>
         </div>
-        <span className={`readiness-score ${missingReadinessItems.length === 0 ? 'is-ready' : ''}`}>
-          {missingReadinessItems.length === 0 ? 'Ready' : `${missingReadinessItems.length} missing`}
+        <span className={`readiness-score ${missingCriticalItems.length === 0 ? 'is-ready' : ''}`}>
+          {missingCriticalItems.length === 0 ? 'Critical ready' : `${missingCriticalItems.length} critical`}
         </span>
       </div>
 
-      <div className="readiness-list">
-        {readinessItems.map((item) => (
-          <div key={item.label} className={`readiness-item ${item.complete ? 'is-complete' : 'is-missing'}`}>
-            <span className="readiness-dot" aria-hidden="true" />
-            <span>{item.label}</span>
+      {(['critical', 'recommended'] as const).map((severity) => {
+        const items = readinessItems.filter((item) => item.severity === severity)
+        const missingCount = items.filter((item) => !item.complete).length
+
+        return (
+          <div key={severity} className="readiness-group">
+            <div className="readiness-group-title">
+              <span>{severity === 'critical' ? 'Critical' : 'Recommended'}</span>
+              <span>{missingCount === 0 ? 'Complete' : `${missingCount} missing`}</span>
+            </div>
+            <div className="readiness-list">
+              {items.map((item) => (
+                <div key={item.label} className={`readiness-item ${item.complete ? 'is-complete' : 'is-missing'}`}>
+                  <span className="readiness-dot" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
+        )
+      })}
     </section>
   )
 
@@ -524,7 +662,12 @@ function CallSheetEditorPage() {
 
               <label className="field">
                 <span>General notes</span>
-                <input value={draft.generalNotes} onChange={(e) => updateField('generalNotes', e.target.value)} />
+                <textarea value={draft.generalNotes} onChange={(e) => updateField('generalNotes', e.target.value)} />
+              </label>
+
+              <label className="field">
+                <span>Revision / Distribution Notes</span>
+                <textarea value={draft.distributionNotes} onChange={(e) => updateField('distributionNotes', e.target.value)} />
               </label>
             </div>
           </div>
@@ -797,6 +940,23 @@ function CallSheetEditorPage() {
             <button className="vw-btn" type="button" onClick={addCastCall}>Add Cast Call</button>
           </div>
 
+          <div className="quick-add-panel">
+            <label className="field">
+              <span>Quick Add Cast</span>
+              <textarea
+                value={castQuickAddText}
+                onChange={(event) => setCastQuickAddText(event.target.value)}
+                placeholder="Name, Role, Email, Call Time, Notes"
+              />
+            </label>
+            <div className="quick-add-actions">
+              <p>Paste one person per line. Commas or pipes both work.</p>
+              <button className="vw-btn" type="button" onClick={quickAddCastCalls} disabled={!castQuickAddText.trim()}>
+                Add Pasted Cast
+              </button>
+            </div>
+          </div>
+
           <div className="stack-list">
             {draft.castCalls.map((cast) => {
               const open = !!openRows[cast.id]
@@ -859,6 +1019,23 @@ function CallSheetEditorPage() {
             <h2>Crew Calls</h2>
           </div>
           <button className="vw-btn" type="button" onClick={addCrewCall}>Add Crew Call</button>
+        </div>
+
+        <div className="quick-add-panel">
+          <label className="field">
+            <span>Quick Add Crew</span>
+            <textarea
+              value={crewQuickAddText}
+              onChange={(event) => setCrewQuickAddText(event.target.value)}
+              placeholder="Name, Role, Email, Call Time, Notes"
+            />
+          </label>
+          <div className="quick-add-actions">
+            <p>Paste one crew member per line. Commas or pipes both work.</p>
+            <button className="vw-btn" type="button" onClick={quickAddCrewCalls} disabled={!crewQuickAddText.trim()}>
+              Add Pasted Crew
+            </button>
+          </div>
         </div>
 
         <div className="stack-list">
@@ -926,7 +1103,7 @@ function CallSheetEditorPage() {
         workflowActionNextStatus={callSheetStatusLabels[workflowAction.nextStatus]}
         onSectionChange={(section) => setActiveSection(section as SectionKey)}
         onWorkflowAction={handleWorkflowAction}
-        onStatusChange={(status: CallSheetStatus) => patchDraft({ status })}
+        onStatusChange={handleStatusChange}
       />
 
       <section className="editor-main">
@@ -984,6 +1161,8 @@ function CallSheetEditorPage() {
             </button>
           ))}
         </div>
+
+        {renderProductionSummary()}
 
         {renderReadinessCheck()}
 

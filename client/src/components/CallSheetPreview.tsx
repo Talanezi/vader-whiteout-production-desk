@@ -68,6 +68,13 @@ function CallSheetPreview({ draft }: Props) {
             </div>
           ) : null}
 
+          {draft.distributionNotes ? (
+            <div className="pdf-notes-block">
+              <div className="pdf-section-title">Revision / Distribution Notes</div>
+              <div className="pdf-notes-copy">{draft.distributionNotes}</div>
+            </div>
+          ) : null}
+
           <div className="pdf-table-block">
             <div className="pdf-section-title">Scenes / Set Breakdown</div>
             <table className="pdf-table">

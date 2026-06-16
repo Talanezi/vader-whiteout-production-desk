@@ -71,6 +71,7 @@ export type CallSheetDraft = {
   castCalls: CastCallRow[]
   crewCalls: CrewCallRow[]
   generalNotes: string
+  distributionNotes: string
 }
 
 export const mockCallSheet: CallSheetDraft = {
@@ -159,4 +160,5 @@ export const mockCallSheet: CallSheetDraft = {
     },
   ],
   generalNotes: 'Builder shell only for now. PDF generation and real persistence come next.',
+  distributionNotes: '',
 }

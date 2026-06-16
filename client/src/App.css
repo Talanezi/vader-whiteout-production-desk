@@ -214,6 +214,12 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.template-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .vw-dashboard-grid {
   display: grid;
   gap: 18px;
@@ -299,6 +305,45 @@ select {
 .vw-inline-action:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.vw-inline-action-danger {
+  color: #ffd2d2;
+}
+
+.dashboard-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) minmax(170px, auto) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.44);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+  margin-bottom: 18px;
+}
+
+.dashboard-control {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-control span {
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.dashboard-control input,
+.dashboard-control select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  color: var(--ink);
+  padding: 0 12px;
 }
 
 .vw-dashboard-hero-inner {
@@ -430,6 +475,40 @@ select {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
 }
 
+.production-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.44);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+}
+
+.summary-item {
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+}
+
+.summary-item span {
+  display: block;
+  color: var(--mute);
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.summary-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
 .readiness-head {
   display: flex;
   align-items: flex-start;
@@ -473,6 +552,20 @@ select {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.readiness-group + .readiness-group {
+  margin-top: 14px;
+}
+
+.readiness-group-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(244, 244, 244, 0.72);
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 8px;
 }
 
 .readiness-item {
@@ -569,6 +662,41 @@ select {
   background: rgba(255,255,255,0.025);
   color: var(--ink);
   padding: 0 14px;
+}
+
+.field textarea {
+  min-height: 92px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.025);
+  color: var(--ink);
+  padding: 12px 14px;
+  resize: vertical;
+  width: 100%;
+}
+
+.quick-add-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 16px;
+}
+
+.quick-add-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-add-actions p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.88rem;
 }
 
 .section-chip-row {
@@ -744,6 +872,7 @@ select {
 @media (max-width: 991px) {
   .vw-card-grid,
   .vw-card-grid-two,
+  .template-grid,
   .vw-dashboard-grid,
   .vw-dashboard-grid-secondary,
   .builder-grid,
@@ -756,6 +885,11 @@ select {
   }
 
   .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-controls,
+  .production-summary {
     grid-template-columns: 1fr;
   }
 }
