@@ -407,6 +407,27 @@ select {
   flex-wrap: wrap;
 }
 
+.autosave-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(120, 200, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.03);
+  color: rgba(244, 244, 244, 0.78);
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.autosave-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: rgb(120, 215, 255);
+}
+
 .builder-grid {
   display: grid;
   grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.08fr);
@@ -954,6 +975,8 @@ select {
   color: #ffe2a4;
 }
 
+.save-state-badge-manual-saving,
+.save-state-badge-autosaving,
 .save-state-badge-saving {
   border-color: rgba(120, 200, 255, 0.24);
   background: rgba(120, 200, 255, 0.08);
@@ -966,6 +989,8 @@ select {
   color: #c8ffe2;
 }
 
+.save-state-badge-autosave-failed,
+.save-state-badge-save-failed,
 .save-state-badge-failed {
   border-color: rgba(255, 150, 150, 0.24);
   background: rgba(255, 120, 120, 0.08);

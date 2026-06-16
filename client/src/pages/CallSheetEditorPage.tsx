@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import CallSheetPreview from '../components/CallSheetPreview'
 import EditorSidebar from '../components/EditorSidebar'
@@ -22,14 +22,19 @@ type SectionKey =
   | 'cast'
   | 'crew'
 
-type SaveState = 'saved' | 'unsaved' | 'saving' | 'failed'
+type SaveMode = 'manual' | 'autosave'
+type SaveState = 'saved' | 'unsaved' | 'manual-saving' | 'autosaving' | 'autosave-failed' | 'save-failed'
 
 const saveStateLabels: Record<SaveState, string> = {
   saved: 'Saved',
   unsaved: 'Unsaved changes',
-  saving: 'Saving…',
-  failed: 'Save failed',
+  'manual-saving': 'Saving…',
+  autosaving: 'Autosaving…',
+  'autosave-failed': 'Autosave failed',
+  'save-failed': 'Save failed',
 }
+
+const AUTOSAVE_DELAY_MS = 1200
 
 const workflowActions: Record<CallSheetStatus, { label: string; nextStatus: CallSheetStatus }> = {
   draft: {
@@ -65,6 +70,9 @@ function CallSheetEditorPage() {
   const [draft, setDraft] = useState<CallSheetDraft | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [dirtyRevision, setDirtyRevision] = useState(0)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [deleting, setDeleting] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
@@ -72,6 +80,8 @@ function CallSheetEditorPage() {
   const [error, setError] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('overview')
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({})
+  const dirtyRevisionRef = useRef(0)
+  const lastAutosaveAttemptRevision = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -81,6 +91,10 @@ function CallSheetEditorPage() {
       .then((data) => {
         if (!active) return
         setDraft(data)
+        dirtyRevisionRef.current = 0
+        lastAutosaveAttemptRevision.current = 0
+        setDirtyRevision(0)
+        setHasUnsavedChanges(false)
         setSaveState('saved')
         setError(null)
       })
@@ -97,6 +111,56 @@ function CallSheetEditorPage() {
       active = false
     }
   }, [id])
+
+  const markDraftUnsaved = () => {
+    dirtyRevisionRef.current += 1
+    setDirtyRevision(dirtyRevisionRef.current)
+    setHasUnsavedChanges(true)
+    setSaveState('unsaved')
+  }
+
+  const saveDraft = useCallback(async (mode: SaveMode) => {
+    if (!draft || saving) return
+
+    const draftToSave = draft
+    const revisionAtStart = dirtyRevisionRef.current
+
+    try {
+      setSaving(true)
+      setSaveState(mode === 'autosave' ? 'autosaving' : 'manual-saving')
+      setError(null)
+      const saved = await updateCallSheet(draftToSave.id, draftToSave)
+
+      if (dirtyRevisionRef.current === revisionAtStart) {
+        setDraft(saved)
+        setHasUnsavedChanges(false)
+        setSaveState('saved')
+      } else {
+        setSaveState('unsaved')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save call sheet')
+      setHasUnsavedChanges(true)
+      setSaveState(mode === 'autosave' ? 'autosave-failed' : 'save-failed')
+    } finally {
+      setSaving(false)
+    }
+  }, [draft, saving])
+
+  useEffect(() => {
+    if (!autosaveEnabled || loading || !draft || !hasUnsavedChanges || saving) return
+    if (lastAutosaveAttemptRevision.current === dirtyRevision) return
+
+    const timer = window.setTimeout(() => {
+      if (lastAutosaveAttemptRevision.current === dirtyRevisionRef.current) return
+      lastAutosaveAttemptRevision.current = dirtyRevisionRef.current
+      void saveDraft('autosave')
+    }, AUTOSAVE_DELAY_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [autosaveEnabled, dirtyRevision, draft, hasUnsavedChanges, loading, saveDraft, saving])
 
   const title = useMemo(() => draft?.title || 'Untitled Call Sheet', [draft])
 
@@ -116,7 +180,7 @@ function CallSheetEditorPage() {
       ...draft,
       ...patch,
     })
-    setSaveState('unsaved')
+    markDraftUnsaved()
   }
 
   const updateField = (field: keyof CallSheetDraft, value: string) => {
@@ -125,7 +189,7 @@ function CallSheetEditorPage() {
       ...draft,
       [field]: value,
     })
-    setSaveState('unsaved')
+    markDraftUnsaved()
   }
 
   const updateStringArrayItem = (
@@ -242,21 +306,8 @@ function CallSheetEditorPage() {
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
-  const handleSave = async () => {
-    if (!draft) return
-    try {
-      setSaving(true)
-      setSaveState('saving')
-      setError(null)
-      const saved = await updateCallSheet(draft.id, draft)
-      setDraft(saved)
-      setSaveState('saved')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save call sheet')
-      setSaveState('failed')
-    } finally {
-      setSaving(false)
-    }
+  const handleSave = () => {
+    void saveDraft('manual')
   }
 
   const handleDelete = async () => {
@@ -734,11 +785,19 @@ function CallSheetEditorPage() {
           </div>
 
           <div className="editor-actions">
+            <label className="autosave-toggle">
+              <input
+                type="checkbox"
+                checked={autosaveEnabled}
+                onChange={(event) => setAutosaveEnabled(event.target.checked)}
+              />
+              <span>Autosave</span>
+            </label>
             <span className={`save-state-badge save-state-badge-${saveState}`} aria-live="polite">
               {saveStateLabel}
             </span>
             <button className="vw-btn" type="button" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Draft'}
+              {saveState === 'manual-saving' ? 'Saving…' : 'Save Draft'}
             </button>
             <button className="vw-btn vw-btn-primary" type="button" onClick={handleDownloadPdf} disabled={downloadingPdf}>
               {downloadingPdf ? 'Preparing…' : 'Download PDF'}
