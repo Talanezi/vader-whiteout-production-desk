@@ -286,6 +286,79 @@ select {
   font-weight: 800;
 }
 
+.vw-dashboard-hero-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.vw-workflow-grid {
+  align-items: stretch;
+}
+
+.vw-workflow-card {
+  min-height: 320px;
+}
+
+.vw-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(120, 200, 255, 0.07);
+  color: #d8f5ff;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.vw-call-sheet-row {
+  align-items: flex-start;
+}
+
+.vw-call-sheet-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-status-badge {
+  min-height: 28px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.dashboard-status-badge-draft {
+  border-color: rgba(255, 210, 120, 0.22);
+  background: rgba(255, 210, 120, 0.08);
+  color: #ffe2a4;
+}
+
+.dashboard-status-badge-ready_for_review {
+  border-color: rgba(120, 200, 255, 0.24);
+  background: rgba(120, 200, 255, 0.08);
+  color: #d8f5ff;
+}
+
+.dashboard-status-badge-approved,
+.dashboard-status-badge-published {
+  border-color: rgba(150, 255, 205, 0.18);
+  background: rgba(150, 255, 205, 0.06);
+  color: #c8ffe2;
+}
+
+.dashboard-status-badge-revised {
+  border-color: rgba(215, 185, 255, 0.24);
+  background: rgba(215, 185, 255, 0.08);
+  color: #eadcff;
+}
+
 .vw-empty-block {
   margin-top: 18px;
   padding: 18px;
@@ -557,6 +630,17 @@ select {
 }
 
 @media (max-width: 767.98px) {
+  .vw-dashboard-hero-inner,
+  .vw-call-sheet-row,
+  .vw-call-sheet-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .vw-call-sheet-actions {
+    justify-content: flex-start;
+  }
+
   .vw-navbar-inner {
     gap: 12px;
     align-items: flex-start;
