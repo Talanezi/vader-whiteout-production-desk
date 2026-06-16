@@ -24,6 +24,10 @@ type SectionKey =
 
 type SaveMode = 'manual' | 'autosave'
 type SaveState = 'saved' | 'unsaved' | 'manual-saving' | 'autosaving' | 'autosave-failed' | 'save-failed'
+type ReadinessItem = {
+  label: string
+  complete: boolean
+}
 
 const saveStateLabels: Record<SaveState, string> = {
   saved: 'Saved',
@@ -61,6 +65,35 @@ const workflowActions: Record<CallSheetStatus, { label: string; nextStatus: Call
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function hasText(value: string) {
+  return value.trim().length > 0
+}
+
+function joinParts(parts: string[]) {
+  return parts.filter(Boolean).join(' • ')
+}
+
+function insertAfter<T extends { id: string }>(items: T[], idValue: string, item: T) {
+  const index = items.findIndex((candidate) => candidate.id === idValue)
+  const next = [...items]
+  next.splice(index >= 0 ? index + 1 : next.length, 0, item)
+  return next
+}
+
+function getReadinessItems(draft: CallSheetDraft): ReadinessItem[] {
+  return [
+    { label: 'Title', complete: hasText(draft.title) },
+    { label: 'Production date', complete: hasText(draft.productionDate) },
+    { label: 'Primary crew call', complete: hasText(draft.primaryCallTime) },
+    { label: 'Main set name', complete: hasText(draft.mainSetName) },
+    { label: 'Nearest hospital name', complete: hasText(draft.nearestHospitalName) },
+    { label: 'Scenes', complete: draft.scenes.length > 0 },
+    { label: 'Cast calls', complete: draft.castCalls.length > 0 },
+    { label: 'Crew calls', complete: draft.crewCalls.length > 0 },
+    { label: 'Emergency contacts', complete: draft.emergencyContacts.length > 0 },
+  ]
 }
 
 function CallSheetEditorPage() {
@@ -162,6 +195,21 @@ function CallSheetEditorPage() {
     }
   }, [autosaveEnabled, dirtyRevision, draft, hasUnsavedChanges, loading, saveDraft, saving])
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [hasUnsavedChanges])
+
   const title = useMemo(() => draft?.title || 'Untitled Call Sheet', [draft])
 
   const sections: { key: SectionKey; label: string; icon: string }[] = [
@@ -260,6 +308,17 @@ function CallSheetEditorPage() {
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
+  const duplicateEmergencyContact = (contact: EmergencyContact) => {
+    if (!draft) return
+    const next = {
+      ...contact,
+      id: uid('ec'),
+      label: contact.label ? `${contact.label} Copy` : contact.label,
+    }
+    patchDraft({ emergencyContacts: insertAfter(draft.emergencyContacts, contact.id, next) })
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
   const addScene = () => {
     if (!draft) return
     const next: SceneRow = {
@@ -273,6 +332,17 @@ function CallSheetEditorPage() {
     }
     patchDraft({ scenes: [...draft.scenes, next] })
     setActiveSection('scenes')
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
+  const duplicateScene = (scene: SceneRow) => {
+    if (!draft) return
+    const next = {
+      ...scene,
+      id: uid('scene'),
+      sceneNumber: scene.sceneNumber ? `${scene.sceneNumber} Copy` : scene.sceneNumber,
+    }
+    patchDraft({ scenes: insertAfter(draft.scenes, scene.id, next) })
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
@@ -291,6 +361,17 @@ function CallSheetEditorPage() {
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
+  const duplicateCastCall = (cast: CastCallRow) => {
+    if (!draft) return
+    const next = {
+      ...cast,
+      id: uid('cast'),
+      castName: cast.castName ? `${cast.castName} Copy` : cast.castName,
+    }
+    patchDraft({ castCalls: insertAfter(draft.castCalls, cast.id, next) })
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
   const addCrewCall = () => {
     if (!draft) return
     const next: CrewCallRow = {
@@ -303,6 +384,17 @@ function CallSheetEditorPage() {
     }
     patchDraft({ crewCalls: [...draft.crewCalls, next] })
     setActiveSection('crew')
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
+  const duplicateCrewCall = (crew: CrewCallRow) => {
+    if (!draft) return
+    const next = {
+      ...crew,
+      id: uid('crew'),
+      crewName: crew.crewName ? `${crew.crewName} Copy` : crew.crewName,
+    }
+    patchDraft({ crewCalls: insertAfter(draft.crewCalls, crew.id, next) })
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
@@ -367,6 +459,44 @@ function CallSheetEditorPage() {
   const statusLabel = callSheetStatusLabels[currentStatus]
   const saveStateLabel = saveStateLabels[saveState]
   const workflowAction = workflowActions[currentStatus]
+  const readinessItems = getReadinessItems(draft)
+  const missingReadinessItems = readinessItems.filter((item) => !item.complete)
+  const readinessCompleteCount = readinessItems.length - missingReadinessItems.length
+
+  const handleWorkflowAction = () => {
+    if (workflowAction.nextStatus === 'published' && missingReadinessItems.length > 0) {
+      const missingList = missingReadinessItems.map((item) => `- ${item.label}`).join('\n')
+      const ok = window.confirm(
+        `This call sheet is missing key publishing details:\n\n${missingList}\n\nPublish anyway?`,
+      )
+      if (!ok) return
+    }
+
+    patchDraft({ status: workflowAction.nextStatus })
+  }
+
+  const renderReadinessCheck = () => (
+    <section className="readiness-panel panel">
+      <div className="readiness-head">
+        <div>
+          <h2>Readiness Check</h2>
+          <p>{readinessCompleteCount} of {readinessItems.length} essentials complete before publishing.</p>
+        </div>
+        <span className={`readiness-score ${missingReadinessItems.length === 0 ? 'is-ready' : ''}`}>
+          {missingReadinessItems.length === 0 ? 'Ready' : `${missingReadinessItems.length} missing`}
+        </span>
+      </div>
+
+      <div className="readiness-list">
+        {readinessItems.map((item) => (
+          <div key={item.label} className={`readiness-item ${item.complete ? 'is-complete' : 'is-missing'}`}>
+            <span className="readiness-dot" aria-hidden="true" />
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 
   const renderSection = () => {
     if (!draft) return null
@@ -409,12 +539,14 @@ function CallSheetEditorPage() {
             <div>
               <h2>Emergency Contacts</h2>
             </div>
-            <button className="vw-btn" type="button" onClick={addEmergencyContact}>Add Contact</button>
+            <button className="vw-btn" type="button" onClick={addEmergencyContact}>Add Emergency Contact</button>
           </div>
 
           <div className="stack-list">
             {draft.emergencyContacts.map((contact) => {
               const open = !!openRows[contact.id]
+              const contactTitle = contact.label || contact.name || 'Untitled emergency contact'
+              const contactMeta = joinParts([contact.name, contact.phone])
               return (
                 <div key={contact.id} className="compact-row-card">
                   <button
@@ -422,7 +554,8 @@ function CallSheetEditorPage() {
                     className={`compact-row-toggle ${open ? 'is-open' : ''}`}
                     onClick={() => toggleRow(contact.id)}
                   >
-                    <span className="compact-row-title">{contact.label || contact.name || 'Untitled contact'}</span>
+                    <span className="compact-row-title">{contactTitle}</span>
+                    {contactMeta ? <span className="compact-row-meta">{contactMeta}</span> : null}
                   </button>
 
                   {open ? (
@@ -460,6 +593,13 @@ function CallSheetEditorPage() {
                       </div>
 
                       <div className="row-actions">
+                        <button
+                          className="vw-btn"
+                          type="button"
+                          onClick={() => duplicateEmergencyContact(contact)}
+                        >
+                          Duplicate
+                        </button>
                         <button
                           className="vw-btn vw-btn-danger"
                           type="button"
@@ -591,10 +731,13 @@ function CallSheetEditorPage() {
           <div className="stack-list">
             {draft.scenes.map((scene) => {
               const open = !!openRows[scene.id]
+              const sceneTitle = scene.sceneNumber || scene.setDescription || 'Untitled scene'
+              const sceneMeta = joinParts([scene.setDescription, scene.castSummary, scene.locationNotes])
               return (
                 <div key={scene.id} className="compact-row-card">
                   <button type="button" className={`compact-row-toggle ${open ? 'is-open' : ''}`} onClick={() => toggleRow(scene.id)}>
-                    <span className="compact-row-title">{scene.sceneNumber || 'Untitled scene'}</span>
+                    <span className="compact-row-title">{sceneTitle}</span>
+                    {sceneMeta ? <span className="compact-row-meta">{sceneMeta}</span> : null}
                   </button>
 
                   {open ? (
@@ -627,6 +770,9 @@ function CallSheetEditorPage() {
                       </div>
 
                       <div className="row-actions">
+                        <button className="vw-btn" type="button" onClick={() => duplicateScene(scene)}>
+                          Duplicate
+                        </button>
                         <button className="vw-btn vw-btn-danger" type="button" onClick={() => removeArrayItem('scenes', scene.id)}>
                           Remove
                         </button>
@@ -654,10 +800,13 @@ function CallSheetEditorPage() {
           <div className="stack-list">
             {draft.castCalls.map((cast) => {
               const open = !!openRows[cast.id]
+              const castTitle = cast.castName || cast.roleName || 'Untitled cast call'
+              const castMeta = joinParts([cast.roleName, cast.callTime ? `Call ${cast.callTime}` : '', cast.email])
               return (
                 <div key={cast.id} className="compact-row-card">
                   <button type="button" className={`compact-row-toggle ${open ? 'is-open' : ''}`} onClick={() => toggleRow(cast.id)}>
-                    <span className="compact-row-title">{cast.castName || cast.roleName || 'Untitled cast call'}</span>
+                    <span className="compact-row-title">{castTitle}</span>
+                    {castMeta ? <span className="compact-row-meta">{castMeta}</span> : null}
                   </button>
 
                   {open ? (
@@ -686,6 +835,9 @@ function CallSheetEditorPage() {
                       </div>
 
                       <div className="row-actions">
+                        <button className="vw-btn" type="button" onClick={() => duplicateCastCall(cast)}>
+                          Duplicate
+                        </button>
                         <button className="vw-btn vw-btn-danger" type="button" onClick={() => removeArrayItem('castCalls', cast.id)}>
                           Remove
                         </button>
@@ -712,10 +864,13 @@ function CallSheetEditorPage() {
         <div className="stack-list">
           {draft.crewCalls.map((crew) => {
             const open = !!openRows[crew.id]
+            const crewTitle = crew.crewName || crew.departmentRole || 'Unnamed crew call'
+            const crewMeta = joinParts([crew.departmentRole, crew.callTime ? `Call ${crew.callTime}` : '', crew.email])
             return (
               <div key={crew.id} className="compact-row-card">
                 <button type="button" className={`compact-row-toggle ${open ? 'is-open' : ''}`} onClick={() => toggleRow(crew.id)}>
-                  <span className="compact-row-title">{crew.crewName || crew.departmentRole || 'Untitled crew call'}</span>
+                  <span className="compact-row-title">{crewTitle}</span>
+                  {crewMeta ? <span className="compact-row-meta">{crewMeta}</span> : null}
                 </button>
 
                 {open ? (
@@ -744,6 +899,9 @@ function CallSheetEditorPage() {
                     </div>
 
                     <div className="row-actions">
+                      <button className="vw-btn" type="button" onClick={() => duplicateCrewCall(crew)}>
+                        Duplicate
+                      </button>
                       <button className="vw-btn vw-btn-danger" type="button" onClick={() => removeArrayItem('crewCalls', crew.id)}>
                         Remove
                       </button>
@@ -767,7 +925,7 @@ function CallSheetEditorPage() {
         workflowActionLabel={workflowAction.label}
         workflowActionNextStatus={callSheetStatusLabels[workflowAction.nextStatus]}
         onSectionChange={(section) => setActiveSection(section as SectionKey)}
-        onWorkflowAction={() => patchDraft({ status: workflowAction.nextStatus })}
+        onWorkflowAction={handleWorkflowAction}
         onStatusChange={(status: CallSheetStatus) => patchDraft({ status })}
       />
 
@@ -826,6 +984,8 @@ function CallSheetEditorPage() {
             </button>
           ))}
         </div>
+
+        {renderReadinessCheck()}
 
         {renderSection()}
 

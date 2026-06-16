@@ -2,39 +2,39 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft, CallSheetStatus } from '../data/mockCallSheet'
 import { callSheetStatusLabels } from '../data/mockCallSheet'
-import { getAuthToken, listCallSheets } from '../lib/api'
+import { downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets } from '../lib/api'
 
 type DashboardGroup = {
   title: string
-  kicker: string
   statuses: CallSheetStatus[]
   emptyCopy: string
 }
 
 const workflowGroups: DashboardGroup[] = [
   {
-    title: 'Needs Work / Drafts',
-    kicker: 'In Progress',
+    title: 'Needs Work',
     statuses: ['draft'],
-    emptyCopy: 'No draft call sheets need work.',
+    emptyCopy: 'Draft call sheets that still need production details will appear here.',
   },
   {
     title: 'Ready for AD Review',
-    kicker: 'Review Queue',
     statuses: ['ready_for_review'],
-    emptyCopy: 'No call sheets are waiting for AD review.',
+    emptyCopy: 'Sheets sent to the AD review queue will appear here.',
   },
   {
-    title: 'Approved / Published Archive',
-    kicker: 'Locked',
-    statuses: ['approved', 'published'],
-    emptyCopy: 'No approved or published call sheets yet.',
+    title: 'Approved for Distribution',
+    statuses: ['approved'],
+    emptyCopy: 'Approved sheets waiting to be published will appear here.',
   },
   {
-    title: 'Revised',
-    kicker: 'Updates',
+    title: 'Published Archive',
+    statuses: ['published'],
+    emptyCopy: 'Published call sheets ready for the crew archive will appear here.',
+  },
+  {
+    title: 'Revised Sheets',
     statuses: ['revised'],
-    emptyCopy: 'No revised call sheets yet.',
+    emptyCopy: 'Revised sheets that need another pass will appear here.',
   },
 ]
 
@@ -43,6 +43,8 @@ function DashboardPage() {
   const [items, setItems] = useState<CallSheetDraft[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -80,6 +82,31 @@ function DashboardPage() {
   const getGroupItems = (statuses: CallSheetStatus[]) =>
     items.filter((item) => statuses.includes(getStatus(item)))
 
+  const handleDuplicate = async (item: CallSheetDraft) => {
+    try {
+      setDuplicatingId(item.id)
+      setError(null)
+      const copied = await duplicateCallSheet(item.id)
+      setItems((prev) => [copied, ...prev])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate call sheet')
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
+
+  const handleDownloadPdf = async (item: CallSheetDraft) => {
+    try {
+      setDownloadingId(item.id)
+      setError(null)
+      await downloadPdfFile(item.id, item.title)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to download PDF')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   const renderCallSheetRow = (item: CallSheetDraft) => {
     const status = getStatus(item)
 
@@ -99,6 +126,12 @@ function DashboardPage() {
           <Link className="vw-inline-link" to={`/callsheets/${item.id}/edit`}>
             Open/Edit
           </Link>
+          <button className="vw-inline-action" type="button" onClick={() => handleDownloadPdf(item)} disabled={downloadingId === item.id}>
+            {downloadingId === item.id ? 'Preparing…' : 'PDF'}
+          </button>
+          <button className="vw-inline-action" type="button" onClick={() => handleDuplicate(item)} disabled={duplicatingId === item.id}>
+            {duplicatingId === item.id ? 'Duplicating…' : 'Duplicate'}
+          </button>
         </div>
       </div>
     )
@@ -109,8 +142,7 @@ function DashboardPage() {
       <section className="vw-section-card vw-dashboard-hero">
         <div className="vw-dashboard-hero-inner">
           <div>
-            <p className="vw-kicker">Production Desk</p>
-            <h1 className="vw-page-title">Production Workspace</h1>
+            <h1 className="vw-page-title">Production Desk</h1>
             <p className="vw-page-note">
               Call sheets grouped by workflow status for the next production move.
             </p>
@@ -138,7 +170,6 @@ function DashboardPage() {
             <article key={group.title} className="vw-section-card vw-module-card vw-workflow-card">
               <div className="vw-module-header">
                 <div>
-                  <p className="vw-kicker">{group.kicker}</p>
                   <h2 className="vw-card-title">{group.title}</h2>
                 </div>
                 <span className="vw-count-badge">{groupItems.length}</span>

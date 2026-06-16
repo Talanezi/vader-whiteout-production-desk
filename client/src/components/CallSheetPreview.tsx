@@ -24,8 +24,8 @@ function CallSheetPreview({ draft }: Props) {
               <div className="pdf-card-title">Emergency Contact</div>
               {draft.emergencyContacts.map((contact) => (
                 <div key={contact.id} className="pdf-line">
-                  <span>{contact.label}</span>
-                  <span>{contact.name}</span>
+                  <span>{contact.label || 'Contact'}</span>
+                  <span>{[contact.name, contact.phone].filter(Boolean).join(' / ') || '—'}</span>
                 </div>
               ))}
             </div>
@@ -51,7 +51,22 @@ function CallSheetPreview({ draft }: Props) {
                 <div key={line} className="pdf-stack-line">{line}</div>
               ))}
             </div>
+
+            <div className="pdf-card">
+              <div className="pdf-card-title">Nearest Hospital</div>
+              <div className="pdf-stack-line strong">{draft.nearestHospitalName || '—'}</div>
+              {draft.nearestHospitalAddress.map((line) => (
+                <div key={line} className="pdf-stack-line">{line}</div>
+              ))}
+            </div>
           </div>
+
+          {draft.generalNotes ? (
+            <div className="pdf-notes-block">
+              <div className="pdf-section-title">General Notes</div>
+              <div className="pdf-notes-copy">{draft.generalNotes}</div>
+            </div>
+          ) : null}
 
           <div className="pdf-table-block">
             <div className="pdf-section-title">Scenes / Set Breakdown</div>
