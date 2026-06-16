@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import CallSheetPreview from '../components/CallSheetPreview'
+import EditorSidebar from '../components/EditorSidebar'
 import type {
   CallSheetDraft,
+  CallSheetStatus,
   CastCallRow,
   CrewCallRow,
   EmergencyContact,
   SceneRow,
 } from '../data/mockCallSheet'
+import { callSheetStatusLabels } from '../data/mockCallSheet'
 import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, updateCallSheet } from '../lib/api'
 
 type SectionKey =
@@ -269,6 +272,9 @@ function CallSheetEditorPage() {
   if (!draft) {
     return <div className="vw-empty-block">Call sheet not found.</div>
   }
+
+  const currentStatus = draft.status || 'draft'
+  const statusLabel = callSheetStatusLabels[currentStatus]
 
   const renderSection = () => {
     if (!draft) return null
@@ -662,10 +668,21 @@ function CallSheetEditorPage() {
 
   return (
     <div className="editor-layout">
+      <EditorSidebar
+        activeSection={activeSection}
+        sections={sections}
+        status={currentStatus}
+        onSectionChange={(section) => setActiveSection(section as SectionKey)}
+        onStatusChange={(status: CallSheetStatus) => patchDraft({ status })}
+      />
+
       <section className="editor-main">
         <div className="editor-header panel">
           <div>
-            <p className="kicker">Editing Draft</p>
+            <div className="editor-title-row">
+              <p className="kicker">Editing Call Sheet</p>
+              <span className="status-badge">{statusLabel}</span>
+            </div>
             <h1 className="editor-title">{title}</h1>
             <p className="editor-subtext">
               {draft.productionDate || 'No date set'} • Primary Crew Call {draft.primaryCallTime || '—'}

@@ -2,8 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CallSheetDraft } from './callsheet.types';
+import { CallSheetDraft, CallSheetStatus } from './callsheet.types';
 import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
+
+const supportedStatuses: CallSheetStatus[] = [
+  'draft',
+  'ready_for_review',
+  'approved',
+  'published',
+  'revised',
+];
 
 @Injectable()
 export class CallsheetsService {
@@ -12,9 +20,16 @@ export class CallsheetsService {
     private readonly callsheetsRepo: Repository<CallSheetDraftEntity>,
   ) {}
 
+  private normalizeStatus(status: unknown): CallSheetStatus {
+    return typeof status === 'string' && supportedStatuses.includes(status as CallSheetStatus)
+      ? (status as CallSheetStatus)
+      : 'draft';
+  }
+
   private normalizeDraft(id: string, payload?: Partial<CallSheetDraft>): CallSheetDraft {
     return {
       id,
+      status: this.normalizeStatus(payload?.status),
       title: payload?.title || 'Untitled Call Sheet',
       productionDate: payload?.productionDate || '',
       primaryCallTime: payload?.primaryCallTime || '',

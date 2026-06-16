@@ -33,8 +33,26 @@ export type CrewCallRow = {
   notes: string
 }
 
+export type CallSheetStatus =
+  | 'draft'
+  | 'ready_for_review'
+  | 'approved'
+  | 'published'
+  | 'revised'
+
+export const callSheetStatusLabels: Record<CallSheetStatus, string> = {
+  draft: 'Draft',
+  ready_for_review: 'Ready for AD Review',
+  approved: 'Approved',
+  published: 'Published',
+  revised: 'Revised',
+}
+
+export const callSheetStatuses = Object.keys(callSheetStatusLabels) as CallSheetStatus[]
+
 export type CallSheetDraft = {
   id: string
+  status: CallSheetStatus
   title: string
   productionDate: string
   primaryCallTime: string
@@ -57,6 +75,7 @@ export type CallSheetDraft = {
 
 export const mockCallSheet: CallSheetDraft = {
   id: 'draft-test-shoot',
+  status: 'draft',
   title: 'Test Shoot Call Sheet',
   productionDate: 'Sunday, April 19, 2026',
   primaryCallTime: '8:00 AM',

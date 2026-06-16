@@ -33,8 +33,16 @@ export type CrewCallRow = {
   notes: string;
 };
 
+export type CallSheetStatus =
+  | 'draft'
+  | 'ready_for_review'
+  | 'approved'
+  | 'published'
+  | 'revised';
+
 export type CallSheetDraft = {
   id: string;
+  status: CallSheetStatus;
   title: string;
   productionDate: string;
   primaryCallTime: string;

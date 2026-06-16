@@ -2,6 +2,7 @@ import { CallSheetDraft } from './callsheet.types';
 
 export const seedCallSheet: CallSheetDraft = {
   id: 'draft-test-shoot',
+  status: 'draft',
   title: 'Test Shoot Call Sheet',
   productionDate: 'Sunday, April 19, 2026',
   primaryCallTime: '8:00 AM',
