@@ -11,7 +11,10 @@ type Props = {
   activeSection: string
   sections: SidebarSection[]
   status: CallSheetStatus
+  workflowActionLabel: string
+  workflowActionNextStatus: string
   onSectionChange: (section: string) => void
+  onWorkflowAction: () => void
   onStatusChange: (status: CallSheetStatus) => void
 }
 
@@ -19,7 +22,10 @@ function EditorSidebar({
   activeSection,
   sections,
   status,
+  workflowActionLabel,
+  workflowActionNextStatus,
   onSectionChange,
+  onWorkflowAction,
   onStatusChange,
 }: Props) {
   return (
@@ -27,8 +33,16 @@ function EditorSidebar({
       <p className="kicker">Call Sheet Builder</p>
       <h2 className="sidebar-title">Workflow</h2>
 
-      <label className="status-control">
-        <span>Current status</span>
+      <div className="workflow-action-panel">
+        <p className="workflow-action-copy">Next step</p>
+        <button className="vw-btn vw-btn-primary workflow-action-btn" type="button" onClick={onWorkflowAction}>
+          {workflowActionLabel}
+        </button>
+        <p className="workflow-action-note">Moves this sheet to {workflowActionNextStatus}.</p>
+      </div>
+
+      <label className="status-control status-control-compact">
+        <span>Manual status</span>
         <select
           value={status}
           onChange={(event) => onStatusChange(event.target.value as CallSheetStatus)}

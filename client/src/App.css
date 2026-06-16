@@ -822,6 +822,38 @@ select {
   gap: 8px;
 }
 
+.workflow-action-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(120, 200, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.028);
+}
+
+.workflow-action-copy,
+.workflow-action-note {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.workflow-action-btn {
+  width: 100%;
+  min-height: 46px;
+  text-align: center;
+}
+
+.workflow-action-note {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.status-control-compact {
+  gap: 6px;
+}
+
 .status-control span {
   color: var(--mute);
   font-size: 13px;
@@ -836,6 +868,13 @@ select {
   background: rgba(255,255,255,0.035);
   color: var(--ink);
   padding: 0 12px;
+}
+
+.status-control-compact select {
+  min-height: 40px;
+  border-color: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.025);
+  font-size: 0.9rem;
 }
 
 .status-control option {

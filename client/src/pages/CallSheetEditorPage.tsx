@@ -31,6 +31,29 @@ const saveStateLabels: Record<SaveState, string> = {
   failed: 'Save failed',
 }
 
+const workflowActions: Record<CallSheetStatus, { label: string; nextStatus: CallSheetStatus }> = {
+  draft: {
+    label: 'Send for AD Review',
+    nextStatus: 'ready_for_review',
+  },
+  ready_for_review: {
+    label: 'Approve Call Sheet',
+    nextStatus: 'approved',
+  },
+  approved: {
+    label: 'Publish Call Sheet',
+    nextStatus: 'published',
+  },
+  published: {
+    label: 'Create Revision',
+    nextStatus: 'revised',
+  },
+  revised: {
+    label: 'Send Revised Sheet for Review',
+    nextStatus: 'ready_for_review',
+  },
+}
+
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 }
@@ -292,6 +315,7 @@ function CallSheetEditorPage() {
   const currentStatus = draft.status || 'draft'
   const statusLabel = callSheetStatusLabels[currentStatus]
   const saveStateLabel = saveStateLabels[saveState]
+  const workflowAction = workflowActions[currentStatus]
 
   const renderSection = () => {
     if (!draft) return null
@@ -689,7 +713,10 @@ function CallSheetEditorPage() {
         activeSection={activeSection}
         sections={sections}
         status={currentStatus}
+        workflowActionLabel={workflowAction.label}
+        workflowActionNextStatus={callSheetStatusLabels[workflowAction.nextStatus]}
         onSectionChange={(section) => setActiveSection(section as SectionKey)}
+        onWorkflowAction={() => patchDraft({ status: workflowAction.nextStatus })}
         onStatusChange={(status: CallSheetStatus) => patchDraft({ status })}
       />
 
