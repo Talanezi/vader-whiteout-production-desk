@@ -23,7 +23,6 @@ import {
   confirmationStatusLabels,
   confirmationStatuses,
   distributionStatusLabels,
-  distributionStatuses,
   emailAttachmentTypeLabels,
   emailAttachmentTypes,
   rosterCategoryLabels,
@@ -148,7 +147,11 @@ function getReadinessItems(draft: CallSheetDraft, status: CallSheetStatus): Read
     },
     { label: 'Distribution recipients', complete: includedRecipients.length > 0, severity: 'critical' },
     { label: 'Recipient email or phone', complete: contactGaps.length === 0, severity: 'critical' },
-    { label: 'Distribution message', complete: hasText(draft.distributionMessage), severity: 'recommended' },
+    {
+      label: 'Opening message',
+      complete: hasText(draft.emailIntro) || hasText(draft.distributionMessage),
+      severity: 'recommended',
+    },
   ]
 }
 
@@ -214,6 +217,7 @@ function CallSheetEditorPage() {
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailNotice, setEmailNotice] = useState<string | null>(null)
   const [harvestNotice, setHarvestNotice] = useState<string | null>(null)
+  const [emailPreviewWidth, setEmailPreviewWidth] = useState<'desktop' | 'mobile'>('desktop')
   const dirtyRevisionRef = useRef(0)
   const lastAutosaveAttemptRevision = useRef(0)
 
@@ -706,10 +710,6 @@ function CallSheetEditorPage() {
     patchDraft({ distributionRecipients: nextRecipients })
   }
 
-  const handleDistributionStatusChange = (status: DistributionStatus) => {
-    patchDraft({ distributionStatus: status })
-  }
-
   const confirmDistributionMilestone = (status: DistributionStatus) => {
     if (!draft) return false
     if (status !== 'distributed' && status !== 'revision_distributed') return true
@@ -1004,6 +1004,7 @@ function CallSheetEditorPage() {
   const missingCriticalItems = missingReadinessItems.filter((item) => item.severity === 'critical')
   const readinessCompleteCount = readinessItems.length - missingReadinessItems.length
   const includedRecipients = draft.distributionRecipients.filter((recipient) => recipient.included)
+  const sentRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'sent')
   const confirmedRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'confirmed')
   const noResponseRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'no_response')
   const issueRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'issue')
@@ -1140,6 +1141,88 @@ function CallSheetEditorPage() {
         </div>
       ) : null}
     </section>
+  )
+
+  const renderRecipientTracker = () => (
+    <>
+      <div className="distribution-summary-strip">
+        <span>{includedRecipients.length} included</span>
+        <span>{recipientsWithEmail.length} with email</span>
+        <span>{confirmedRecipients.length} confirmed</span>
+        <span>{noResponseRecipients.length} no response</span>
+        <span>{issueRecipients.length} issue</span>
+        <span>{distributionContactGaps.length} missing contact</span>
+      </div>
+
+      <div className="distribution-recipient-list">
+        {draft.distributionRecipients.length === 0 ? (
+          <div className="vw-empty-block">
+            Build the recipient list from cast, crew, and emergency contact rows when the call sheet is close to distribution.
+          </div>
+        ) : (
+          draft.distributionRecipients.map((recipient) => (
+            <article key={recipient.id} className={`distribution-recipient-card ${recipient.included ? '' : 'is-excluded'}`}>
+              <div className="distribution-recipient-head">
+                <label className="recipient-include-toggle">
+                  <input
+                    type="checkbox"
+                    checked={recipient.included}
+                    onChange={(event) => updateDistributionRecipient(recipient.id, { included: event.target.checked })}
+                  />
+                  <span>{recipient.included ? 'Included' : 'Excluded'}</span>
+                </label>
+                <span className="status-badge">
+                  {recipient.sourceType === 'cast'
+                    ? 'Cast'
+                    : recipient.sourceType === 'crew'
+                      ? 'Crew'
+                      : recipient.sourceType === 'emergency'
+                        ? 'Emergency'
+                        : 'Manual'}
+                </span>
+              </div>
+
+              <div className="distribution-recipient-main">
+                <div>
+                  <h3>{recipient.name || 'Unnamed recipient'}</h3>
+                  <p>{recipient.role || 'No role set'}</p>
+                </div>
+                <div className="distribution-contact-line">
+                  {recipient.email || recipient.phone || 'Missing email and phone'}
+                </div>
+              </div>
+
+              {!recipient.email && !recipient.phone ? (
+                <div className="distribution-warning">Add an email or phone before final distribution.</div>
+              ) : null}
+
+              <div className="field-grid field-grid-2 recipient-control-grid">
+                <label className="field">
+                  <span>Confirmation</span>
+                  <select
+                    value={recipient.confirmationStatus}
+                    onChange={(event) => updateDistributionRecipient(recipient.id, { confirmationStatus: event.target.value as ConfirmationStatus })}
+                  >
+                    {confirmationStatuses.map((status) => (
+                      <option key={status} value={status}>{confirmationStatusLabels[status]}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span>Notes</span>
+                  <input
+                    value={recipient.notes}
+                    onChange={(event) => updateDistributionRecipient(recipient.id, { notes: event.target.value })}
+                    placeholder="Manual follow-up notes"
+                  />
+                </label>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </>
   )
 
   const renderSection = () => {
@@ -1567,10 +1650,6 @@ function CallSheetEditorPage() {
               </div>
               <p>Prepare the branded email, manage linked files, send when configured, and track confirmations.</p>
             </div>
-            <div className="distribution-header-actions">
-              <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>Build Recipient List</button>
-              <button className="vw-btn" type="button" onClick={harvestPeopleToRoster}>Save People to Roster</button>
-            </div>
           </div>
 
           {currentStatus !== 'published' && currentStatus !== 'revised' ? (
@@ -1588,134 +1667,94 @@ function CallSheetEditorPage() {
           {emailNotice ? <div className="vw-inline-success">{emailNotice}</div> : null}
           {harvestNotice ? <div className="vw-inline-success">{harvestNotice}</div> : null}
 
-          <div className="email-workflow-grid">
-            <article className="email-workflow-card">
-              <div className="email-workflow-step">1. Recipients</div>
-              <p>{includedRecipients.length} included recipients, {recipientsWithEmail.length} with email.</p>
-              <div className="distribution-actions">
+          <div className="email-step-panel">
+            <div className="section-head">
+              <div>
+                <h3>1. Recipients</h3>
+                <p>Build the send list from the call sheet, then include or exclude people as needed.</p>
+              </div>
+              <div className="distribution-header-actions">
                 <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>Build Recipient List</button>
                 <button className="vw-btn" type="button" onClick={harvestPeopleToRoster}>Save People to Roster</button>
               </div>
-            </article>
-
-            <article className="email-workflow-card">
-              <div className="email-workflow-step">2. Email</div>
-              <p>{draft.emailSubject || 'No subject set'}</p>
-              <div className="distribution-actions">
-                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailHtml, 'HTML email')}>Copy HTML</button>
-                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailText, 'Plain text email')}>Copy Plain Text</button>
-              </div>
-            </article>
-
-            <article className="email-workflow-card">
-              <div className="email-workflow-step">3. Attachments</div>
-              <p>{includedEmailAttachments.length} included files, {missingAttachmentLinks.length} links pending.</p>
-              {missingAttachmentLinks.length > 0 ? <div className="distribution-warning">Included non-PDF files need URLs before sending.</div> : null}
-            </article>
-
-            <article className="email-workflow-card">
-              <div className="email-workflow-step">4. Send / Track</div>
-              <p>{mailConfigured ? `Ready through ${mailConfig?.provider}.` : 'Preview and copy mode.'}</p>
-              <div className="distribution-actions">
-                <button className="vw-btn" type="button" onClick={() => markDistributionStatus('ready')}>Mark Ready</button>
-                <button className="vw-btn" type="button" onClick={() => markDistributionStatus('distributed')}>Mark Distributed</button>
-              </div>
-            </article>
+            </div>
+            {renderRecipientTracker()}
           </div>
 
-          <div className="email-editor-layout">
+          <div className="email-step-panel">
+            <div className="section-head">
+              <div>
+                <h3>2. Email Content</h3>
+                <p>These fields generate the branded email preview and copied HTML.</p>
+              </div>
+            </div>
             <div className="email-editor-panel">
-              <h3>Email Fields</h3>
               <div className="field-grid field-grid-2">
                 <label className="field field-full">
                   <span>Subject</span>
                   <input value={draft.emailSubject} onChange={(event) => updateField('emailSubject', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Preheader</span>
+                  <span>Preview Text / Preheader</span>
+                  <small>Small preview text some email apps show next to the subject.</small>
                   <input value={draft.emailPreheader} onChange={(event) => updateField('emailPreheader', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Headline</span>
+                  <span>Email Title / Headline</span>
                   <input value={draft.emailHeadline} onChange={(event) => updateField('emailHeadline', event.target.value)} />
                 </label>
                 <label className="field field-full">
-                  <span>Intro</span>
-                  <textarea value={draft.emailIntro} onChange={(event) => updateField('emailIntro', event.target.value)} placeholder="Use the old distribution message as a starting point if helpful." />
+                  <span>Opening Message</span>
+                  <textarea value={draft.emailIntro} onChange={(event) => updateField('emailIntro', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Sender name</span>
+                  <span>Sender Name</span>
                   <input value={draft.emailSenderName} onChange={(event) => updateField('emailSenderName', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Sender title</span>
+                  <span>Sender Role / Title</span>
                   <input value={draft.emailSenderTitle} onChange={(event) => updateField('emailSenderTitle', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Reply-to email</span>
+                  <span>Reply-To Email</span>
                   <input value={draft.emailReplyTo} onChange={(event) => updateField('emailReplyTo', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Hero image URL</span>
+                  <span>Hero Image URL</span>
                   <input value={draft.emailHeroImageUrl} onChange={(event) => updateField('emailHeroImageUrl', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Transport title</span>
-                  <input value={draft.emailTransportTitle} onChange={(event) => updateField('emailTransportTitle', event.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Transport details</span>
+                  <span>Transport Details</span>
                   <input value={draft.emailTransportDetails} onChange={(event) => updateField('emailTransportDetails', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Weather title</span>
-                  <input value={draft.emailWeatherTitle} onChange={(event) => updateField('emailWeatherTitle', event.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Weather details</span>
+                  <span>Weather Details</span>
                   <input value={draft.emailWeatherDetails} onChange={(event) => updateField('emailWeatherDetails', event.target.value)} />
                 </label>
                 <label className="field">
-                  <span>Set title</span>
-                  <input value={draft.emailSetTitle} onChange={(event) => updateField('emailSetTitle', event.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Set details</span>
+                  <span>Set Details</span>
                   <input value={draft.emailSetDetails} onChange={(event) => updateField('emailSetDetails', event.target.value)} />
                 </label>
                 <label className="field field-full">
-                  <span>Please prepare</span>
+                  <span>Prep Notes</span>
                   <textarea value={draft.emailPrepNotes} onChange={(event) => updateField('emailPrepNotes', event.target.value)} />
                 </label>
                 <label className="field field-full">
-                  <span>Production-provided supplies</span>
+                  <span>Production Supplies / Provided Items</span>
                   <textarea value={draft.emailSuppliesNotes} onChange={(event) => updateField('emailSuppliesNotes', event.target.value)} />
                 </label>
                 <label className="field field-full">
-                  <span>Closing message</span>
+                  <span>Closing Message</span>
                   <textarea value={draft.emailClosingMessage} onChange={(event) => updateField('emailClosingMessage', event.target.value)} />
                 </label>
               </div>
             </div>
-
-            <div className="email-preview-panel">
-              <div className="section-head">
-                <div>
-                  <h3>Email Preview</h3>
-                </div>
-                <div className="distribution-actions">
-                  <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailHtml, 'HTML email')}>Copy HTML</button>
-                  <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailText, 'Plain text email')}>Copy Plain Text</button>
-                </div>
-              </div>
-              <iframe className="email-preview-frame" title="Branded call sheet email preview" srcDoc={emailHtml} />
-            </div>
           </div>
 
-          <div className="email-editor-panel">
+          <div className="email-step-panel">
             <div className="section-head">
               <div>
-                <h3>Quick Timeline</h3>
+                <h3>2a. Quick Timeline</h3>
                 <p>Use this for the email summary. Keep the full flow of the day as an attachment link for now.</p>
               </div>
               <button className="vw-btn" type="button" onClick={addTimelineItem}>Add Timeline Item</button>
@@ -1732,13 +1771,13 @@ function CallSheetEditorPage() {
             </div>
           </div>
 
-          <div className="email-editor-panel">
+          <div className="email-step-panel">
             <div className="section-head">
               <div>
-                <h3>Attachments / Files</h3>
-                <p>Phase 6 uses link-based files. The generated call sheet PDF stays available from Production Desk.</p>
+                <h3>3. Files for This Shoot</h3>
+                <p>Use linked production files. The call sheet PDF is generated by Production Desk.</p>
               </div>
-              <button className="vw-btn" type="button" onClick={addEmailAttachment}>Add Attachment</button>
+              <button className="vw-btn" type="button" onClick={addEmailAttachment}>Add Linked File</button>
             </div>
             <div className="stack-list">
               {draft.emailAttachments.map((attachment) => (
@@ -1786,32 +1825,47 @@ function CallSheetEditorPage() {
             </div>
           </div>
 
-          <div className="email-editor-panel">
+          <div className="email-step-panel">
             <div className="section-head">
               <div>
-                <h3>Send / Track</h3>
-                <p>Sending is explicit. Nothing goes out automatically.</p>
+                <h3>4. Preview</h3>
+                <p>Preview the rendered email at a realistic email-client width.</p>
+              </div>
+              <div className="distribution-actions">
+                <button className={`vw-btn ${emailPreviewWidth === 'desktop' ? 'is-active' : ''}`} type="button" onClick={() => setEmailPreviewWidth('desktop')}>600px</button>
+                <button className={`vw-btn ${emailPreviewWidth === 'mobile' ? 'is-active' : ''}`} type="button" onClick={() => setEmailPreviewWidth('mobile')}>375px</button>
+                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailHtml, 'HTML email')}>Copy HTML</button>
+                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailText, 'Plain text email')}>Copy Plain Text</button>
+              </div>
+            </div>
+            <div className="email-preview-canvas">
+              <iframe
+                className={`email-preview-frame email-preview-frame-${emailPreviewWidth}`}
+                title="Branded call sheet email preview"
+                srcDoc={emailHtml}
+              />
+            </div>
+          </div>
+
+          <div className="email-step-panel">
+            <div className="section-head">
+              <div>
+                <h3>5. Send / Track</h3>
+                <p>
+                  {mailConfigured
+                    ? `${recipientsWithEmail.length} included recipients have email addresses.`
+                    : 'Email sending is not configured. You can still preview and copy the email.'}
+                </p>
               </div>
             </div>
 
-            <div className="distribution-controls">
-            <label className="field">
-              <span>Distribution status</span>
-              <select value={distributionStatus} onChange={(event) => handleDistributionStatusChange(event.target.value as DistributionStatus)}>
-                {distributionStatuses.map((status) => (
-                  <option key={status} value={status}>{distributionStatusLabels[status]}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field field-full">
-              <span>Legacy distribution message</span>
-              <textarea
-                value={draft.distributionMessage}
-                onChange={(event) => updateField('distributionMessage', event.target.value)}
-                placeholder="Kept for compatibility. The email intro is the primary crew-facing message now."
-              />
-            </label>
+            <div className="distribution-summary-strip distribution-summary-strip-compact">
+              <span>{includedRecipients.length} included</span>
+              <span>{sentRecipients.length} sent</span>
+              <span>{confirmedRecipients.length} confirmed</span>
+              <span>{noResponseRecipients.length} no response</span>
+              <span>{issueRecipients.length} issue</span>
+              <span>{distributionContactGaps.length} missing contact</span>
             </div>
 
             <div className="distribution-actions">
@@ -1833,83 +1887,6 @@ function CallSheetEditorPage() {
                 {sendingEmail ? 'Sending...' : `Send to ${recipientsWithEmail.length}`}
               </button>
             </div>
-          </div>
-
-          <div className="distribution-summary-strip">
-            <span>{includedRecipients.length} included</span>
-            <span>{confirmedRecipients.length} confirmed</span>
-            <span>{noResponseRecipients.length} no response</span>
-            <span>{issueRecipients.length} issue</span>
-            <span>{distributionContactGaps.length} missing contact</span>
-          </div>
-
-          <div className="distribution-recipient-list">
-            {draft.distributionRecipients.length === 0 ? (
-              <div className="vw-empty-block">
-                Build the recipient list from cast, crew, and emergency contact rows when the call sheet is close to distribution.
-              </div>
-            ) : (
-              draft.distributionRecipients.map((recipient) => (
-                <article key={recipient.id} className={`distribution-recipient-card ${recipient.included ? '' : 'is-excluded'}`}>
-                  <div className="distribution-recipient-head">
-                    <label className="recipient-include-toggle">
-                      <input
-                        type="checkbox"
-                        checked={recipient.included}
-                        onChange={(event) => updateDistributionRecipient(recipient.id, { included: event.target.checked })}
-                      />
-                      <span>{recipient.included ? 'Included' : 'Excluded'}</span>
-                    </label>
-                    <span className="status-badge">
-                      {recipient.sourceType === 'cast'
-                        ? 'Cast'
-                        : recipient.sourceType === 'crew'
-                          ? 'Crew'
-                          : recipient.sourceType === 'emergency'
-                            ? 'Emergency'
-                            : 'Manual'}
-                    </span>
-                  </div>
-
-                  <div className="distribution-recipient-main">
-                    <div>
-                      <h3>{recipient.name || 'Unnamed recipient'}</h3>
-                      <p>{recipient.role || 'No role set'}</p>
-                    </div>
-                    <div className="distribution-contact-line">
-                      {recipient.email || recipient.phone || 'Missing email and phone'}
-                    </div>
-                  </div>
-
-                  {!recipient.email && !recipient.phone ? (
-                    <div className="distribution-warning">Add an email or phone before final distribution.</div>
-                  ) : null}
-
-                  <div className="field-grid field-grid-2">
-                    <label className="field">
-                      <span>Confirmation</span>
-                      <select
-                        value={recipient.confirmationStatus}
-                        onChange={(event) => updateDistributionRecipient(recipient.id, { confirmationStatus: event.target.value as ConfirmationStatus })}
-                      >
-                        {confirmationStatuses.map((status) => (
-                          <option key={status} value={status}>{confirmationStatusLabels[status]}</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="field">
-                      <span>Notes</span>
-                      <input
-                        value={recipient.notes}
-                        onChange={(event) => updateDistributionRecipient(recipient.id, { notes: event.target.value })}
-                        placeholder="Manual follow-up notes"
-                      />
-                    </label>
-                  </div>
-                </article>
-              ))
-            )}
           </div>
         </section>
       )
