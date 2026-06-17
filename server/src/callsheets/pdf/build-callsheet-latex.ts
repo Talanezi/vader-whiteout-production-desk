@@ -82,12 +82,14 @@ export function buildCallSheetLatex(draft: CallSheetDraft) {
     ? draft.nearestHospitalAddress.map((line) => `${esc(line)}\\\\`).join('\n')
     : '\\\\';
 
-  const distributionMessageBlock = draft.distributionMessage
+  const crewMessage = draft.distributionMessage || draft.emailIntro;
+
+  const distributionMessageBlock = crewMessage
     ? String.raw`
 \vspace{0.18em}
 \begin{simplebox}
 {\small\bfseries MESSAGE TO CREW}\\[4pt]
-${esc(draft.distributionMessage)}
+${esc(crewMessage)}
 \end{simplebox}
 `
     : '';

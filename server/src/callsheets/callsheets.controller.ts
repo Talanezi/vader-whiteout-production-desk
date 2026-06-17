@@ -1,19 +1,29 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { SchedulerAuthGuard } from '../auth/scheduler-auth.guard';
+import { MailService } from '../mail/mail.service';
 import { CallsheetsService } from './callsheets.service';
 import { CallSheetDraft } from './callsheet.types';
+import { buildCallSheetEmailHtml, buildCallSheetEmailText } from './email/build-callsheet-email';
 import { buildCallSheetLatex } from './pdf/build-callsheet-latex';
 import { compileLatexToPdf } from './pdf/compile-latex-to-pdf';
 
 @UseGuards(SchedulerAuthGuard)
 @Controller('api/callsheets')
 export class CallsheetsController {
-  constructor(private readonly callsheetsService: CallsheetsService) {}
+  constructor(
+    private readonly callsheetsService: CallsheetsService,
+    private readonly mailService: MailService,
+  ) {}
 
   @Get()
   list(@Req() req: Request & { user: { userID: number } }) {
     return this.callsheetsService.list(req.user.userID);
+  }
+
+  @Get('email/config')
+  getEmailConfig() {
+    return this.mailService.getStatus();
   }
 
   @Get(':id')
@@ -55,6 +65,63 @@ export class CallsheetsController {
     @Param('id') id: string,
   ) {
     return this.callsheetsService.duplicate(req.user.userID, id);
+  }
+
+  @Post(':id/email/test')
+  async sendTestEmail(
+    @Req() req: Request & { user: { userID: number } },
+    @Param('id') id: string,
+    @Body() payload: { testRecipientEmail?: string },
+  ) {
+    const draft = await this.callsheetsService.getById(req.user.userID, id);
+    const recipient = payload.testRecipientEmail?.trim();
+    if (!recipient) {
+      return { ok: false, message: 'Test recipient email is required.' };
+    }
+
+    return this.mailService.send({
+      to: [{ email: recipient, name: 'Test Recipient' }],
+      subject: `[TEST] ${draft.emailSubject || draft.title || 'Vader: Whiteout Call Sheet'}`,
+      html: buildCallSheetEmailHtml(draft),
+      text: buildCallSheetEmailText(draft),
+      replyTo: draft.emailReplyTo,
+    });
+  }
+
+  @Post(':id/email/send')
+  async sendEmail(
+    @Req() req: Request & { user: { userID: number } },
+    @Param('id') id: string,
+  ) {
+    const draft = await this.callsheetsService.getById(req.user.userID, id);
+    const recipients = draft.distributionRecipients
+      .filter((recipient) => recipient.included && recipient.email.trim())
+      .map((recipient) => ({
+        email: recipient.email,
+        name: recipient.name,
+      }));
+
+    const result = await this.mailService.send({
+      to: recipients,
+      subject: draft.emailSubject || draft.title || 'Vader: Whiteout Call Sheet',
+      html: buildCallSheetEmailHtml(draft),
+      text: buildCallSheetEmailText(draft),
+      replyTo: draft.emailReplyTo,
+    });
+
+    const updated = await this.callsheetsService.update(req.user.userID, id, {
+      distributionStatus: draft.status === 'revised' ? 'revision_distributed' : 'distributed',
+      distributionRecipients: draft.distributionRecipients.map((recipient) =>
+        recipient.included && recipient.email.trim() && recipient.confirmationStatus !== 'confirmed'
+          ? { ...recipient, confirmationStatus: 'sent' }
+          : recipient,
+      ),
+    });
+
+    return {
+      ...result,
+      draft: updated,
+    };
   }
 
   @Put(':id')

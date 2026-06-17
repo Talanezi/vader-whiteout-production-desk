@@ -8,9 +8,13 @@ import type {
   CastCallRow,
   ConfirmationStatus,
   CrewCallRow,
+  EmailAttachment,
+  EmailAttachmentType,
+  EmailTimelineItem,
   DistributionRecipient,
   DistributionStatus,
   EmergencyContact,
+  RosterCategory,
   RosterPerson,
   SceneRow,
 } from '../data/mockCallSheet'
@@ -20,9 +24,23 @@ import {
   confirmationStatuses,
   distributionStatusLabels,
   distributionStatuses,
+  emailAttachmentTypeLabels,
+  emailAttachmentTypes,
   rosterCategoryLabels,
 } from '../data/mockCallSheet'
-import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, listRosterPeople, updateCallSheet } from '../lib/api'
+import {
+  createRosterPerson,
+  deleteCallSheet,
+  downloadPdfFile,
+  duplicateCallSheet,
+  getCallSheet,
+  getEmailConfig,
+  listRosterPeople,
+  sendCallSheetEmail,
+  sendTestCallSheetEmail,
+  updateCallSheet,
+} from '../lib/api'
+import { renderCallSheetEmailHtml, renderCallSheetEmailText } from '../lib/email'
 
 type SectionKey =
   | 'overview'
@@ -74,6 +92,13 @@ const workflowActions: Record<CallSheetStatus, { label: string; nextStatus: Call
     label: 'Send Revised Sheet for Review',
     nextStatus: 'ready_for_review',
   },
+}
+
+type EmailConfig = {
+  configured: boolean
+  provider: string | null
+  fromEmail: string
+  fromName: string
 }
 
 function uid(prefix: string) {
@@ -131,6 +156,19 @@ function recipientKey(recipient: Pick<DistributionRecipient, 'name' | 'email'>) 
   return `${recipient.name.trim().toLowerCase()}|${recipient.email.trim().toLowerCase()}`
 }
 
+function normalized(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function rosterMatchKey(person: Pick<RosterPerson, 'name' | 'roleOrDepartment' | 'category'>) {
+  return `${normalized(person.name)}|${normalized(person.roleOrDepartment)}|${person.category}`
+}
+
+function sourceToRosterCategory(sourceType: DistributionRecipient['sourceType']): RosterCategory {
+  if (sourceType === 'cast' || sourceType === 'crew' || sourceType === 'emergency') return sourceType
+  return 'other'
+}
+
 function parsePeopleLines(text: string) {
   return text
     .split(/\r?\n/)
@@ -171,6 +209,11 @@ function CallSheetEditorPage() {
   const [selectedCastRosterId, setSelectedCastRosterId] = useState('')
   const [selectedCrewRosterId, setSelectedCrewRosterId] = useState('')
   const [selectedContactRosterId, setSelectedContactRosterId] = useState('')
+  const [mailConfig, setMailConfig] = useState<EmailConfig | null>(null)
+  const [testRecipientEmail, setTestRecipientEmail] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailNotice, setEmailNotice] = useState<string | null>(null)
+  const [harvestNotice, setHarvestNotice] = useState<string | null>(null)
   const dirtyRevisionRef = useRef(0)
   const lastAutosaveAttemptRevision = useRef(0)
 
@@ -216,6 +259,24 @@ function CallSheetEditorPage() {
         if (!active) return
         setRosterPeople([])
         setRosterError(err instanceof Error ? err.message : 'Failed to load production roster')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    getEmailConfig()
+      .then((config) => {
+        if (!active) return
+        setMailConfig(config)
+      })
+      .catch(() => {
+        if (!active) return
+        setMailConfig({ configured: false, provider: null, fromEmail: '', fromName: '' })
       })
 
     return () => {
@@ -298,7 +359,7 @@ function CallSheetEditorPage() {
     { key: 'scenes', label: 'Scenes', icon: '◈' },
     { key: 'cast', label: 'Cast', icon: '★' },
     { key: 'crew', label: 'Crew', icon: '☰' },
-    { key: 'distribution', label: 'Distribution', icon: '✉' },
+    { key: 'distribution', label: 'Email & Distribution', icon: '✉' },
   ]
 
   const patchDraft = (patch: Partial<CallSheetDraft>) => {
@@ -673,6 +734,208 @@ function CallSheetEditorPage() {
     patchDraft({ distributionStatus: status })
   }
 
+  const addEmailAttachment = () => {
+    if (!draft) return
+    const next: EmailAttachment = {
+      id: uid('attachment'),
+      label: 'Production File',
+      type: 'other',
+      fileName: '',
+      url: '',
+      notes: '',
+      included: true,
+    }
+    patchDraft({ emailAttachments: [...draft.emailAttachments, next] })
+  }
+
+  const updateEmailAttachment = (idValue: string, patch: Partial<EmailAttachment>) => {
+    if (!draft) return
+    patchDraft({
+      emailAttachments: draft.emailAttachments.map((attachment) =>
+        attachment.id === idValue ? { ...attachment, ...patch } : attachment,
+      ),
+    })
+  }
+
+  const removeEmailAttachment = (idValue: string) => {
+    if (!draft) return
+    patchDraft({
+      emailAttachments: draft.emailAttachments.filter((attachment) => attachment.id !== idValue),
+    })
+  }
+
+  const addTimelineItem = () => {
+    if (!draft) return
+    const next: EmailTimelineItem = {
+      id: uid('timeline'),
+      time: '',
+      text: '',
+    }
+    patchDraft({ emailTimelineItems: [...draft.emailTimelineItems, next] })
+  }
+
+  const updateTimelineItem = (idValue: string, patch: Partial<EmailTimelineItem>) => {
+    if (!draft) return
+    patchDraft({
+      emailTimelineItems: draft.emailTimelineItems.map((item) =>
+        item.id === idValue ? { ...item, ...patch } : item,
+      ),
+    })
+  }
+
+  const removeTimelineItem = (idValue: string) => {
+    if (!draft) return
+    patchDraft({
+      emailTimelineItems: draft.emailTimelineItems.filter((item) => item.id !== idValue),
+    })
+  }
+
+  const copyToClipboard = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setEmailNotice(`${label} copied.`)
+    } catch {
+      setEmailNotice(`Could not copy ${label.toLowerCase()}.`)
+    }
+  }
+
+  const harvestPeopleToRoster = async () => {
+    if (!draft) return
+
+    const candidates: Array<Omit<RosterPerson, 'id' | 'active'>> = [
+      ...draft.castCalls.map((cast) => ({
+        name: cast.castName,
+        category: 'cast' as RosterCategory,
+        roleOrDepartment: cast.roleName,
+        email: cast.email,
+        phone: '',
+        notes: cast.notes,
+      })),
+      ...draft.crewCalls.map((crew) => ({
+        name: crew.crewName,
+        category: 'crew' as RosterCategory,
+        roleOrDepartment: crew.departmentRole,
+        email: crew.email,
+        phone: '',
+        notes: crew.notes,
+      })),
+      ...draft.emergencyContacts.map((contact) => ({
+        name: contact.name,
+        category: 'emergency' as RosterCategory,
+        roleOrDepartment: contact.label,
+        email: '',
+        phone: contact.phone,
+        notes: '',
+      })),
+      ...draft.distributionRecipients.map((recipient) => ({
+        name: recipient.name,
+        category: sourceToRosterCategory(recipient.sourceType),
+        roleOrDepartment: recipient.role,
+        email: recipient.email,
+        phone: recipient.phone,
+        notes: recipient.notes,
+      })),
+    ]
+
+    const existingEmails = new Set(rosterPeople.map((person) => normalized(person.email)).filter(Boolean))
+    const existingPhones = new Set(rosterPeople.map((person) => normalized(person.phone)).filter(Boolean))
+    const existingNameRoles = new Set(rosterPeople.map(rosterMatchKey))
+    const seen = new Set<string>()
+    let alreadyInRoster = 0
+    let skippedMissingName = 0
+
+    const newPeople = candidates.filter((candidate) => {
+      if (!hasText(candidate.name)) {
+        skippedMissingName += 1
+        return false
+      }
+
+      const key = candidate.email
+        ? `email:${normalized(candidate.email)}`
+        : candidate.phone
+          ? `phone:${normalized(candidate.phone)}`
+          : `name:${rosterMatchKey(candidate)}`
+      if (seen.has(key)) return false
+      seen.add(key)
+
+      const exists = Boolean(
+        (candidate.email && existingEmails.has(normalized(candidate.email))) ||
+        (candidate.phone && existingPhones.has(normalized(candidate.phone))) ||
+        existingNameRoles.has(rosterMatchKey(candidate)),
+      )
+
+      if (exists) {
+        alreadyInRoster += 1
+        return false
+      }
+
+      return true
+    })
+
+    const ok = window.confirm(
+      `Add call sheet people to the production roster?\n\nFound: ${candidates.length}\nAlready in roster: ${alreadyInRoster}\nNew people to add: ${newPeople.length}\nSkipped missing name: ${skippedMissingName}`,
+    )
+    if (!ok || newPeople.length === 0) {
+      setHarvestNotice(newPeople.length === 0 ? 'No new roster people to add.' : null)
+      return
+    }
+
+    try {
+      const savedPeople = await Promise.all(newPeople.map((person) => createRosterPerson({ ...person, active: true })))
+      setRosterPeople((prev) => [...savedPeople, ...prev])
+      setHarvestNotice(`${savedPeople.length} ${savedPeople.length === 1 ? 'person was' : 'people were'} added to the roster.`)
+    } catch (err: unknown) {
+      setHarvestNotice(err instanceof Error ? err.message : 'Failed to add people to roster.')
+    }
+  }
+
+  const handleSendTestEmail = async () => {
+    if (!draft || !testRecipientEmail.trim()) return
+    const ok = window.confirm(`Send a test call sheet email to ${testRecipientEmail.trim()}?`)
+    if (!ok) return
+
+    try {
+      setSendingEmail(true)
+      setEmailNotice(null)
+      if (hasUnsavedChanges) {
+        await saveDraft('manual')
+      }
+      const result = await sendTestCallSheetEmail(draft.id, testRecipientEmail.trim())
+      setEmailNotice(`Test email sent to ${result.sent} recipient.`)
+    } catch (err: unknown) {
+      setEmailNotice(err instanceof Error ? err.message : 'Failed to send test email.')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
+  const handleSendEmail = async () => {
+    if (!draft) return
+    const recipientsWithEmail = draft.distributionRecipients.filter((recipient) => recipient.included && recipient.email.trim())
+    const ok = window.confirm(`Send this call sheet email to ${recipientsWithEmail.length} selected ${recipientsWithEmail.length === 1 ? 'recipient' : 'recipients'}?`)
+    if (!ok) return
+
+    try {
+      setSendingEmail(true)
+      setEmailNotice(null)
+      if (hasUnsavedChanges) {
+        await saveDraft('manual')
+      }
+      const result = await sendCallSheetEmail(draft.id)
+      setDraft(result.draft)
+      dirtyRevisionRef.current = 0
+      lastAutosaveAttemptRevision.current = 0
+      setDirtyRevision(0)
+      setHasUnsavedChanges(false)
+      setSaveState('saved')
+      setEmailNotice(`Email sent to ${result.sent} ${result.sent === 1 ? 'recipient' : 'recipients'}.`)
+    } catch (err: unknown) {
+      setEmailNotice(err instanceof Error ? err.message : 'Failed to send call sheet email.')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   const handleSave = () => {
     void saveDraft('manual')
   }
@@ -745,6 +1008,12 @@ function CallSheetEditorPage() {
   const noResponseRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'no_response')
   const issueRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'issue')
   const distributionContactGaps = getDistributionContactGaps(draft)
+  const emailHtml = renderCallSheetEmailHtml(draft)
+  const emailText = renderCallSheetEmailText(draft)
+  const includedEmailAttachments = draft.emailAttachments.filter((attachment) => attachment.included)
+  const missingAttachmentLinks = includedEmailAttachments.filter((attachment) => attachment.type !== 'call_sheet_pdf' && !hasText(attachment.url))
+  const recipientsWithEmail = includedRecipients.filter((recipient) => hasText(recipient.email))
+  const mailConfigured = mailConfig?.configured ?? false
   const activeRosterPeople = rosterPeople.filter((person) => person.active)
   const castRosterPeople = activeRosterPeople.filter((person) => person.category === 'cast')
   const crewRosterPeople = activeRosterPeople.filter((person) => person.category === 'crew')
@@ -1291,16 +1560,17 @@ function CallSheetEditorPage() {
           <div className="section-head">
             <div>
               <div className="editor-title-row">
-                <h2>Distribution</h2>
+                <h2>Email & Distribution</h2>
                 <span className={`status-badge distribution-status-badge distribution-status-badge-${distributionStatus}`}>
                   {distributionStatusLabel}
                 </span>
               </div>
-              <p>Prepare the crew message and track manual confirmations before the call sheet goes out.</p>
+              <p>Prepare the branded email, manage linked files, send when configured, and track confirmations.</p>
             </div>
-            <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>
-              Build Recipient List
-            </button>
+            <div className="distribution-header-actions">
+              <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>Build Recipient List</button>
+              <button className="vw-btn" type="button" onClick={harvestPeopleToRoster}>Save People to Roster</button>
+            </div>
           </div>
 
           {currentStatus !== 'published' && currentStatus !== 'revised' ? (
@@ -1309,7 +1579,222 @@ function CallSheetEditorPage() {
             </div>
           ) : null}
 
-          <div className="distribution-controls">
+          {!mailConfigured ? (
+            <div className="readiness-tip">
+              Email sending is not configured yet. You can still preview, copy, and use link-based attachments.
+            </div>
+          ) : null}
+
+          {emailNotice ? <div className="vw-inline-success">{emailNotice}</div> : null}
+          {harvestNotice ? <div className="vw-inline-success">{harvestNotice}</div> : null}
+
+          <div className="email-workflow-grid">
+            <article className="email-workflow-card">
+              <div className="email-workflow-step">1. Recipients</div>
+              <p>{includedRecipients.length} included recipients, {recipientsWithEmail.length} with email.</p>
+              <div className="distribution-actions">
+                <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>Build Recipient List</button>
+                <button className="vw-btn" type="button" onClick={harvestPeopleToRoster}>Save People to Roster</button>
+              </div>
+            </article>
+
+            <article className="email-workflow-card">
+              <div className="email-workflow-step">2. Email</div>
+              <p>{draft.emailSubject || 'No subject set'}</p>
+              <div className="distribution-actions">
+                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailHtml, 'HTML email')}>Copy HTML</button>
+                <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailText, 'Plain text email')}>Copy Plain Text</button>
+              </div>
+            </article>
+
+            <article className="email-workflow-card">
+              <div className="email-workflow-step">3. Attachments</div>
+              <p>{includedEmailAttachments.length} included files, {missingAttachmentLinks.length} links pending.</p>
+              {missingAttachmentLinks.length > 0 ? <div className="distribution-warning">Included non-PDF files need URLs before sending.</div> : null}
+            </article>
+
+            <article className="email-workflow-card">
+              <div className="email-workflow-step">4. Send / Track</div>
+              <p>{mailConfigured ? `Ready through ${mailConfig?.provider}.` : 'Preview and copy mode.'}</p>
+              <div className="distribution-actions">
+                <button className="vw-btn" type="button" onClick={() => markDistributionStatus('ready')}>Mark Ready</button>
+                <button className="vw-btn" type="button" onClick={() => markDistributionStatus('distributed')}>Mark Distributed</button>
+              </div>
+            </article>
+          </div>
+
+          <div className="email-editor-layout">
+            <div className="email-editor-panel">
+              <h3>Email Fields</h3>
+              <div className="field-grid field-grid-2">
+                <label className="field field-full">
+                  <span>Subject</span>
+                  <input value={draft.emailSubject} onChange={(event) => updateField('emailSubject', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Preheader</span>
+                  <input value={draft.emailPreheader} onChange={(event) => updateField('emailPreheader', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Headline</span>
+                  <input value={draft.emailHeadline} onChange={(event) => updateField('emailHeadline', event.target.value)} />
+                </label>
+                <label className="field field-full">
+                  <span>Intro</span>
+                  <textarea value={draft.emailIntro} onChange={(event) => updateField('emailIntro', event.target.value)} placeholder="Use the old distribution message as a starting point if helpful." />
+                </label>
+                <label className="field">
+                  <span>Sender name</span>
+                  <input value={draft.emailSenderName} onChange={(event) => updateField('emailSenderName', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Sender title</span>
+                  <input value={draft.emailSenderTitle} onChange={(event) => updateField('emailSenderTitle', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Reply-to email</span>
+                  <input value={draft.emailReplyTo} onChange={(event) => updateField('emailReplyTo', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Hero image URL</span>
+                  <input value={draft.emailHeroImageUrl} onChange={(event) => updateField('emailHeroImageUrl', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Transport title</span>
+                  <input value={draft.emailTransportTitle} onChange={(event) => updateField('emailTransportTitle', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Transport details</span>
+                  <input value={draft.emailTransportDetails} onChange={(event) => updateField('emailTransportDetails', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Weather title</span>
+                  <input value={draft.emailWeatherTitle} onChange={(event) => updateField('emailWeatherTitle', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Weather details</span>
+                  <input value={draft.emailWeatherDetails} onChange={(event) => updateField('emailWeatherDetails', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Set title</span>
+                  <input value={draft.emailSetTitle} onChange={(event) => updateField('emailSetTitle', event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>Set details</span>
+                  <input value={draft.emailSetDetails} onChange={(event) => updateField('emailSetDetails', event.target.value)} />
+                </label>
+                <label className="field field-full">
+                  <span>Please prepare</span>
+                  <textarea value={draft.emailPrepNotes} onChange={(event) => updateField('emailPrepNotes', event.target.value)} />
+                </label>
+                <label className="field field-full">
+                  <span>Production-provided supplies</span>
+                  <textarea value={draft.emailSuppliesNotes} onChange={(event) => updateField('emailSuppliesNotes', event.target.value)} />
+                </label>
+                <label className="field field-full">
+                  <span>Closing message</span>
+                  <textarea value={draft.emailClosingMessage} onChange={(event) => updateField('emailClosingMessage', event.target.value)} />
+                </label>
+              </div>
+            </div>
+
+            <div className="email-preview-panel">
+              <div className="section-head">
+                <div>
+                  <h3>Email Preview</h3>
+                </div>
+                <div className="distribution-actions">
+                  <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailHtml, 'HTML email')}>Copy HTML</button>
+                  <button className="vw-btn" type="button" onClick={() => copyToClipboard(emailText, 'Plain text email')}>Copy Plain Text</button>
+                </div>
+              </div>
+              <iframe className="email-preview-frame" title="Branded call sheet email preview" srcDoc={emailHtml} />
+            </div>
+          </div>
+
+          <div className="email-editor-panel">
+            <div className="section-head">
+              <div>
+                <h3>Quick Timeline</h3>
+                <p>Use this for the email summary. Keep the full flow of the day as an attachment link for now.</p>
+              </div>
+              <button className="vw-btn" type="button" onClick={addTimelineItem}>Add Timeline Item</button>
+            </div>
+            <div className="stack-list">
+              {draft.emailTimelineItems.map((item) => (
+                <div key={item.id} className="inline-row email-inline-row">
+                  <input className="inline-input timeline-time-input" value={item.time} onChange={(event) => updateTimelineItem(item.id, { time: event.target.value })} placeholder="8:00 AM" />
+                  <input className="inline-input" value={item.text} onChange={(event) => updateTimelineItem(item.id, { text: event.target.value })} placeholder="Crew call / company move / first shot" />
+                  <button className="vw-btn vw-btn-danger" type="button" onClick={() => removeTimelineItem(item.id)}>Remove</button>
+                </div>
+              ))}
+              {draft.emailTimelineItems.length === 0 ? <div className="vw-empty-block">Add a few top-line milestones for the email. The full flow can stay linked as a file.</div> : null}
+            </div>
+          </div>
+
+          <div className="email-editor-panel">
+            <div className="section-head">
+              <div>
+                <h3>Attachments / Files</h3>
+                <p>Phase 6 uses link-based files. The generated call sheet PDF stays available from Production Desk.</p>
+              </div>
+              <button className="vw-btn" type="button" onClick={addEmailAttachment}>Add Attachment</button>
+            </div>
+            <div className="stack-list">
+              {draft.emailAttachments.map((attachment) => (
+                <div key={attachment.id} className={`attachment-card ${attachment.included ? '' : 'is-excluded'}`}>
+                  <div className="attachment-card-head">
+                    <label className="recipient-include-toggle">
+                      <input checked={attachment.included} type="checkbox" onChange={(event) => updateEmailAttachment(attachment.id, { included: event.target.checked })} />
+                      <span>{attachment.included ? 'Included' : 'Excluded'}</span>
+                    </label>
+                    {attachment.included && attachment.type !== 'call_sheet_pdf' && !attachment.url ? (
+                      <span className="distribution-warning">URL needed</span>
+                    ) : null}
+                  </div>
+                  <div className="field-grid field-grid-2">
+                    <label className="field">
+                      <span>Label</span>
+                      <input value={attachment.label} onChange={(event) => updateEmailAttachment(attachment.id, { label: event.target.value })} />
+                    </label>
+                    <label className="field">
+                      <span>Type</span>
+                      <select value={attachment.type} onChange={(event) => updateEmailAttachment(attachment.id, { type: event.target.value as EmailAttachmentType })}>
+                        {emailAttachmentTypes.map((type) => (
+                          <option key={type} value={type}>{emailAttachmentTypeLabels[type]}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>File name</span>
+                      <input value={attachment.fileName} onChange={(event) => updateEmailAttachment(attachment.id, { fileName: event.target.value })} />
+                    </label>
+                    <label className="field">
+                      <span>URL</span>
+                      <input value={attachment.url} onChange={(event) => updateEmailAttachment(attachment.id, { url: event.target.value })} placeholder="Google Drive, Dropbox, map, or file link" />
+                    </label>
+                    <label className="field field-full">
+                      <span>Notes</span>
+                      <input value={attachment.notes} onChange={(event) => updateEmailAttachment(attachment.id, { notes: event.target.value })} />
+                    </label>
+                  </div>
+                  <div className="row-actions">
+                    <button className="vw-btn vw-btn-danger" type="button" onClick={() => removeEmailAttachment(attachment.id)}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="email-editor-panel">
+            <div className="section-head">
+              <div>
+                <h3>Send / Track</h3>
+                <p>Sending is explicit. Nothing goes out automatically.</p>
+              </div>
+            </div>
+
+            <div className="distribution-controls">
             <label className="field">
               <span>Distribution status</span>
               <select value={distributionStatus} onChange={(event) => handleDistributionStatusChange(event.target.value as DistributionStatus)}>
@@ -1320,28 +1805,34 @@ function CallSheetEditorPage() {
             </label>
 
             <label className="field field-full">
-              <span>Distribution Message</span>
+              <span>Legacy distribution message</span>
               <textarea
                 value={draft.distributionMessage}
                 onChange={(event) => updateField('distributionMessage', event.target.value)}
-                placeholder="Short note for cast and crew before this call sheet is distributed."
+                placeholder="Kept for compatibility. The email intro is the primary crew-facing message now."
               />
             </label>
-          </div>
+            </div>
 
-          <div className="distribution-actions">
-            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('ready')}>
-              Mark Ready to Distribute
-            </button>
-            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('distributed')}>
-              Mark Distributed
-            </button>
-            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('revision_distributed')}>
-              Mark Revision Distributed
-            </button>
-            <button className="vw-btn vw-btn-danger" type="button" onClick={() => markDistributionStatus('not_ready')}>
-              Reset Distribution
-            </button>
+            <div className="distribution-actions">
+              <button className="vw-btn" type="button" onClick={() => markDistributionStatus('ready')}>Mark Ready to Distribute</button>
+              <button className="vw-btn" type="button" onClick={() => markDistributionStatus('distributed')}>Mark Distributed</button>
+              <button className="vw-btn" type="button" onClick={() => markDistributionStatus('revision_distributed')}>Mark Revision Distributed</button>
+              <button className="vw-btn vw-btn-danger" type="button" onClick={() => markDistributionStatus('not_ready')}>Reset Distribution</button>
+            </div>
+
+            <div className="email-send-row">
+              <label className="field">
+                <span>Test recipient</span>
+                <input value={testRecipientEmail} onChange={(event) => setTestRecipientEmail(event.target.value)} placeholder="name@example.com" />
+              </label>
+              <button className="vw-btn" type="button" onClick={handleSendTestEmail} disabled={!mailConfigured || sendingEmail || !testRecipientEmail.trim()}>
+                {sendingEmail ? 'Sending...' : 'Send Test Email'}
+              </button>
+              <button className="vw-btn vw-btn-primary" type="button" onClick={handleSendEmail} disabled={!mailConfigured || sendingEmail || recipientsWithEmail.length === 0}>
+                {sendingEmail ? 'Sending...' : `Send to ${recipientsWithEmail.length}`}
+              </button>
+            </div>
           </div>
 
           <div className="distribution-summary-strip">

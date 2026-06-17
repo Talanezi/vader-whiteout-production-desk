@@ -69,6 +69,30 @@ export type DistributionRecipient = {
   notes: string;
 };
 
+export type EmailAttachmentType =
+  | 'call_sheet_pdf'
+  | 'flow_of_day'
+  | 'shortlist'
+  | 'map'
+  | 'safety'
+  | 'other';
+
+export type EmailAttachment = {
+  id: string;
+  label: string;
+  type: EmailAttachmentType;
+  fileName: string;
+  url: string;
+  notes: string;
+  included: boolean;
+};
+
+export type EmailTimelineItem = {
+  id: string;
+  time: string;
+  text: string;
+};
+
 export type CallSheetDraft = {
   id: string;
   status: CallSheetStatus;
@@ -94,6 +118,25 @@ export type CallSheetDraft = {
   distributionStatus: DistributionStatus;
   distributionRecipients: DistributionRecipient[];
   distributionMessage: string;
+  emailSubject: string;
+  emailPreheader: string;
+  emailHeadline: string;
+  emailIntro: string;
+  emailSenderName: string;
+  emailSenderTitle: string;
+  emailReplyTo: string;
+  emailHeroImageUrl: string;
+  emailTransportTitle: string;
+  emailTransportDetails: string;
+  emailWeatherTitle: string;
+  emailWeatherDetails: string;
+  emailSetTitle: string;
+  emailSetDetails: string;
+  emailPrepNotes: string;
+  emailSuppliesNotes: string;
+  emailClosingMessage: string;
+  emailAttachments: EmailAttachment[];
+  emailTimelineItems: EmailTimelineItem[];
 };
 
 export type RosterCategory = 'cast' | 'crew' | 'emergency' | 'other';

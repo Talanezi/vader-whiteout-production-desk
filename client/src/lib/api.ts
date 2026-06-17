@@ -75,6 +75,27 @@ export async function deleteCallSheet(id: string): Promise<{ ok: true; id: strin
   return parseJson(response)
 }
 
+export async function getEmailConfig(): Promise<{ configured: boolean; provider: string | null; fromEmail: string; fromName: string }> {
+  const response = await authFetch(`${API_BASE_URL}/callsheets/email/config`)
+  return parseJson(response)
+}
+
+export async function sendTestCallSheetEmail(id: string, testRecipientEmail: string): Promise<{ ok: true; sent: number }> {
+  const response = await authFetch(`${API_BASE_URL}/callsheets/${id}/email/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ testRecipientEmail }),
+  })
+  return parseJson(response)
+}
+
+export async function sendCallSheetEmail(id: string): Promise<{ ok: true; sent: number; draft: CallSheetDraft }> {
+  const response = await authFetch(`${API_BASE_URL}/callsheets/${id}/email/send`, {
+    method: 'POST',
+  })
+  return parseJson(response)
+}
+
 export async function listRosterPeople(): Promise<{ items: RosterPerson[]; total: number }> {
   const response = await authFetch(`${API_BASE_URL}/roster`)
   return parseJson(response)

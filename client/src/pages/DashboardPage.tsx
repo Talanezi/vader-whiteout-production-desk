@@ -178,10 +178,12 @@ function DashboardPage() {
     if (included.length === 0) return 'No distribution list yet'
 
     const confirmed = included.filter((recipient) => recipient.confirmationStatus === 'confirmed').length
+    const sent = included.filter((recipient) => recipient.confirmationStatus === 'sent').length
     const noResponse = included.filter((recipient) => recipient.confirmationStatus === 'no_response').length
     const issue = included.filter((recipient) => recipient.confirmationStatus === 'issue').length
+    const missingEmail = included.filter((recipient) => !recipient.email).length
 
-    return `${included.length} recipients · ${confirmed} confirmed · ${noResponse} no response · ${issue} issue`
+    return `${included.length} recipients · ${sent} sent · ${confirmed} confirmed · ${noResponse} no response · ${issue} issue · ${missingEmail} missing email`
   }
 
   const renderCallSheetRow = (item: CallSheetDraft) => {

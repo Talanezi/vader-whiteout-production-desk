@@ -5,6 +5,8 @@ type Props = {
 }
 
 function CallSheetPreview({ draft }: Props) {
+  const crewMessage = draft.distributionMessage || draft.emailIntro
+
   return (
     <section className="preview-wrap">
       <div className="pdf-preview panel">
@@ -75,10 +77,10 @@ function CallSheetPreview({ draft }: Props) {
             </div>
           ) : null}
 
-          {draft.distributionMessage ? (
+          {crewMessage ? (
             <div className="pdf-notes-block">
               <div className="pdf-section-title">Message to Crew</div>
-              <div className="pdf-notes-copy">{draft.distributionMessage}</div>
+              <div className="pdf-notes-copy">{crewMessage}</div>
             </div>
           ) : null}
 

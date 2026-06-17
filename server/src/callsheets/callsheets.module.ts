@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { MailModule } from '../mail/mail.module';
 import { CallsheetsController } from './callsheets.controller';
 import { CallsheetsService } from './callsheets.service';
 import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
@@ -9,6 +10,7 @@ import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
   imports: [
     TypeOrmModule.forFeature([CallSheetDraftEntity]),
     AuthModule,
+    MailModule,
   ],
   controllers: [CallsheetsController],
   providers: [CallsheetsService],
