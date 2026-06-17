@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft, CallSheetStatus } from '../data/mockCallSheet'
-import { callSheetStatusLabels, callSheetStatuses } from '../data/mockCallSheet'
+import { callSheetStatusLabels, callSheetStatuses, distributionStatusLabels } from '../data/mockCallSheet'
 import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets, listRosterPeople } from '../lib/api'
 
 type DashboardGroup = {
@@ -172,21 +172,40 @@ function DashboardPage() {
     }
   }
 
+  const getDistributionSummary = (item: CallSheetDraft) => {
+    const recipients = item.distributionRecipients || []
+    const included = recipients.filter((recipient) => recipient.included)
+    if (included.length === 0) return 'No distribution list yet'
+
+    const confirmed = included.filter((recipient) => recipient.confirmationStatus === 'confirmed').length
+    const noResponse = included.filter((recipient) => recipient.confirmationStatus === 'no_response').length
+    const issue = included.filter((recipient) => recipient.confirmationStatus === 'issue').length
+
+    return `${included.length} recipients · ${confirmed} confirmed · ${noResponse} no response · ${issue} issue`
+  }
+
   const renderCallSheetRow = (item: CallSheetDraft) => {
     const status = getStatus(item)
+    const distributionStatus = item.distributionStatus || 'not_ready'
 
     return (
       <div key={item.id} className="vw-list-row vw-call-sheet-row">
-          <div className="vw-list-copy">
+        <div className="vw-list-copy">
           <div className="vw-list-title">{item.title || 'Untitled Call Sheet'}</div>
           <div className="vw-list-meta">
             {item.productionDate || 'No production date set'} • Primary Crew Call {item.primaryCallTime || 'Not set'}
+          </div>
+          <div className="vw-list-meta distribution-dashboard-meta">
+            {distributionStatusLabels[distributionStatus]} • {getDistributionSummary(item)}
           </div>
         </div>
 
         <div className="vw-list-actions vw-call-sheet-actions">
           <span className={`status-badge dashboard-status-badge dashboard-status-badge-${status}`}>
             {callSheetStatusLabels[status]}
+          </span>
+          <span className={`status-badge distribution-status-badge distribution-status-badge-${distributionStatus}`}>
+            {distributionStatusLabels[distributionStatus]}
           </span>
           <Link className="vw-inline-link" to={`/callsheets/${item.id}/edit`}>
             Open/Edit

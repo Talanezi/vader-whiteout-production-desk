@@ -43,6 +43,32 @@ export type CallSheetStatus =
   | 'published'
   | 'revised';
 
+export type DistributionStatus =
+  | 'not_ready'
+  | 'ready'
+  | 'distributed'
+  | 'revision_distributed';
+
+export type ConfirmationStatus =
+  | 'not_sent'
+  | 'sent'
+  | 'confirmed'
+  | 'no_response'
+  | 'issue';
+
+export type DistributionRecipient = {
+  id: string;
+  sourceType: 'cast' | 'crew' | 'emergency' | 'manual';
+  sourceRowId?: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  included: boolean;
+  confirmationStatus: ConfirmationStatus;
+  notes: string;
+};
+
 export type CallSheetDraft = {
   id: string;
   status: CallSheetStatus;
@@ -65,6 +91,9 @@ export type CallSheetDraft = {
   crewCalls: CrewCallRow[];
   generalNotes: string;
   distributionNotes: string;
+  distributionStatus: DistributionStatus;
+  distributionRecipients: DistributionRecipient[];
+  distributionMessage: string;
 };
 
 export type RosterCategory = 'cast' | 'crew' | 'emergency' | 'other';

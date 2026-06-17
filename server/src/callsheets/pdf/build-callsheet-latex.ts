@@ -82,6 +82,16 @@ export function buildCallSheetLatex(draft: CallSheetDraft) {
     ? draft.nearestHospitalAddress.map((line) => `${esc(line)}\\\\`).join('\n')
     : '\\\\';
 
+  const distributionMessageBlock = draft.distributionMessage
+    ? String.raw`
+\vspace{0.18em}
+\begin{simplebox}
+{\small\bfseries MESSAGE TO CREW}\\[4pt]
+${esc(draft.distributionMessage)}
+\end{simplebox}
+`
+    : '';
+
   return String.raw`\documentclass[10pt]{article}
 
 \usepackage[letterpaper,landscape,margin=0.42in]{geometry}
@@ -195,6 +205,8 @@ ${hospitalAddress}
 \end{minipage}
 
 \vspace{0.18em}
+
+${distributionMessageBlock}
 
 \section*{Scenes / Set Breakdown}
 

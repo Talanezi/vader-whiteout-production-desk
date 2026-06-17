@@ -53,6 +53,51 @@ export const callSheetStatusLabels: Record<CallSheetStatus, string> = {
 
 export const callSheetStatuses = Object.keys(callSheetStatusLabels) as CallSheetStatus[]
 
+export type DistributionStatus =
+  | 'not_ready'
+  | 'ready'
+  | 'distributed'
+  | 'revision_distributed'
+
+export const distributionStatusLabels: Record<DistributionStatus, string> = {
+  not_ready: 'Not Ready',
+  ready: 'Ready to Distribute',
+  distributed: 'Distributed',
+  revision_distributed: 'Revision Distributed',
+}
+
+export const distributionStatuses = Object.keys(distributionStatusLabels) as DistributionStatus[]
+
+export type ConfirmationStatus =
+  | 'not_sent'
+  | 'sent'
+  | 'confirmed'
+  | 'no_response'
+  | 'issue'
+
+export const confirmationStatusLabels: Record<ConfirmationStatus, string> = {
+  not_sent: 'Not Sent',
+  sent: 'Sent',
+  confirmed: 'Confirmed',
+  no_response: 'No Response',
+  issue: 'Issue',
+}
+
+export const confirmationStatuses = Object.keys(confirmationStatusLabels) as ConfirmationStatus[]
+
+export type DistributionRecipient = {
+  id: string
+  sourceType: 'cast' | 'crew' | 'emergency' | 'manual'
+  sourceRowId?: string
+  name: string
+  role: string
+  email: string
+  phone: string
+  included: boolean
+  confirmationStatus: ConfirmationStatus
+  notes: string
+}
+
 export type RosterCategory = 'cast' | 'crew' | 'emergency' | 'other'
 
 export const rosterCategoryLabels: Record<RosterCategory, string> = {
@@ -97,6 +142,9 @@ export type CallSheetDraft = {
   crewCalls: CrewCallRow[]
   generalNotes: string
   distributionNotes: string
+  distributionStatus: DistributionStatus
+  distributionRecipients: DistributionRecipient[]
+  distributionMessage: string
 }
 
 export const mockCallSheet: CallSheetDraft = {
@@ -186,4 +234,7 @@ export const mockCallSheet: CallSheetDraft = {
   ],
   generalNotes: 'Builder shell only for now. PDF generation and real persistence come next.',
   distributionNotes: '',
+  distributionStatus: 'not_ready',
+  distributionRecipients: [],
+  distributionMessage: '',
 }

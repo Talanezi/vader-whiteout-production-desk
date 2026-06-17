@@ -75,6 +75,13 @@ function CallSheetPreview({ draft }: Props) {
             </div>
           ) : null}
 
+          {draft.distributionMessage ? (
+            <div className="pdf-notes-block">
+              <div className="pdf-section-title">Message to Crew</div>
+              <div className="pdf-notes-copy">{draft.distributionMessage}</div>
+            </div>
+          ) : null}
+
           <div className="pdf-table-block">
             <div className="pdf-section-title">Scenes / Set Breakdown</div>
             <table className="pdf-table">

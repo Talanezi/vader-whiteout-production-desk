@@ -54,7 +54,10 @@ export const seedCallSheet: CallSheetDraft = {
     }
   ],
   generalNotes: 'Builder shell only for now. PDF generation and real persistence come next.',
-  distributionNotes: ''
+  distributionNotes: '',
+  distributionStatus: 'not_ready',
+  distributionRecipients: [],
+  distributionMessage: ''
 };
 
 export const callSheetStore = new Map<string, CallSheetDraft>([

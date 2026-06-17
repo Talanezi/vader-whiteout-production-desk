@@ -426,6 +426,35 @@ select {
   color: #eadcff;
 }
 
+.distribution-dashboard-meta {
+  margin-top: 4px;
+}
+
+.distribution-status-badge {
+  min-height: 28px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.distribution-status-badge-not_ready {
+  border-color: rgba(255, 210, 120, 0.18);
+  background: rgba(255, 210, 120, 0.06);
+  color: #ffe2a4;
+}
+
+.distribution-status-badge-ready {
+  border-color: rgba(120, 200, 255, 0.24);
+  background: rgba(120, 200, 255, 0.08);
+  color: #d8f5ff;
+}
+
+.distribution-status-badge-distributed,
+.distribution-status-badge-revision_distributed {
+  border-color: rgba(150, 255, 205, 0.18);
+  background: rgba(150, 255, 205, 0.06);
+  color: #c8ffe2;
+}
+
 .vw-empty-block {
   margin-top: 18px;
   padding: 18px;
@@ -746,6 +775,108 @@ select {
   color: #d5ffe3;
 }
 
+.distribution-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.4fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.distribution-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.distribution-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.distribution-summary-strip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.025);
+  color: rgba(244, 244, 244, 0.78);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.distribution-recipient-list {
+  display: grid;
+  gap: 12px;
+}
+
+.distribution-recipient-card {
+  padding: 14px;
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+}
+
+.distribution-recipient-card.is-excluded {
+  opacity: 0.62;
+}
+
+.distribution-recipient-head,
+.distribution-recipient-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.recipient-include-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 244, 244, 0.8);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.recipient-include-toggle input {
+  accent-color: rgb(120, 215, 255);
+}
+
+.distribution-recipient-main {
+  margin-top: 12px;
+}
+
+.distribution-recipient-main h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.distribution-recipient-main p,
+.distribution-contact-line {
+  margin: 3px 0 0;
+  color: var(--mute);
+  font-size: 0.88rem;
+}
+
+.distribution-contact-line {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.distribution-warning {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 210, 120, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 210, 120, 0.08);
+  color: #ffe2a4;
+  font-size: 0.86rem;
+}
+
 .section-chip-row {
   display: flex;
   gap: 10px;
@@ -1044,7 +1175,8 @@ select {
   .dashboard-controls,
   .production-summary,
   .dashboard-stats,
-  .roster-picker-panel {
+  .roster-picker-panel,
+  .distribution-controls {
     grid-template-columns: 1fr;
   }
 }
@@ -1053,6 +1185,8 @@ select {
   .vw-dashboard-hero-inner,
   .vw-call-sheet-row,
   .vw-call-sheet-actions,
+  .distribution-recipient-head,
+  .distribution-recipient-main,
   .readiness-head {
     align-items: flex-start;
     flex-direction: column;
@@ -1060,6 +1194,10 @@ select {
 
   .vw-call-sheet-actions {
     justify-content: flex-start;
+  }
+
+  .distribution-contact-line {
+    text-align: left;
   }
 
   .vw-navbar-inner {

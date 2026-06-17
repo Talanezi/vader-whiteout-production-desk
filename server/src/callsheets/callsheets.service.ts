@@ -2,7 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CallSheetDraft, CallSheetStatus } from './callsheet.types';
+import {
+  CallSheetDraft,
+  ConfirmationStatus,
+  DistributionRecipient,
+  DistributionStatus,
+  CallSheetStatus,
+} from './callsheet.types';
 import { CallSheetDraftEntity } from './entities/callsheet-draft.entity';
 
 const supportedStatuses: CallSheetStatus[] = [
@@ -11,6 +17,21 @@ const supportedStatuses: CallSheetStatus[] = [
   'approved',
   'published',
   'revised',
+];
+
+const supportedDistributionStatuses: DistributionStatus[] = [
+  'not_ready',
+  'ready',
+  'distributed',
+  'revision_distributed',
+];
+
+const supportedConfirmationStatuses: ConfirmationStatus[] = [
+  'not_sent',
+  'sent',
+  'confirmed',
+  'no_response',
+  'issue',
 ];
 
 @Injectable()
@@ -24,6 +45,40 @@ export class CallsheetsService {
     return typeof status === 'string' && supportedStatuses.includes(status as CallSheetStatus)
       ? (status as CallSheetStatus)
       : 'draft';
+  }
+
+  private normalizeDistributionStatus(status: unknown): DistributionStatus {
+    return typeof status === 'string' && supportedDistributionStatuses.includes(status as DistributionStatus)
+      ? (status as DistributionStatus)
+      : 'not_ready';
+  }
+
+  private normalizeConfirmationStatus(status: unknown): ConfirmationStatus {
+    return typeof status === 'string' && supportedConfirmationStatuses.includes(status as ConfirmationStatus)
+      ? (status as ConfirmationStatus)
+      : 'not_sent';
+  }
+
+  private normalizeRecipients(recipients: unknown): DistributionRecipient[] {
+    if (!Array.isArray(recipients)) return [];
+
+    return recipients.map((recipient, index) => {
+      const value = recipient as Partial<DistributionRecipient>;
+      return {
+        id: value.id || `recipient-${index + 1}`,
+        sourceType: value.sourceType === 'cast' || value.sourceType === 'crew' || value.sourceType === 'emergency' || value.sourceType === 'manual'
+          ? value.sourceType
+          : 'manual',
+        sourceRowId: value.sourceRowId || undefined,
+        name: value.name || '',
+        role: value.role || '',
+        email: value.email || '',
+        phone: value.phone || '',
+        included: value.included !== false,
+        confirmationStatus: this.normalizeConfirmationStatus(value.confirmationStatus),
+        notes: value.notes || '',
+      };
+    });
   }
 
   private normalizeDraft(id: string, payload?: Partial<CallSheetDraft>): CallSheetDraft {
@@ -49,6 +104,9 @@ export class CallsheetsService {
       crewCalls: payload?.crewCalls || [],
       generalNotes: payload?.generalNotes || '',
       distributionNotes: payload?.distributionNotes || '',
+      distributionStatus: this.normalizeDistributionStatus(payload?.distributionStatus),
+      distributionRecipients: this.normalizeRecipients(payload?.distributionRecipients),
+      distributionMessage: payload?.distributionMessage || '',
     };
   }
 

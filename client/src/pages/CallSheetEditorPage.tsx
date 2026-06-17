@@ -6,12 +6,22 @@ import type {
   CallSheetDraft,
   CallSheetStatus,
   CastCallRow,
+  ConfirmationStatus,
   CrewCallRow,
+  DistributionRecipient,
+  DistributionStatus,
   EmergencyContact,
   RosterPerson,
   SceneRow,
 } from '../data/mockCallSheet'
-import { callSheetStatusLabels, rosterCategoryLabels } from '../data/mockCallSheet'
+import {
+  callSheetStatusLabels,
+  confirmationStatusLabels,
+  confirmationStatuses,
+  distributionStatusLabels,
+  distributionStatuses,
+  rosterCategoryLabels,
+} from '../data/mockCallSheet'
 import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, listRosterPeople, updateCallSheet } from '../lib/api'
 
 type SectionKey =
@@ -22,6 +32,7 @@ type SectionKey =
   | 'scenes'
   | 'cast'
   | 'crew'
+  | 'distribution'
 
 type SaveMode = 'manual' | 'autosave'
 type SaveState = 'saved' | 'unsaved' | 'manual-saving' | 'autosaving' | 'autosave-failed' | 'save-failed'
@@ -84,7 +95,16 @@ function insertAfter<T extends { id: string }>(items: T[], idValue: string, item
   return next
 }
 
+function getDistributionContactGaps(draft: CallSheetDraft) {
+  return draft.distributionRecipients.filter((recipient) =>
+    recipient.included && !hasText(recipient.email) && !hasText(recipient.phone),
+  )
+}
+
 function getReadinessItems(draft: CallSheetDraft, status: CallSheetStatus): ReadinessItem[] {
+  const includedRecipients = draft.distributionRecipients.filter((recipient) => recipient.included)
+  const contactGaps = getDistributionContactGaps(draft)
+
   return [
     { label: 'Title', complete: hasText(draft.title), severity: 'critical' },
     { label: 'Production date', complete: hasText(draft.productionDate), severity: 'critical' },
@@ -101,7 +121,14 @@ function getReadinessItems(draft: CallSheetDraft, status: CallSheetStatus): Read
       complete: status === 'revised' || status === 'published' ? hasText(draft.distributionNotes) : true,
       severity: 'recommended',
     },
+    { label: 'Distribution recipients', complete: includedRecipients.length > 0, severity: 'critical' },
+    { label: 'Recipient email or phone', complete: contactGaps.length === 0, severity: 'critical' },
+    { label: 'Distribution message', complete: hasText(draft.distributionMessage), severity: 'recommended' },
   ]
+}
+
+function recipientKey(recipient: Pick<DistributionRecipient, 'name' | 'email'>) {
+  return `${recipient.name.trim().toLowerCase()}|${recipient.email.trim().toLowerCase()}`
 }
 
 function parsePeopleLines(text: string) {
@@ -271,6 +298,7 @@ function CallSheetEditorPage() {
     { key: 'scenes', label: 'Scenes', icon: '◈' },
     { key: 'cast', label: 'Cast', icon: '★' },
     { key: 'crew', label: 'Crew', icon: '☰' },
+    { key: 'distribution', label: 'Distribution', icon: '✉' },
   ]
 
   const patchDraft = (patch: Partial<CallSheetDraft>) => {
@@ -337,6 +365,15 @@ function CallSheetEditorPage() {
     patchDraft({
       [field]: draft[field].filter((item) => item.id !== idValue),
     } as Partial<CallSheetDraft>)
+  }
+
+  const updateDistributionRecipient = (idValue: string, patch: Partial<DistributionRecipient>) => {
+    if (!draft) return
+    patchDraft({
+      distributionRecipients: draft.distributionRecipients.map((recipient) =>
+        recipient.id === idValue ? { ...recipient, ...patch } : recipient,
+      ),
+    })
   }
 
   const toggleRow = (idValue: string) => {
@@ -539,6 +576,103 @@ function CallSheetEditorPage() {
     }))
   }
 
+  const buildDistributionRecipients = () => {
+    if (!draft) return
+
+    const existingByKey = new Map(draft.distributionRecipients.map((recipient) => [recipientKey(recipient), recipient]))
+    const seen = new Set<string>()
+
+    const candidates: DistributionRecipient[] = [
+      ...draft.castCalls.map((cast) => ({
+        id: uid('dist'),
+        sourceType: 'cast' as const,
+        sourceRowId: cast.id,
+        name: cast.castName,
+        role: cast.roleName,
+        email: cast.email,
+        phone: '',
+        included: true,
+        confirmationStatus: 'not_sent' as ConfirmationStatus,
+        notes: '',
+      })),
+      ...draft.crewCalls.map((crew) => ({
+        id: uid('dist'),
+        sourceType: 'crew' as const,
+        sourceRowId: crew.id,
+        name: crew.crewName,
+        role: crew.departmentRole,
+        email: crew.email,
+        phone: '',
+        included: true,
+        confirmationStatus: 'not_sent' as ConfirmationStatus,
+        notes: '',
+      })),
+      ...draft.emergencyContacts.map((contact) => ({
+        id: uid('dist'),
+        sourceType: 'emergency' as const,
+        sourceRowId: contact.id,
+        name: contact.name,
+        role: contact.label,
+        email: '',
+        phone: contact.phone,
+        included: true,
+        confirmationStatus: 'not_sent' as ConfirmationStatus,
+        notes: '',
+      })),
+    ]
+
+    const nextRecipients = candidates
+      .filter((recipient) => hasText(recipient.name) || hasText(recipient.email) || hasText(recipient.phone))
+      .filter((recipient) => {
+        const key = recipientKey(recipient)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .map((recipient) => {
+        const existing = existingByKey.get(recipientKey(recipient))
+        return existing
+          ? {
+              ...recipient,
+              id: existing.id,
+              included: existing.included,
+              confirmationStatus: existing.confirmationStatus,
+              notes: existing.notes,
+            }
+          : recipient
+      })
+
+    patchDraft({ distributionRecipients: nextRecipients })
+  }
+
+  const handleDistributionStatusChange = (status: DistributionStatus) => {
+    patchDraft({ distributionStatus: status })
+  }
+
+  const confirmDistributionMilestone = (status: DistributionStatus) => {
+    if (!draft) return false
+    if (status !== 'distributed' && status !== 'revision_distributed') return true
+
+    const warnings: string[] = []
+    if (currentStatus !== 'published' && currentStatus !== 'revised') {
+      warnings.push('Publish the call sheet before final distribution.')
+    }
+
+    const contactGaps = getDistributionContactGaps(draft)
+    if (contactGaps.length > 0) {
+      warnings.push(`${contactGaps.length} included ${contactGaps.length === 1 ? 'recipient is' : 'recipients are'} missing both email and phone.`)
+    }
+
+    if (warnings.length === 0) return true
+
+    return window.confirm(`${warnings.join('\n')}\n\nMark this distribution status anyway?`)
+  }
+
+  const markDistributionStatus = (status: DistributionStatus) => {
+    if (!confirmDistributionMilestone(status)) return
+    patchDraft({ distributionStatus: status })
+  }
+
   const handleSave = () => {
     void saveDraft('manual')
   }
@@ -598,12 +732,19 @@ function CallSheetEditorPage() {
 
   const currentStatus = draft.status || 'draft'
   const statusLabel = callSheetStatusLabels[currentStatus]
+  const distributionStatus = draft.distributionStatus || 'not_ready'
+  const distributionStatusLabel = distributionStatusLabels[distributionStatus]
   const saveStateLabel = saveStateLabels[saveState]
   const workflowAction = workflowActions[currentStatus]
   const readinessItems = getReadinessItems(draft, currentStatus)
   const missingReadinessItems = readinessItems.filter((item) => !item.complete)
   const missingCriticalItems = missingReadinessItems.filter((item) => item.severity === 'critical')
   const readinessCompleteCount = readinessItems.length - missingReadinessItems.length
+  const includedRecipients = draft.distributionRecipients.filter((recipient) => recipient.included)
+  const confirmedRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'confirmed')
+  const noResponseRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'no_response')
+  const issueRecipients = includedRecipients.filter((recipient) => recipient.confirmationStatus === 'issue')
+  const distributionContactGaps = getDistributionContactGaps(draft)
   const activeRosterPeople = rosterPeople.filter((person) => person.active)
   const castRosterPeople = activeRosterPeople.filter((person) => person.category === 'cast')
   const crewRosterPeople = activeRosterPeople.filter((person) => person.category === 'crew')
@@ -678,6 +819,10 @@ function CallSheetEditorPage() {
       <div className="summary-item">
         <span>Readiness</span>
         <strong>{readinessCompleteCount}/{readinessItems.length} complete</strong>
+      </div>
+      <div className="summary-item">
+        <span>Distribution</span>
+        <strong>{distributionStatusLabel}</strong>
       </div>
       <div className="summary-item">
         <span>Autosave</span>
@@ -1135,6 +1280,145 @@ function CallSheetEditorPage() {
                 </div>
               )
             })}
+          </div>
+        </section>
+      )
+    }
+
+    if (activeSection === 'distribution') {
+      return (
+        <section className="builder-form panel">
+          <div className="section-head">
+            <div>
+              <div className="editor-title-row">
+                <h2>Distribution</h2>
+                <span className={`status-badge distribution-status-badge distribution-status-badge-${distributionStatus}`}>
+                  {distributionStatusLabel}
+                </span>
+              </div>
+              <p>Prepare the crew message and track manual confirmations before the call sheet goes out.</p>
+            </div>
+            <button className="vw-btn" type="button" onClick={buildDistributionRecipients}>
+              Build Recipient List
+            </button>
+          </div>
+
+          {currentStatus !== 'published' && currentStatus !== 'revised' ? (
+            <div className="readiness-tip">
+              Publish the call sheet before final distribution. You can still prepare recipients and confirmations early.
+            </div>
+          ) : null}
+
+          <div className="distribution-controls">
+            <label className="field">
+              <span>Distribution status</span>
+              <select value={distributionStatus} onChange={(event) => handleDistributionStatusChange(event.target.value as DistributionStatus)}>
+                {distributionStatuses.map((status) => (
+                  <option key={status} value={status}>{distributionStatusLabels[status]}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field field-full">
+              <span>Distribution Message</span>
+              <textarea
+                value={draft.distributionMessage}
+                onChange={(event) => updateField('distributionMessage', event.target.value)}
+                placeholder="Short note for cast and crew before this call sheet is distributed."
+              />
+            </label>
+          </div>
+
+          <div className="distribution-actions">
+            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('ready')}>
+              Mark Ready to Distribute
+            </button>
+            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('distributed')}>
+              Mark Distributed
+            </button>
+            <button className="vw-btn" type="button" onClick={() => markDistributionStatus('revision_distributed')}>
+              Mark Revision Distributed
+            </button>
+            <button className="vw-btn vw-btn-danger" type="button" onClick={() => markDistributionStatus('not_ready')}>
+              Reset Distribution
+            </button>
+          </div>
+
+          <div className="distribution-summary-strip">
+            <span>{includedRecipients.length} included</span>
+            <span>{confirmedRecipients.length} confirmed</span>
+            <span>{noResponseRecipients.length} no response</span>
+            <span>{issueRecipients.length} issue</span>
+            <span>{distributionContactGaps.length} missing contact</span>
+          </div>
+
+          <div className="distribution-recipient-list">
+            {draft.distributionRecipients.length === 0 ? (
+              <div className="vw-empty-block">
+                Build the recipient list from cast, crew, and emergency contact rows when the call sheet is close to distribution.
+              </div>
+            ) : (
+              draft.distributionRecipients.map((recipient) => (
+                <article key={recipient.id} className={`distribution-recipient-card ${recipient.included ? '' : 'is-excluded'}`}>
+                  <div className="distribution-recipient-head">
+                    <label className="recipient-include-toggle">
+                      <input
+                        type="checkbox"
+                        checked={recipient.included}
+                        onChange={(event) => updateDistributionRecipient(recipient.id, { included: event.target.checked })}
+                      />
+                      <span>{recipient.included ? 'Included' : 'Excluded'}</span>
+                    </label>
+                    <span className="status-badge">
+                      {recipient.sourceType === 'cast'
+                        ? 'Cast'
+                        : recipient.sourceType === 'crew'
+                          ? 'Crew'
+                          : recipient.sourceType === 'emergency'
+                            ? 'Emergency'
+                            : 'Manual'}
+                    </span>
+                  </div>
+
+                  <div className="distribution-recipient-main">
+                    <div>
+                      <h3>{recipient.name || 'Unnamed recipient'}</h3>
+                      <p>{recipient.role || 'No role set'}</p>
+                    </div>
+                    <div className="distribution-contact-line">
+                      {recipient.email || recipient.phone || 'Missing email and phone'}
+                    </div>
+                  </div>
+
+                  {!recipient.email && !recipient.phone ? (
+                    <div className="distribution-warning">Add an email or phone before final distribution.</div>
+                  ) : null}
+
+                  <div className="field-grid field-grid-2">
+                    <label className="field">
+                      <span>Confirmation</span>
+                      <select
+                        value={recipient.confirmationStatus}
+                        onChange={(event) => updateDistributionRecipient(recipient.id, { confirmationStatus: event.target.value as ConfirmationStatus })}
+                      >
+                        {confirmationStatuses.map((status) => (
+                          <option key={status} value={status}>{confirmationStatusLabels[status]}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      <span>Notes</span>
+                      <input
+                        value={recipient.notes}
+                        onChange={(event) => updateDistributionRecipient(recipient.id, { notes: event.target.value })}
+                        placeholder="Manual follow-up notes"
+                      />
+                    </label>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
       )
