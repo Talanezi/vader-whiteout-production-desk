@@ -8,10 +8,11 @@ import type {
   CastCallRow,
   CrewCallRow,
   EmergencyContact,
+  RosterPerson,
   SceneRow,
 } from '../data/mockCallSheet'
-import { callSheetStatusLabels } from '../data/mockCallSheet'
-import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, updateCallSheet } from '../lib/api'
+import { callSheetStatusLabels, rosterCategoryLabels } from '../data/mockCallSheet'
+import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getCallSheet, listRosterPeople, updateCallSheet } from '../lib/api'
 
 type SectionKey =
   | 'overview'
@@ -138,6 +139,11 @@ function CallSheetEditorPage() {
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({})
   const [castQuickAddText, setCastQuickAddText] = useState('')
   const [crewQuickAddText, setCrewQuickAddText] = useState('')
+  const [rosterPeople, setRosterPeople] = useState<RosterPerson[]>([])
+  const [rosterError, setRosterError] = useState<string | null>(null)
+  const [selectedCastRosterId, setSelectedCastRosterId] = useState('')
+  const [selectedCrewRosterId, setSelectedCrewRosterId] = useState('')
+  const [selectedContactRosterId, setSelectedContactRosterId] = useState('')
   const dirtyRevisionRef = useRef(0)
   const lastAutosaveAttemptRevision = useRef(0)
 
@@ -169,6 +175,26 @@ function CallSheetEditorPage() {
       active = false
     }
   }, [id])
+
+  useEffect(() => {
+    let active = true
+
+    listRosterPeople()
+      .then((data) => {
+        if (!active) return
+        setRosterPeople(data.items)
+        setRosterError(null)
+      })
+      .catch((err: unknown) => {
+        if (!active) return
+        setRosterPeople([])
+        setRosterError(err instanceof Error ? err.message : 'Failed to load production roster')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const markDraftUnsaved = () => {
     dirtyRevisionRef.current += 1
@@ -423,6 +449,52 @@ function CallSheetEditorPage() {
     setOpenRows((prev) => ({ ...prev, [next.id]: true }))
   }
 
+  const addCastFromRoster = (person: RosterPerson) => {
+    if (!draft) return
+    const next: CastCallRow = {
+      id: uid('cast'),
+      rosterPersonId: person.id,
+      castName: person.name,
+      roleName: person.roleOrDepartment,
+      email: person.email,
+      callTime: draft.primaryCallTime || '',
+      notes: person.notes,
+    }
+    patchDraft({ castCalls: [...draft.castCalls, next] })
+    setActiveSection('cast')
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
+  const addCrewFromRoster = (person: RosterPerson) => {
+    if (!draft) return
+    const next: CrewCallRow = {
+      id: uid('crew'),
+      rosterPersonId: person.id,
+      departmentRole: person.roleOrDepartment,
+      crewName: person.name,
+      email: person.email,
+      callTime: draft.primaryCallTime || '',
+      notes: person.notes,
+    }
+    patchDraft({ crewCalls: [...draft.crewCalls, next] })
+    setActiveSection('crew')
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
+  const addEmergencyContactFromRoster = (person: RosterPerson) => {
+    if (!draft) return
+    const next: EmergencyContact = {
+      id: uid('ec'),
+      rosterPersonId: person.id,
+      label: person.roleOrDepartment || rosterCategoryLabels[person.category],
+      name: person.name,
+      phone: person.phone,
+    }
+    patchDraft({ emergencyContacts: [...draft.emergencyContacts, next] })
+    setActiveSection('contacts')
+    setOpenRows((prev) => ({ ...prev, [next.id]: true }))
+  }
+
   const quickAddCastCalls = () => {
     if (!draft) return
     const rows = parsePeopleLines(castQuickAddText)
@@ -532,6 +604,20 @@ function CallSheetEditorPage() {
   const missingReadinessItems = readinessItems.filter((item) => !item.complete)
   const missingCriticalItems = missingReadinessItems.filter((item) => item.severity === 'critical')
   const readinessCompleteCount = readinessItems.length - missingReadinessItems.length
+  const activeRosterPeople = rosterPeople.filter((person) => person.active)
+  const castRosterPeople = activeRosterPeople.filter((person) => person.category === 'cast')
+  const crewRosterPeople = activeRosterPeople.filter((person) => person.category === 'crew')
+  const contactRosterPeople = [
+    ...activeRosterPeople.filter((person) => person.category === 'emergency'),
+    ...activeRosterPeople.filter((person) => person.category !== 'emergency'),
+  ]
+  const selectedCastPerson = activeRosterPeople.find((person) => person.id === selectedCastRosterId)
+  const selectedCrewPerson = activeRosterPeople.find((person) => person.id === selectedCrewRosterId)
+  const selectedContactPerson = activeRosterPeople.find((person) => person.id === selectedContactRosterId)
+  const rosterReadinessTips = [
+    draft.castCalls.length === 0 && castRosterPeople.length > 0 ? 'Cast roster is ready if you want to add cast calls quickly.' : '',
+    draft.crewCalls.length === 0 && crewRosterPeople.length > 0 ? 'Crew roster is ready if you want to add crew calls quickly.' : '',
+  ].filter(Boolean)
 
   const confirmStatusChange = (nextStatus: CallSheetStatus) => {
     if (nextStatus === currentStatus) return false
@@ -633,6 +719,12 @@ function CallSheetEditorPage() {
           </div>
         )
       })}
+
+      {rosterReadinessTips.length > 0 ? (
+        <div className="readiness-tip">
+          {rosterReadinessTips.join(' ')}
+        </div>
+      ) : null}
     </section>
   )
 
@@ -683,6 +775,24 @@ function CallSheetEditorPage() {
               <h2>Emergency Contacts</h2>
             </div>
             <button className="vw-btn" type="button" onClick={addEmergencyContact}>Add Emergency Contact</button>
+          </div>
+
+          <div className="roster-picker-panel">
+            <label className="field">
+              <span>Add Contact from Roster</span>
+              <select value={selectedContactRosterId} onChange={(event) => setSelectedContactRosterId(event.target.value)}>
+                <option value="">Select a roster person</option>
+                {contactRosterPeople.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name} - {person.roleOrDepartment || rosterCategoryLabels[person.category]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="vw-btn" type="button" onClick={() => selectedContactPerson && addEmergencyContactFromRoster(selectedContactPerson)} disabled={!selectedContactPerson}>
+              Add Contact from Roster
+            </button>
+            {rosterError ? <p className="roster-picker-note">{rosterError}</p> : null}
           </div>
 
           <div className="stack-list">
@@ -957,6 +1067,24 @@ function CallSheetEditorPage() {
             </div>
           </div>
 
+          <div className="roster-picker-panel">
+            <label className="field">
+              <span>Add Cast from Roster</span>
+              <select value={selectedCastRosterId} onChange={(event) => setSelectedCastRosterId(event.target.value)}>
+                <option value="">Select cast</option>
+                {castRosterPeople.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name} - {person.roleOrDepartment || 'Cast'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="vw-btn" type="button" onClick={() => selectedCastPerson && addCastFromRoster(selectedCastPerson)} disabled={!selectedCastPerson}>
+              Add Cast from Roster
+            </button>
+            {castRosterPeople.length === 0 ? <p className="roster-picker-note">Cast saved in the production roster will appear here.</p> : null}
+          </div>
+
           <div className="stack-list">
             {draft.castCalls.map((cast) => {
               const open = !!openRows[cast.id]
@@ -1036,6 +1164,24 @@ function CallSheetEditorPage() {
               Add Pasted Crew
             </button>
           </div>
+        </div>
+
+        <div className="roster-picker-panel">
+          <label className="field">
+            <span>Add Crew from Roster</span>
+            <select value={selectedCrewRosterId} onChange={(event) => setSelectedCrewRosterId(event.target.value)}>
+              <option value="">Select crew</option>
+              {crewRosterPeople.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name} - {person.roleOrDepartment || 'Crew'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="vw-btn" type="button" onClick={() => selectedCrewPerson && addCrewFromRoster(selectedCrewPerson)} disabled={!selectedCrewPerson}>
+            Add Crew from Roster
+          </button>
+          {crewRosterPeople.length === 0 ? <p className="roster-picker-note">Crew saved in the production roster will appear here.</p> : null}
         </div>
 
         <div className="stack-list">

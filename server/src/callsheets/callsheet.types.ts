@@ -1,5 +1,6 @@
 export type EmergencyContact = {
   id: string;
+  rosterPersonId?: string;
   label: string;
   name: string;
   phone: string;
@@ -17,6 +18,7 @@ export type SceneRow = {
 
 export type CastCallRow = {
   id: string;
+  rosterPersonId?: string;
   castName: string;
   roleName: string;
   email: string;
@@ -26,6 +28,7 @@ export type CastCallRow = {
 
 export type CrewCallRow = {
   id: string;
+  rosterPersonId?: string;
   departmentRole: string;
   crewName: string;
   email: string;
@@ -62,4 +65,17 @@ export type CallSheetDraft = {
   crewCalls: CrewCallRow[];
   generalNotes: string;
   distributionNotes: string;
+};
+
+export type RosterCategory = 'cast' | 'crew' | 'emergency' | 'other';
+
+export type RosterPerson = {
+  id: string;
+  name: string;
+  category: RosterCategory;
+  roleOrDepartment: string;
+  email: string;
+  phone: string;
+  notes: string;
+  active: boolean;
 };

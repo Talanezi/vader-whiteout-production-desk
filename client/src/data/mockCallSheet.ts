@@ -1,5 +1,6 @@
 export type EmergencyContact = {
   id: string
+  rosterPersonId?: string
   label: string
   name: string
   phone: string
@@ -17,6 +18,7 @@ export type SceneRow = {
 
 export type CastCallRow = {
   id: string
+  rosterPersonId?: string
   castName: string
   roleName: string
   email: string
@@ -26,6 +28,7 @@ export type CastCallRow = {
 
 export type CrewCallRow = {
   id: string
+  rosterPersonId?: string
   departmentRole: string
   crewName: string
   email: string
@@ -49,6 +52,28 @@ export const callSheetStatusLabels: Record<CallSheetStatus, string> = {
 }
 
 export const callSheetStatuses = Object.keys(callSheetStatusLabels) as CallSheetStatus[]
+
+export type RosterCategory = 'cast' | 'crew' | 'emergency' | 'other'
+
+export const rosterCategoryLabels: Record<RosterCategory, string> = {
+  cast: 'Cast',
+  crew: 'Crew',
+  emergency: 'Emergency Contact',
+  other: 'Other',
+}
+
+export const rosterCategories = Object.keys(rosterCategoryLabels) as RosterCategory[]
+
+export type RosterPerson = {
+  id: string
+  name: string
+  category: RosterCategory
+  roleOrDepartment: string
+  email: string
+  phone: string
+  notes: string
+  active: boolean
+}
 
 export type CallSheetDraft = {
   id: string

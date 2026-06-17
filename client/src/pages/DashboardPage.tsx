@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft, CallSheetStatus } from '../data/mockCallSheet'
 import { callSheetStatusLabels, callSheetStatuses } from '../data/mockCallSheet'
-import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets } from '../lib/api'
+import { deleteCallSheet, downloadPdfFile, duplicateCallSheet, getAuthToken, listCallSheets, listRosterPeople } from '../lib/api'
 
 type DashboardGroup = {
   title: string
@@ -51,6 +51,7 @@ function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | CallSheetStatus>('all')
   const [sortMode, setSortMode] = useState<SortMode>('production_date')
+  const [rosterCount, setRosterCount] = useState<number | null>(null)
 
   useEffect(() => {
     let active = true
@@ -62,16 +63,23 @@ function DashboardPage() {
       return
     }
 
-    listCallSheets()
-      .then((data) => {
+    Promise.allSettled([listCallSheets(), listRosterPeople()])
+      .then(([callSheetsResult, rosterResult]) => {
         if (!active) return
-        setItems(data.items)
-        setError(null)
-      })
-      .catch((err: unknown) => {
-        if (!active) return
-        setItems([])
-        setError(err instanceof Error ? err.message : 'Failed to load call sheets')
+
+        if (callSheetsResult.status === 'fulfilled') {
+          setItems(callSheetsResult.value.items)
+          setError(null)
+        } else {
+          setItems([])
+          setError(callSheetsResult.reason instanceof Error ? callSheetsResult.reason.message : 'Failed to load call sheets')
+        }
+
+        if (rosterResult.status === 'fulfilled') {
+          setRosterCount(rosterResult.value.total)
+        } else {
+          setRosterCount(null)
+        }
       })
       .finally(() => {
         if (!active) return
@@ -112,6 +120,10 @@ function DashboardPage() {
 
   const getGroupItems = (statuses: CallSheetStatus[]) =>
     filteredItems.filter((item) => statuses.includes(getStatus(item)))
+
+  const draftCount = items.filter((item) => getStatus(item) === 'draft').length
+  const reviewCount = items.filter((item) => getStatus(item) === 'ready_for_review').length
+  const publishedCount = items.filter((item) => getStatus(item) === 'published').length
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -216,6 +228,31 @@ function DashboardPage() {
         <div className="vw-empty-block">{error}</div>
       ) : items.length === 0 ? (
         <div className="vw-empty-block">No call sheets yet. Start with a template to build the first production day.</div>
+      ) : null}
+
+      {!loading && !error ? (
+        <section className="dashboard-stats panel">
+          <div className="summary-item">
+            <span>Total Call Sheets</span>
+            <strong>{items.length}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Drafts Needing Work</span>
+            <strong>{draftCount}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Ready for Review</span>
+            <strong>{reviewCount}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Published Archive</span>
+            <strong>{publishedCount}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Roster</span>
+            <strong>{rosterCount ?? '—'}</strong>
+          </div>
+        </section>
       ) : null}
 
       <section className="dashboard-controls panel">

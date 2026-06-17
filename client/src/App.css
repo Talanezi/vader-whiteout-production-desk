@@ -346,6 +346,13 @@ select {
   padding: 0 12px;
 }
 
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
 .vw-dashboard-hero-inner {
   display: flex;
   align-items: flex-start;
@@ -655,13 +662,15 @@ select {
   font-weight: 700;
 }
 
-.field input {
+.field input,
+.field select {
   min-height: 48px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.025);
   color: var(--ink);
   padding: 0 14px;
+  width: 100%;
 }
 
 .field textarea {
@@ -697,6 +706,44 @@ select {
   margin: 0;
   color: var(--mute);
   font-size: 0.88rem;
+}
+
+.roster-picker-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 16px;
+}
+
+.roster-picker-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.88rem;
+}
+
+.readiness-tip {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(120, 200, 255, 0.05);
+  color: #d8f5ff;
+  font-size: 0.9rem;
+}
+
+.vw-inline-success {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(151, 255, 189, 0.2);
+  background: rgba(151, 255, 189, 0.08);
+  color: #d5ffe3;
 }
 
 .section-chip-row {
@@ -869,6 +916,110 @@ select {
   background: #f5f6f8;
 }
 
+.roster-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.roster-form-panel,
+.roster-import-panel,
+.roster-list-panel {
+  padding: 20px;
+}
+
+.roster-import-panel h2,
+.roster-list-panel h2 {
+  margin: 0;
+}
+
+.roster-active-toggle {
+  align-self: end;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.roster-active-toggle input {
+  width: auto;
+  min-height: 0;
+}
+
+.roster-controls {
+  box-shadow: none;
+  margin-top: 14px;
+}
+
+.roster-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.roster-person-card {
+  padding: 16px;
+  border: 1px solid rgba(120, 200, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+}
+
+.roster-person-card.is-inactive {
+  opacity: 0.64;
+}
+
+.roster-person-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.roster-person-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.roster-person-head p,
+.roster-person-meta,
+.roster-person-notes {
+  margin: 4px 0 0;
+  color: var(--mute);
+  font-size: 0.88rem;
+}
+
+.roster-person-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.roster-person-notes {
+  margin-top: 10px;
+}
+
+.roster-card-actions {
+  margin-top: 12px;
+}
+
+.roster-category-badge {
+  white-space: nowrap;
+}
+
+.roster-category-cast {
+  border-color: rgba(120, 215, 255, 0.28);
+}
+
+.roster-category-crew {
+  border-color: rgba(151, 255, 189, 0.24);
+}
+
+.roster-category-emergency {
+  border-color: rgba(255, 210, 210, 0.28);
+}
+
 @media (max-width: 991px) {
   .vw-card-grid,
   .vw-card-grid-two,
@@ -876,7 +1027,9 @@ select {
   .vw-dashboard-grid,
   .vw-dashboard-grid-secondary,
   .builder-grid,
-  .editor-layout {
+  .editor-layout,
+  .roster-layout,
+  .roster-card-grid {
     grid-template-columns: 1fr;
   }
 
@@ -889,7 +1042,9 @@ select {
   }
 
   .dashboard-controls,
-  .production-summary {
+  .production-summary,
+  .dashboard-stats,
+  .roster-picker-panel {
     grid-template-columns: 1fr;
   }
 }

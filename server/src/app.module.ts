@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CallsheetsModule } from './callsheets/callsheets.module';
 import { CallSheetDraftEntity } from './callsheets/entities/callsheet-draft.entity';
+import { RosterPersonEntity } from './roster/entities/roster-person.entity';
+import { RosterModule } from './roster/roster.module';
 
 @Module({
   imports: [
@@ -22,10 +24,11 @@ import { CallSheetDraftEntity } from './callsheets/entities/callsheet-draft.enti
         ssl: configService.get<string>('DATABASE_URL')?.includes('railway')
           ? { rejectUnauthorized: false }
           : false,
-        entities: [CallSheetDraftEntity],
+        entities: [CallSheetDraftEntity, RosterPersonEntity],
       }),
     }),
     CallsheetsModule,
+    RosterModule,
     AuthModule,
   ],
   controllers: [AppController],

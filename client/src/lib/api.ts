@@ -1,4 +1,4 @@
-import type { CallSheetDraft } from '../data/mockCallSheet'
+import type { CallSheetDraft, RosterPerson } from '../data/mockCallSheet'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -70,6 +70,36 @@ export async function updateCallSheet(id: string, payload: Partial<CallSheetDraf
 
 export async function deleteCallSheet(id: string): Promise<{ ok: true; id: string }> {
   const response = await authFetch(`${API_BASE_URL}/callsheets/${id}`, {
+    method: 'DELETE',
+  })
+  return parseJson(response)
+}
+
+export async function listRosterPeople(): Promise<{ items: RosterPerson[]; total: number }> {
+  const response = await authFetch(`${API_BASE_URL}/roster`)
+  return parseJson(response)
+}
+
+export async function createRosterPerson(payload: Partial<RosterPerson>): Promise<RosterPerson> {
+  const response = await authFetch(`${API_BASE_URL}/roster`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return parseJson(response)
+}
+
+export async function updateRosterPerson(id: string, payload: Partial<RosterPerson>): Promise<RosterPerson> {
+  const response = await authFetch(`${API_BASE_URL}/roster/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return parseJson(response)
+}
+
+export async function deleteRosterPerson(id: string): Promise<{ ok: true; id: string }> {
+  const response = await authFetch(`${API_BASE_URL}/roster/${id}`, {
     method: 'DELETE',
   })
   return parseJson(response)
