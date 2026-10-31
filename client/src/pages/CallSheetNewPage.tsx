@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CallSheetDraft } from '../data/mockCallSheet'
-import { createCallSheet } from '../lib/api'
+import { createCallSheet, getAuthToken } from '../lib/api'
+import { Link } from 'react-router-dom'
+import Icon from '../components/whiteout/Icon'
+import { ErrorNotice, SessionState } from '../components/whiteout/Feedback'
+import { PageHeader } from '../components/whiteout/Workspace'
 
 type TemplateOption = {
   id: string
@@ -27,7 +31,8 @@ const templateOptions: TemplateOption[] = [
     description: 'Useful for camera, lighting, costume, and blocking tests.',
     payload: {
       title: 'Test Shoot Call Sheet',
-      generalNotes: 'Confirm test goals, equipment needs, and review plan before crew call.',
+      generalNotes:
+        'Confirm test goals, equipment needs, and review plan before crew call.',
       scenes: [
         {
           id: 'template-scene-test',
@@ -58,7 +63,8 @@ const templateOptions: TemplateOption[] = [
     payload: {
       title: 'Studio Shoot Call Sheet',
       mainSetName: 'Studio',
-      generalNotes: 'Confirm studio access, load-in, sound restrictions, and wrap procedures.',
+      generalNotes:
+        'Confirm studio access, load-in, sound restrictions, and wrap procedures.',
       scenes: [
         {
           id: 'template-scene-studio',
@@ -78,7 +84,8 @@ const templateOptions: TemplateOption[] = [
     description: 'A field day with location, hospital, and movement details.',
     payload: {
       title: 'Location Shoot Call Sheet',
-      generalNotes: 'Confirm parking, holding, restrooms, company moves, and location contact.',
+      generalNotes:
+        'Confirm parking, holding, restrooms, company moves, and location contact.',
       mainSetName: 'Location TBD',
       scenes: [
         {
@@ -99,7 +106,8 @@ const templateOptions: TemplateOption[] = [
     description: 'A compact day for inserts, pickups, and small crew work.',
     payload: {
       title: 'Pickup Shoot Call Sheet',
-      generalNotes: 'Prioritize required pickups, continuity references, and minimum crew needs.',
+      generalNotes:
+        'Prioritize required pickups, continuity references, and minimum crew needs.',
       scenes: [
         {
           id: 'template-scene-pickup',
@@ -116,10 +124,12 @@ const templateOptions: TemplateOption[] = [
   {
     id: 'table-read',
     title: 'Rehearsal / Table Read',
-    description: 'A lightweight sheet for rehearsal, read-through, or blocking.',
+    description:
+      'A lightweight sheet for rehearsal, read-through, or blocking.',
     payload: {
       title: 'Rehearsal / Table Read Call Sheet',
-      generalNotes: 'Confirm script pages, rehearsal goals, room access, and arrival expectations.',
+      generalNotes:
+        'Confirm script pages, rehearsal goals, room access, and arrival expectations.',
       scenes: [
         {
           id: 'template-scene-read',
@@ -147,7 +157,9 @@ const templateOptions: TemplateOption[] = [
 
 function CallSheetNewPage() {
   const navigate = useNavigate()
-  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null)
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
 
   const handleCreate = async (template: TemplateOption) => {
@@ -157,40 +169,73 @@ function CallSheetNewPage() {
       const draft = await createCallSheet(template.payload)
       navigate(`/callsheets/${draft.id}/edit`)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create call sheet')
+      setError(
+        err instanceof Error ? err.message : 'Failed to create call sheet',
+      )
     } finally {
       setCreatingTemplateId(null)
     }
   }
 
   return (
-    <div className="vw-page-wrap">
-      <section className="vw-section-card vw-dashboard-hero">
-        <h1 className="vw-page-title">Start a Call Sheet</h1>
-        <p className="vw-page-note">
-          Choose a practical starting point, then finish the day in the editor.
-        </p>
-      </section>
-
-      {error ? <p className="vw-inline-error">{error}</p> : null}
-
-      <section className="template-grid">
-        {templateOptions.map((template) => {
-          const creating = creatingTemplateId === template.id
-
-          return (
-            <article key={template.id} className="vw-section-card vw-template-card">
-              <h2 className="vw-card-title">{template.title}</h2>
-              <p className="vw-card-copy">{template.description}</p>
-              <div className="vw-actions-row">
-                <button className="vw-btn vw-btn-primary" type="button" onClick={() => handleCreate(template)} disabled={creatingTemplateId !== null}>
-                  {creating ? 'Creating…' : 'Use Template'}
-                </button>
-              </div>
-            </article>
-          )
-        })}
-      </section>
+    <div className="pd-page">
+      <Link className="pd-back" to="/">
+        <Icon name="back" />
+        Call sheets
+      </Link>
+      {getAuthToken() && error !== 'UNAUTHORIZED' && (
+        <PageHeader title="New call sheet" />
+      )}
+      {!getAuthToken() || error === 'UNAUTHORIZED' ? (
+        <SessionState />
+      ) : (
+        <>
+          {error && <ErrorNotice>{error}</ErrorNotice>}
+          <div className="pd-templates">
+            {templateOptions.map((template, index) => (
+              <button
+                key={template.id}
+                type="button"
+                className={`pd-template ${creatingTemplateId === template.id ? 'is-pending' : ''}`}
+                disabled={creatingTemplateId !== null}
+                aria-busy={creatingTemplateId === template.id || undefined}
+                onClick={() => void handleCreate(template)}
+              >
+                <div className="pd-template-drawing" aria-hidden="true">
+                  <svg viewBox="0 0 160 100" fill="none">
+                    <path d="M44 15h66v76H44z M48 11h66v76 M52 7h66v76" />
+                    <path
+                      className="pd-template-rules"
+                      d="M54 31h46 M54 42h46 M54 53h46 M54 64h46 M54 75h46 M69 42v33"
+                    />
+                    {index > 0 && (
+                      <path
+                        className="pd-template-accent"
+                        d={`M54 ${42 + index * 5}h${20 + index * 3}`}
+                      />
+                    )}
+                  </svg>
+                </div>
+                <h2>{template.title}</h2>
+                <p>{template.description}</p>
+                <span className="pd-template-action">
+                  {creatingTemplateId === template.id ? (
+                    <>
+                      <span className="pd-spinner" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      Use template
+                      <Icon name="arrow" />
+                    </>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

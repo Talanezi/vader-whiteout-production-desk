@@ -1,0 +1,174 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
+import { IconButton, Button } from './Button'
+import Icon from './Icon'
+type Toast = { id: number; text: string }
+const ToastContext = createContext<(text: string) => void>(() => {})
+function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
+  const timer = useRef<number | undefined>(undefined)
+  const stop = () => clearTimeout(timer.current)
+  const resume = () => {
+    stop()
+    timer.current = window.setTimeout(dismiss, 6000)
+  }
+  useEffect(() => {
+    resume()
+    return stop
+  }, [])
+  return (
+    <div
+      className="pd-toast"
+      onMouseEnter={stop}
+      onMouseLeave={resume}
+      onFocus={stop}
+      onBlur={resume}
+    >
+      <Icon name="check" />
+      <span>{item.text}</span>
+      <IconButton name="close" label="Dismiss notification" onClick={dismiss} />
+    </div>
+  )
+}
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<Toast[]>([]),
+    sequence = useRef(0)
+  const notify = useCallback(
+    (text: string) =>
+      setItems((old) => [...old.slice(-2), { id: ++sequence.current, text }]),
+    [],
+  )
+  return (
+    <ToastContext.Provider value={notify}>
+      {children}
+      {createPortal(
+        <div
+          className="pd-ui pd-toasts"
+          role="status"
+          aria-live="polite"
+          aria-atomic="false"
+        >
+          {items.map((item) => (
+            <ToastItem
+              key={item.id}
+              item={item}
+              dismiss={() =>
+                setItems((old) => old.filter((x) => x.id !== item.id))
+              }
+            />
+          ))}
+        </div>,
+        document.body,
+      )}
+    </ToastContext.Provider>
+  )
+}
+export const useToast = () => useContext(ToastContext)
+export function ErrorNotice({
+  children,
+  onDismiss,
+}: {
+  children: ReactNode
+  onDismiss?: () => void
+}) {
+  return (
+    <div className="pd-alert" role="alert">
+      <Icon name="alert" />
+      <div>
+        {children}
+        {typeof children === 'string' &&
+          children.includes('session has expired') && (
+            <a
+              className="pd-session-link"
+              href={`/scheduler/login?returnTo=${encodeURIComponent('/productiondesk/' + window.location.hash)}`}
+            >
+              Sign in
+              <Icon name="arrow" />
+            </a>
+          )}
+      </div>
+      {onDismiss && (
+        <IconButton name="close" label="Dismiss error" onClick={onDismiss} />
+      )}
+    </div>
+  )
+}
+export function LoadingRows({ label }: { label: string }) {
+  return (
+    <div className="pd-loading" role="status" aria-live="polite">
+      <span className="pd-loading-caption">
+        <span className="pd-spinner" />
+        {label}
+      </span>
+      {[0, 1, 2, 3].map((i) => (
+        <div className="pd-skeleton-row" key={i}>
+          <span />
+          <span />
+          <span />
+        </div>
+      ))}
+    </div>
+  )
+}
+export function EmptyState({
+  kind = 'empty',
+  title,
+  children,
+  action,
+}: {
+  kind?: 'empty' | 'search' | 'error' | 'auth'
+  title: string
+  children?: ReactNode
+  action?: ReactNode
+}) {
+  return (
+    <div className="pd-empty">
+      <div className="pd-empty-mark">
+        <Icon
+          name={
+            kind === 'auth'
+              ? 'lock'
+              : kind === 'error'
+                ? 'alert'
+                : kind === 'search'
+                  ? 'search'
+                  : 'file'
+          }
+        />
+      </div>
+      <h2>{title}</h2>
+      {children && <p>{children}</p>}
+      {action && <div className="pd-empty-action">{action}</div>}
+    </div>
+  )
+}
+export function SessionState() {
+  // Scheduler already validates this allowlisted returnTo path. Token storage is unchanged.
+  const destination = '/productiondesk/' + window.location.hash
+  return (
+    <section className="pd-session" aria-labelledby="pd-session-title">
+      <h1 id="pd-session-title">Sign in to Production Desk</h1>
+      <a
+        className="pd-button pd-button-primary"
+        href={`/scheduler/login?returnTo=${encodeURIComponent(destination)}`}
+      >
+        Sign in
+        <Icon name="arrow" />
+      </a>
+    </section>
+  )
+}
+export function RetryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button icon="retry" onClick={onClick}>
+      Try again
+    </Button>
+  )
+}

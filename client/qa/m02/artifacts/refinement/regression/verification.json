@@ -1,0 +1,274 @@
+[
+  {
+    "name": "Call-sheet search, all statuses, sort, distribution details, duplicate, PDF, delete cancel/failure/retry, menu keys and return focus",
+    "pass": true
+  },
+  {
+    "name": "Sidebar collapse survives routes and reload",
+    "pass": true
+  },
+  {
+    "name": "Roster filtering, add/edit returned records, failed save retains form, pending/saved states, stable button width, focus containment/return, unsaved guard, active switch confirmation, delete, scroll recovery",
+    "pass": true
+  },
+  {
+    "name": "Import preview, category normalization, partial successes retained, failed rows preserved, retry without confirmed duplicates",
+    "pass": true
+  },
+  {
+    "name": "Distinct state: signed-out",
+    "pass": true
+  },
+  {
+    "name": "Distinct state: expired-session",
+    "pass": true
+  },
+  {
+    "name": "Distinct state: api-error",
+    "pass": true
+  },
+  {
+    "name": "Distinct state: empty",
+    "pass": true
+  },
+  {
+    "name": "Distinct state: loading",
+    "pass": true
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 1440×900",
+    "pass": true,
+    "dashboard": {
+      "width": 1440,
+      "scroll": 1440,
+      "main": {
+        "x": 232,
+        "y": 0,
+        "width": 1208,
+        "height": 817.1875,
+        "top": 0,
+        "right": 1440,
+        "bottom": 817.1875,
+        "left": 232
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 1440,
+      "scroll": 1440,
+      "main": {
+        "x": 232,
+        "y": 0,
+        "width": 1208,
+        "height": 852.6875,
+        "top": 0,
+        "right": 1440,
+        "bottom": 852.6875,
+        "left": 232
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 1280×800",
+    "pass": true,
+    "dashboard": {
+      "width": 1280,
+      "scroll": 1280,
+      "main": {
+        "x": 232,
+        "y": 0,
+        "width": 1048,
+        "height": 817.1875,
+        "top": 0,
+        "right": 1280,
+        "bottom": 817.1875,
+        "left": 232
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 1280,
+      "scroll": 1280,
+      "main": {
+        "x": 232,
+        "y": 0,
+        "width": 1048,
+        "height": 852.6875,
+        "top": 0,
+        "right": 1280,
+        "bottom": 852.6875,
+        "left": 232
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 1024×768",
+    "pass": true,
+    "dashboard": {
+      "width": 1024,
+      "scroll": 1024,
+      "main": {
+        "x": 224,
+        "y": 0,
+        "width": 800,
+        "height": 846.1875,
+        "top": 0,
+        "right": 1024,
+        "bottom": 846.1875,
+        "left": 224
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 1024,
+      "scroll": 1024,
+      "main": {
+        "x": 224,
+        "y": 0,
+        "width": 800,
+        "height": 833.6875,
+        "top": 0,
+        "right": 1024,
+        "bottom": 833.6875,
+        "left": 224
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 768×1024",
+    "pass": true,
+    "dashboard": {
+      "width": 768,
+      "scroll": 768,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 768,
+        "height": 870.796875,
+        "top": 61,
+        "right": 768,
+        "bottom": 931.796875,
+        "left": 0
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 768,
+      "scroll": 768,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 768,
+        "height": 864.5,
+        "top": 61,
+        "right": 768,
+        "bottom": 925.5,
+        "left": 0
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 390×844",
+    "pass": true,
+    "dashboard": {
+      "width": 390,
+      "scroll": 390,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 390,
+        "height": 1567.796875,
+        "top": 61,
+        "right": 390,
+        "bottom": 1628.796875,
+        "left": 0
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 390,
+      "scroll": 390,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 390,
+        "height": 1724.796875,
+        "top": 61,
+        "right": 390,
+        "bottom": 1785.796875,
+        "left": 0
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "Responsive dashboard, roster, drawer, navigation 360×800",
+    "pass": true,
+    "dashboard": {
+      "width": 360,
+      "scroll": 360,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 360,
+        "height": 1612.796875,
+        "top": 61,
+        "right": 360,
+        "bottom": 1673.796875,
+        "left": 0
+      },
+      "dialogs": []
+    },
+    "roster": {
+      "width": 360,
+      "scroll": 360,
+      "main": {
+        "x": 0,
+        "y": 61,
+        "width": 360,
+        "height": 1724.796875,
+        "top": 61,
+        "right": 360,
+        "bottom": 1785.796875,
+        "left": 0
+      },
+      "dialogs": []
+    }
+  },
+  {
+    "name": "All six template POST payloads, existing editor route/fields/save/PDF/distribution/sidebar/mobile and return route; no emails",
+    "pass": true
+  },
+  {
+    "name": "Long names/emails, empty fields and reduced-motion overlays",
+    "pass": true
+  },
+  {
+    "name": "Touch menu, mobile navigation and person save",
+    "pass": true
+  },
+  {
+    "name": "Native 200% Chrome zoom: dashboard/roster reflow and collision-aware menu within person drawer",
+    "pass": true,
+    "before": {
+      "width": 1440,
+      "dpr": 2
+    },
+    "after": {
+      "width": 720,
+      "dpr": 4
+    }
+  },
+  {
+    "name": "Browser Back guards unsaved person edits and pending imports; cancel retains contents, explicit discard navigates, imports complete once",
+    "pass": true
+  },
+  {
+    "name": "No uncaught browser errors",
+    "pass": true
+  }
+]

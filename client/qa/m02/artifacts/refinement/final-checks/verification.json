@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Call-sheet search, all statuses, sort, distribution details, duplicate, PDF, delete cancel/failure/retry, menu keys and return focus",
+    "pass": true
+  },
+  {
+    "name": "Sidebar collapse survives routes and reload",
+    "pass": true
+  },
+  {
+    "name": "Roster filtering, add/edit returned records, failed save retains form, pending/saved states, stable button width, focus containment/return, unsaved guard, active switch confirmation, delete, scroll recovery",
+    "pass": true
+  },
+  {
+    "name": "Import preview, category normalization, partial successes retained, failed rows preserved, retry without confirmed duplicates",
+    "pass": true
+  },
+  {
+    "name": "Native 200% Chrome zoom: dashboard/roster reflow and collision-aware menu within person drawer",
+    "pass": true,
+    "before": {
+      "width": 1440,
+      "dpr": 2
+    },
+    "after": {
+      "width": 720,
+      "dpr": 4
+    }
+  },
+  {
+    "name": "No uncaught browser errors",
+    "pass": true
+  }
+]

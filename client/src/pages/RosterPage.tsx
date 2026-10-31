@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 import type { RosterCategory, RosterPerson } from '../data/mockCallSheet'
 import { rosterCategories, rosterCategoryLabels } from '../data/mockCallSheet'
 import {
@@ -8,369 +9,775 @@ import {
   listRosterPeople,
   updateRosterPerson,
 } from '../lib/api'
+import {
+  emptyRosterForm,
+  parseRosterLines,
+  type RosterForm,
+} from '../lib/rosterImport'
+import { Button, type ActionState } from '../components/whiteout/Button'
+import Icon from '../components/whiteout/Icon'
+import Menu from '../components/whiteout/Menu'
+import { Confirm, Overlay } from '../components/whiteout/Overlay'
+import {
+  EmptyState,
+  ErrorNotice,
+  LoadingRows,
+  RetryButton,
+  SessionState,
+  useToast,
+} from '../components/whiteout/Feedback'
+import {
+  PageHeader,
+  SearchField,
+  Status,
+} from '../components/whiteout/Workspace'
 
-type RosterForm = Omit<RosterPerson, 'id'>
-
-const emptyForm: RosterForm = {
-  name: '',
-  category: 'other',
-  roleOrDepartment: '',
-  email: '',
-  phone: '',
-  notes: '',
-  active: true,
-}
-
-function normalizeCategory(value: string): RosterCategory {
-  const normalized = value.trim().toLowerCase()
-
-  if (normalized === 'cast' || normalized === 'actor' || normalized === 'actress') return 'cast'
-  if (normalized === 'crew') return 'crew'
-  if (normalized === 'emergency' || normalized === 'contact' || normalized === 'emergency contact') return 'emergency'
-  return 'other'
-}
-
-function parseRosterLines(text: string): RosterForm[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const separator = line.includes('|') ? '|' : ','
-      const [name = '', category = '', roleOrDepartment = '', email = '', phone = '', notes = ''] = line
-        .split(separator)
-        .map((part) => part.trim())
-
-      return {
-        name,
-        category: normalizeCategory(category),
-        roleOrDepartment,
-        email,
-        phone,
-        notes,
-        active: true,
-      }
-    })
-    .filter((person) => person.name)
-}
-
+const categories = rosterCategories.map((value) => ({
+  value,
+  label: rosterCategoryLabels[value],
+}))
 function RosterPage() {
-  const token = getAuthToken()
-  const [people, setPeople] = useState<RosterPerson[]>([])
-  const [form, setForm] = useState<RosterForm>(emptyForm)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<'all' | RosterCategory>('all')
-  const [pasteText, setPasteText] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-
+  const token = getAuthToken(),
+    notify = useToast()
+  const [people, setPeople] = useState<RosterPerson[]>([]),
+    [loading, setLoading] = useState(true),
+    [loadError, setLoadError] = useState<string | null>(null),
+    [attempt, setAttempt] = useState(0)
+  const [search, setSearch] = useState(''),
+    [category, setCategory] = useState<'all' | RosterCategory>('all')
+  const [form, setForm] = useState<RosterForm>({ ...emptyRosterForm }),
+    [baseline, setBaseline] = useState(JSON.stringify(emptyRosterForm)),
+    [editingId, setEditingId] = useState<string | null>(null),
+    [editorOpen, setEditorOpen] = useState(false)
+  const [saveState, setSaveState] = useState<ActionState>('idle'),
+    [formError, setFormError] = useState<string | null>(null),
+    [discard, setDiscard] = useState(false)
+  const [deleting, setDeleting] = useState<RosterPerson | null>(null),
+    [deleteBusy, setDeleteBusy] = useState(false),
+    [deleteError, setDeleteError] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<Record<string, boolean>>({}),
+    [actionError, setActionError] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false),
+    [paste, setPaste] = useState(''),
+    [importState, setImportState] = useState<ActionState>('idle'),
+    [importError, setImportError] = useState<string | null>(null),
+    [progress, setProgress] = useState({ done: 0, total: 0 })
+  const parsed = useMemo(() => parseRosterLines(paste), [paste])
+  const dirty = JSON.stringify(form) !== baseline
+  const hasDraft = (editorOpen && dirty) || !!paste.trim()
+  const blocker = useBlocker(hasDraft || importState === 'pending')
+  useEffect(() => {
+    if (blocker.state === 'blocked' && !hasDraft && importState !== 'pending')
+      blocker.proceed()
+  }, [blocker, hasDraft, importState])
   useEffect(() => {
     let active = true
-
     if (!token) {
       setLoading(false)
-      setPeople([])
       return
     }
-
+    setLoading(true)
+    setLoadError(null)
     listRosterPeople()
       .then((data) => {
-        if (!active) return
-        setPeople(data.items)
-        setError(null)
+        if (active) setPeople(data.items)
       })
-      .catch((err: unknown) => {
-        if (!active) return
-        setError(err instanceof Error ? err.message : 'Failed to load roster')
+      .catch((error) => {
+        if (active)
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : 'Could not load the roster.',
+          )
       })
       .finally(() => {
-        if (!active) return
-        setLoading(false)
+        if (active) setLoading(false)
       })
-
     return () => {
       active = false
     }
-  }, [token])
-
-  const parsedPastePeople = useMemo(() => parseRosterLines(pasteText), [pasteText])
-
-  const filteredPeople = people.filter((person) => {
-    const query = searchQuery.trim().toLowerCase()
-    const matchesSearch = !query || [
-      person.name,
-      person.roleOrDepartment,
-      person.email,
-      person.phone,
-      rosterCategoryLabels[person.category],
-    ].some((value) => value.toLowerCase().includes(query))
-    const matchesCategory = categoryFilter === 'all' || person.category === categoryFilter
-    return matchesSearch && matchesCategory
-  })
-
-  const resetForm = () => {
-    setForm(emptyForm)
-    setEditingId(null)
+  }, [token, attempt])
+  useEffect(() => {
+    if (!hasDraft && importState !== 'pending') return
+    const prevent = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', prevent)
+    return () => window.removeEventListener('beforeunload', prevent)
+  }, [hasDraft, importState])
+  const unauthorized = !token || loadError === 'UNAUTHORIZED'
+  const filtered = people.filter(
+    (person) =>
+      (category === 'all' || person.category === category) &&
+      [
+        person.name,
+        person.roleOrDepartment,
+        person.email,
+        person.phone,
+        rosterCategoryLabels[person.category],
+      ].some((value) =>
+        (value || '').toLowerCase().includes(search.trim().toLowerCase()),
+      ),
+  )
+  const clear = () => {
+    setSearch('')
+    setCategory('all')
   }
-
-  const handleSubmit = async () => {
-    if (!form.name.trim()) return
-
+  const readableError = (error: unknown, fallback: string) =>
+    error instanceof Error && error.message === 'UNAUTHORIZED'
+      ? 'Your session has expired. Sign in again.'
+      : error instanceof Error
+        ? error.message
+        : fallback
+  function openEditor(person?: RosterPerson) {
+    const next = person
+      ? {
+          name: person.name,
+          category: person.category,
+          roleOrDepartment: person.roleOrDepartment,
+          email: person.email,
+          phone: person.phone,
+          notes: person.notes,
+          active: person.active,
+        }
+      : { ...emptyRosterForm }
+    setForm(next)
+    setBaseline(JSON.stringify(next))
+    setEditingId(person?.id || null)
+    setFormError(null)
+    setSaveState('idle')
+    setEditorOpen(true)
+  }
+  function requestClose() {
+    if (saveState === 'pending') return
+    if (dirty) setDiscard(true)
+    else setEditorOpen(false)
+  }
+  function change<K extends keyof RosterForm>(key: K, value: RosterForm[K]) {
+    setForm((old) => ({ ...old, [key]: value }))
+    setSaveState('idle')
+    setFormError(null)
+  }
+  async function save() {
+    if (!form.name.trim() || saveState === 'pending' || saveState === 'success')
+      return
+    setSaveState('pending')
+    setFormError(null)
     try {
-      setSaving(true)
-      setError(null)
-      setNotice(null)
-
-      if (editingId) {
-        const saved = await updateRosterPerson(editingId, form)
-        setPeople((prev) => prev.map((person) => person.id === saved.id ? saved : person))
-        setNotice('Roster person updated.')
-      } else {
-        const saved = await createRosterPerson(form)
-        setPeople((prev) => [saved, ...prev])
-        setNotice('Roster person added.')
+      const saved = editingId
+        ? await updateRosterPerson(editingId, form)
+        : await createRosterPerson(form)
+      setPeople((old) =>
+        editingId
+          ? old.map((x) => (x.id === saved.id ? saved : x))
+          : [saved, ...old],
+      )
+      const { id, ...next } = saved
+      setForm(next)
+      setBaseline(JSON.stringify(next))
+      setEditingId(id)
+      setSaveState('success')
+      notify('Person saved to the roster.')
+    } catch (error) {
+      setFormError(readableError(error, 'Could not save this person.'))
+      setSaveState('error')
+    }
+  }
+  async function remove() {
+    if (!deleting || deleteBusy) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      await deleteRosterPerson(deleting.id)
+      setPeople((old) => old.filter((x) => x.id !== deleting.id))
+      setDeleting(null)
+      notify('Person removed from the roster.')
+    } catch (error) {
+      setDeleteError(readableError(error, 'Could not delete this person.'))
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+  async function toggle(person: RosterPerson) {
+    if (toggling[person.id]) return
+    setToggling((old) => ({ ...old, [person.id]: true }))
+    setActionError(null)
+    try {
+      const saved = await updateRosterPerson(person.id, {
+        active: !person.active,
+      })
+      setPeople((old) => old.map((x) => (x.id === saved.id ? saved : x)))
+      notify(`${saved.name} marked ${saved.active ? 'active' : 'inactive'}.`)
+    } catch (error) {
+      setActionError(readableError(error, 'Could not update active state.'))
+    } finally {
+      setToggling((old) => {
+        const next = { ...old }
+        delete next[person.id]
+        return next
+      })
+    }
+  }
+  async function importPeople() {
+    if (!parsed.length || importState === 'pending') return
+    const rows = [...parsed],
+      failed: string[] = []
+    let savedCount = 0
+    setImportState('pending')
+    setImportError(null)
+    setProgress({ done: 0, total: rows.length })
+    // Individual create requests, with each confirmed result reflected immediately.
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const saved = await createRosterPerson(rows[i].person)
+        setPeople((old) => [saved, ...old])
+        savedCount++
+      } catch {
+        failed.push(rows[i].source)
       }
-
-      resetForm()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save roster person')
-    } finally {
-      setSaving(false)
+      setProgress({ done: i + 1, total: rows.length })
+    }
+    setPaste(failed.join('\n'))
+    if (failed.length) {
+      setImportState('error')
+      setImportError(
+        `${savedCount} saved; ${failed.length} could not be confirmed. Only the unconfirmed rows remain below. Check the directory before retrying to avoid duplicates.`,
+      )
+    } else {
+      setImportState('success')
+      notify(
+        `${savedCount} ${savedCount === 1 ? 'person' : 'people'} imported.`,
+      )
     }
   }
-
-  const handleEdit = (person: RosterPerson) => {
-    setEditingId(person.id)
-    setForm({
-      name: person.name,
-      category: person.category,
-      roleOrDepartment: person.roleOrDepartment,
-      email: person.email,
-      phone: person.phone,
-      notes: person.notes,
-      active: person.active,
-    })
-    setNotice(null)
-  }
-
-  const handleDelete = async (person: RosterPerson) => {
-    const ok = window.confirm(`Delete "${person.name}" from the production roster?`)
-    if (!ok) return
-
-    try {
-      setDeletingId(person.id)
-      setError(null)
-      await deleteRosterPerson(person.id)
-      setPeople((prev) => prev.filter((candidate) => candidate.id !== person.id))
-      if (editingId === person.id) resetForm()
-      setNotice('Roster person deleted.')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete roster person')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  const handleToggleActive = async (person: RosterPerson) => {
-    try {
-      setSaving(true)
-      setError(null)
-      const saved = await updateRosterPerson(person.id, { active: !person.active })
-      setPeople((prev) => prev.map((candidate) => candidate.id === saved.id ? saved : candidate))
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update roster person')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleImport = async () => {
-    if (parsedPastePeople.length === 0) return
-
-    try {
-      setImporting(true)
-      setError(null)
-      const savedPeople = await Promise.all(parsedPastePeople.map((person) => createRosterPerson(person)))
-      setPeople((prev) => [...savedPeople, ...prev])
-      setPasteText('')
-      setNotice(`${savedPeople.length} roster ${savedPeople.length === 1 ? 'person' : 'people'} imported.`)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to import roster people')
-    } finally {
-      setImporting(false)
-    }
-  }
-
   return (
-    <div className="vw-page-wrap">
-      <section className="vw-section-card vw-dashboard-hero">
-        <div className="vw-dashboard-hero-inner">
-          <div>
-            <h1 className="vw-page-title">Production Roster</h1>
-            <p className="vw-page-note">
-              Keep cast, crew, and emergency contacts ready for fast call sheet builds.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {error ? <div className="vw-inline-error">{error}</div> : null}
-      {notice ? <div className="vw-inline-success">{notice}</div> : null}
-
-      <section className="roster-layout">
-        <div className="panel roster-form-panel">
-          <div className="section-head">
-            <div>
-              <h2>{editingId ? 'Edit Person' : 'Add Person'}</h2>
+    <div className="pd-page">
+      {!unauthorized && (
+        <>
+          <PageHeader title="Production roster">
+            <Button
+              icon="import"
+              onClick={() => {
+                setImportOpen(true)
+                if (importState !== 'error') setImportState('idle')
+              }}
+              disabled={unauthorized}
+            >
+              Paste import
+            </Button>
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => openEditor()}
+              disabled={unauthorized}
+            >
+              Add person
+            </Button>
+          </PageHeader>
+        </>
+      )}
+      {actionError && (
+        <ErrorNotice onDismiss={() => setActionError(null)}>
+          {actionError}
+        </ErrorNotice>
+      )}
+      {unauthorized ? (
+        <SessionState />
+      ) : (
+        <>
+          <div className="pd-toolbar">
+            <SearchField
+              label="Search roster"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search name, role, email, or phone…"
+            />
+            <div className="pd-toolbar-options">
+              <Menu
+                label={
+                  category === 'all'
+                    ? 'All categories'
+                    : rosterCategoryLabels[category]
+                }
+                icon="people"
+                items={[
+                  { value: 'all', label: 'All categories' },
+                  ...categories,
+                ]}
+                value={category}
+                onChange={(v) => setCategory(v as typeof category)}
+              />
             </div>
-            {editingId ? (
-              <button className="vw-btn" type="button" onClick={resetForm}>Cancel Edit</button>
-            ) : null}
           </div>
-
-          <div className="field-grid field-grid-2">
-            <label className="field">
-              <span>Name</span>
-              <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
-            </label>
-
-            <label className="field">
-              <span>Category</span>
-              <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value as RosterCategory }))}>
-                {rosterCategories.map((category) => (
-                  <option key={category} value={category}>{rosterCategoryLabels[category]}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Role / Department</span>
-              <input value={form.roleOrDepartment} onChange={(event) => setForm((prev) => ({ ...prev, roleOrDepartment: event.target.value }))} />
-            </label>
-
-            <label className="field">
-              <span>Email</span>
-              <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} />
-            </label>
-
-            <label className="field">
-              <span>Phone</span>
-              <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
-            </label>
-
-            <label className="field roster-active-toggle">
-              <input type="checkbox" checked={form.active} onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))} />
-              <span>Active</span>
-            </label>
-
-            <label className="field field-full">
-              <span>Notes</span>
-              <textarea value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
-            </label>
-          </div>
-
-          <button className="vw-btn vw-btn-primary" type="button" onClick={handleSubmit} disabled={saving || !form.name.trim()}>
-            {saving ? 'Saving…' : editingId ? 'Save Person' : 'Add Person'}
-          </button>
-        </div>
-
-        <div className="panel roster-import-panel">
-          <h2>Paste Roster</h2>
-          <label className="field">
-            <span>One person per line</span>
+          {loading ? (
+            <LoadingRows label="Loading production roster…" />
+          ) : loadError ? (
+            <EmptyState
+              kind="error"
+              title="The roster couldn’t be loaded"
+              action={<RetryButton onClick={() => setAttempt((x) => x + 1)} />}
+            >
+              {loadError}
+            </EmptyState>
+          ) : !people.length ? (
+            <EmptyState
+              title="No people yet"
+              action={
+                <Button
+                  variant="primary"
+                  icon="plus"
+                  onClick={() => openEditor()}
+                >
+                  Add your first person
+                </Button>
+              }
+            ></EmptyState>
+          ) : !filtered.length ? (
+            <EmptyState
+              kind="search"
+              title="No people match this view"
+              action={<Button onClick={clear}>Clear search and filters</Button>}
+            ></EmptyState>
+          ) : (
+            <>
+              <div className="pd-table-wrap">
+                <table className="pd-table pd-roster">
+                  <caption className="pd-sr-only">Production roster</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Person / department</th>
+                      <th scope="col">Category</th>
+                      <th scope="col">Contact</th>
+                      <th scope="col">Active</th>
+                      <th scope="col">
+                        <span className="pd-sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((person) => (
+                      <tr
+                        key={person.id}
+                        className={person.active ? '' : 'pd-row-inactive'}
+                      >
+                        <td className="pd-person-name">
+                          <button
+                            type="button"
+                            className="pd-name-link"
+                            onClick={() => openEditor(person)}
+                          >
+                            {person.name}
+                          </button>
+                          <small>
+                            {person.roleOrDepartment || 'Role not set'}
+                          </small>
+                          {person.notes && (
+                            <small className="pd-note-preview">
+                              {person.notes}
+                            </small>
+                          )}
+                        </td>
+                        <td data-label="Category">
+                          <span className="pd-category">
+                            <Icon
+                              name={
+                                person.category === 'cast'
+                                  ? 'people'
+                                  : person.category === 'emergency'
+                                    ? 'phone'
+                                    : 'file'
+                              }
+                            />
+                            {rosterCategoryLabels[person.category]}
+                          </span>
+                        </td>
+                        <td data-label="Contact" className="pd-contact">
+                          {person.email && (
+                            <a href={`mailto:${person.email}`}>
+                              <Icon name="mail" />
+                              {person.email}
+                            </a>
+                          )}
+                          {person.phone && (
+                            <a href={`tel:${person.phone}`}>
+                              <Icon name="phone" />
+                              {person.phone}
+                            </a>
+                          )}
+                          {!person.email && !person.phone && (
+                            <span className="pd-muted">No contact details</span>
+                          )}
+                        </td>
+                        <td data-label="Active">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={person.active}
+                            aria-label={`${person.active ? 'Deactivate' : 'Activate'} ${person.name}`}
+                            aria-busy={toggling[person.id] || undefined}
+                            disabled={toggling[person.id]}
+                            className="pd-switch-control"
+                            onClick={() => void toggle(person)}
+                          >
+                            <span
+                              className={`pd-switch ${person.active ? 'is-on' : ''}`}
+                            >
+                              <span />
+                            </span>
+                            <span>
+                              {toggling[person.id]
+                                ? 'Updating…'
+                                : person.active
+                                  ? 'Active'
+                                  : 'Inactive'}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="pd-row-actions">
+                          <Menu
+                            compact
+                            label={`Actions for ${person.name}`}
+                            icon="more"
+                            disabled={toggling[person.id]}
+                            items={[
+                              {
+                                value: 'edit',
+                                label: 'Edit person',
+                                icon: 'edit',
+                                onSelect: () => openEditor(person),
+                              },
+                              {
+                                value: 'active',
+                                label: person.active
+                                  ? 'Mark inactive'
+                                  : 'Mark active',
+                                icon: 'check',
+                                onSelect: () => void toggle(person),
+                              },
+                              {
+                                value: 'delete',
+                                label: 'Delete person',
+                                icon: 'trash',
+                                danger: true,
+                                onSelect: () => {
+                                  setDeleteError(null)
+                                  setDeleting(person)
+                                },
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="pd-list-footer">
+                <span>
+                  {filtered.length === people.length
+                    ? `${people.length} people`
+                    : `${filtered.length} of ${people.length} people`}
+                </span>
+                {(search || category !== 'all') && (
+                  <Button variant="quiet" onClick={clear}>
+                    Clear filters
+                  </Button>
+                )}
+                <span>
+                  {people.filter((x) => x.active).length} active in directory
+                </span>
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {editorOpen && (
+        <Overlay
+          kind="drawer"
+          title={editingId ? 'Edit person' : 'Add person'}
+          onClose={requestClose}
+          busy={saveState === 'pending'}
+          footer={
+            <>
+              <Button onClick={requestClose} disabled={saveState === 'pending'}>
+                {saveState === 'success' ? 'Done' : 'Cancel'}
+              </Button>
+              <Button
+                type="submit"
+                form="pd-person-form"
+                variant="primary"
+                icon="check"
+                className="pd-save-button"
+                state={saveState}
+                disabled={!form.name.trim() || saveState === 'success'}
+              >
+                Save person
+              </Button>
+            </>
+          }
+        >
+          <form
+            id="pd-person-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void save()
+            }}
+          >
+            <fieldset
+              className="pd-form-fields"
+              disabled={saveState === 'pending'}
+            >
+              <label className="pd-field" htmlFor="person-name">
+                Name <span className="pd-field-hint">Required</span>
+                <input
+                  data-initial-focus
+                  id="person-name"
+                  autoComplete="name"
+                  value={form.name}
+                  required
+                  aria-describedby={formError ? 'person-error' : undefined}
+                  onChange={(e) => change('name', e.target.value)}
+                />
+              </label>
+              <div className="pd-field">
+                <span id="person-category-label">Category</span>
+                <Menu
+                  ariaLabel={`Category: ${rosterCategoryLabels[form.category]}`}
+                  label={rosterCategoryLabels[form.category]}
+                  icon="people"
+                  items={categories}
+                  value={form.category}
+                  onChange={(v) => change('category', v as RosterCategory)}
+                />
+              </div>
+              <label className="pd-field" htmlFor="person-role">
+                Role / department
+                <input
+                  id="person-role"
+                  value={form.roleOrDepartment}
+                  onChange={(e) => change('roleOrDepartment', e.target.value)}
+                  placeholder="e.g. Director of photography"
+                />
+              </label>
+              <div className="pd-form-columns">
+                <label className="pd-field" htmlFor="person-email">
+                  Email
+                  <input
+                    id="person-email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={form.email}
+                    onChange={(e) => change('email', e.target.value)}
+                    placeholder="name@example.com"
+                  />
+                </label>
+                <label className="pd-field" htmlFor="person-phone">
+                  Phone
+                  <input
+                    id="person-phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={form.phone}
+                    onChange={(e) => change('phone', e.target.value)}
+                    placeholder="Phone number"
+                  />
+                </label>
+              </div>
+              <label className="pd-field" htmlFor="person-notes">
+                Notes
+                <textarea
+                  id="person-notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => change('notes', e.target.value)}
+                />
+              </label>
+              <div className="pd-form-active">
+                <div>
+                  <strong>Active in the directory</strong>
+                  <p>Inactive contacts stay saved for future reference.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Active in the directory"
+                  aria-checked={form.active}
+                  className={`pd-switch ${form.active ? 'is-on' : ''}`}
+                  onClick={() => change('active', !form.active)}
+                >
+                  <span />
+                </button>
+              </div>
+            </fieldset>
+          </form>
+          {formError && (
+            <div id="person-error">
+              <ErrorNotice>{formError}</ErrorNotice>
+            </div>
+          )}
+          {saveState === 'success' && (
+            <p className="pd-saved-message" role="status">
+              <Icon name="check" />
+              Saved to the production roster.
+            </p>
+          )}
+        </Overlay>
+      )}
+      {blocker.state === 'blocked' &&
+        (importState === 'pending' ? (
+          <Overlay
+            title="Import in progress"
+            description="People are being saved individually. Wait for the results before leaving."
+            onClose={() => blocker.reset()}
+            footer={
+              <Button variant="primary" onClick={() => blocker.reset()}>
+                Return to import
+              </Button>
+            }
+          >
+            <p className="pd-help">
+              {progress.done} of {progress.total} requests completed. Confirmed
+              contacts stay saved.
+            </p>
+          </Overlay>
+        ) : hasDraft ? (
+          <Confirm
+            destructive={false}
+            title="Leave the roster?"
+            description={
+              editorOpen && dirty
+                ? 'The person editor has unsaved changes. Discard them and leave this page?'
+                : 'Some pasted people have not been imported. Discard the remaining input and leave this page?'
+            }
+            confirmLabel="Discard and leave"
+            onCancel={() => blocker.reset()}
+            onConfirm={() => blocker.proceed()}
+          />
+        ) : null)}
+      {discard && (
+        <Confirm
+          destructive={false}
+          title="Discard unsaved changes?"
+          description="The person editor has changes that haven’t been saved."
+          confirmLabel="Discard changes"
+          onCancel={() => setDiscard(false)}
+          onConfirm={() => {
+            setDiscard(false)
+            setEditorOpen(false)
+          }}
+        />
+      )}
+      {deleting && (
+        <Confirm
+          title="Delete this person?"
+          description={`“${deleting.name}” will be removed from the production roster. Existing call sheet entries are unchanged.`}
+          pending={deleteBusy}
+          error={deleteError}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => void remove()}
+        />
+      )}
+      {importOpen && (
+        <Overlay
+          className="pd-import-dialog"
+          title="Paste people into the roster"
+          onClose={() => {
+            if (importState !== 'pending') setImportOpen(false)
+          }}
+          busy={importState === 'pending'}
+          footer={
+            <>
+              <Button
+                disabled={importState === 'pending'}
+                onClick={() => setImportOpen(false)}
+              >
+                {importState === 'success' ? 'Done' : 'Close'}
+              </Button>
+              <Button
+                variant="primary"
+                icon="import"
+                className="pd-save-button"
+                state={importState}
+                pendingLabel={`Importing ${progress.done}/${progress.total}`}
+                successLabel="Imported"
+                errorLabel="Retry remaining"
+                disabled={!parsed.length || importState === 'success'}
+                onClick={() => void importPeople()}
+              >
+                Import {parsed.length || ''}{' '}
+                {parsed.length === 1 ? 'person' : 'people'}
+              </Button>
+            </>
+          }
+        >
+          <label className="pd-field" htmlFor="roster-paste">
+            One person per line
             <textarea
-              value={pasteText}
-              onChange={(event) => setPasteText(event.target.value)}
-              placeholder="Name, Category, Role, Email, Phone, Notes"
+              data-initial-focus
+              id="roster-paste"
+              rows={5}
+              value={paste}
+              disabled={importState === 'pending'}
+              onChange={(e) => {
+                setPaste(e.target.value)
+                setImportState('idle')
+                setImportError(null)
+              }}
+              placeholder="Name | Category | Role | Email | Phone | Notes"
+              aria-describedby="roster-format"
             />
           </label>
-          <div className="quick-add-actions">
-            <p>Commas or pipes both work. Unknown categories become Other.</p>
-            <button className="vw-btn" type="button" onClick={handleImport} disabled={importing || parsedPastePeople.length === 0}>
-              {importing ? 'Importing…' : `Import ${parsedPastePeople.length || ''}`.trim()}
-            </button>
+          <p id="roster-format" className="pd-help">
+            Use pipes or simple comma-separated values in the order shown.
+            Unknown categories become Other. Quoted CSV and headers are not
+            supported.
+          </p>
+          <div className="pd-import-preview">
+            <h3>
+              Preview{' '}
+              <span>
+                {parsed.length} {parsed.length === 1 ? 'person' : 'people'}
+              </span>
+            </h3>
+            {parsed.length ? (
+              <ul>
+                {parsed.slice(0, 6).map((row, i) => (
+                  <li key={i}>
+                    <span>
+                      <strong>{row.person.name}</strong>
+                      <small>
+                        {row.person.roleOrDepartment ||
+                          row.person.email ||
+                          'No role or email'}
+                      </small>
+                    </span>
+                    <Status value="draft">
+                      {rosterCategoryLabels[row.person.category]}
+                    </Status>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No people to preview.</p>
+            )}
+            {parsed.length > 6 && <p>And {parsed.length - 6} more people.</p>}
           </div>
-        </div>
-      </section>
-
-      <section className="panel roster-list-panel">
-        <div className="section-head">
-          <div>
-            <h2>Roster People</h2>
-            <p>{people.length} saved {people.length === 1 ? 'person' : 'people'}</p>
-          </div>
-        </div>
-
-        <div className="dashboard-controls roster-controls">
-          <label className="dashboard-control">
-            <span>Search</span>
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Name, role, email, phone" />
-          </label>
-          <label className="dashboard-control">
-            <span>Category</span>
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as 'all' | RosterCategory)}>
-              <option value="all">All categories</option>
-              {rosterCategories.map((category) => (
-                <option key={category} value={category}>{rosterCategoryLabels[category]}</option>
-              ))}
-            </select>
-          </label>
-          <button className="vw-btn" type="button" onClick={() => { setSearchQuery(''); setCategoryFilter('all') }} disabled={!searchQuery && categoryFilter === 'all'}>
-            Clear
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="vw-empty-block">Loading production roster...</div>
-        ) : filteredPeople.length === 0 ? (
-          <div className="vw-empty-block">
-            {people.length === 0
-              ? 'Your production roster is ready for the first cast, crew, or emergency contact.'
-              : 'No roster people match the current search or category.'}
-          </div>
-        ) : (
-          <div className="roster-card-grid">
-            {filteredPeople.map((person) => (
-              <article key={person.id} className={`roster-person-card ${person.active ? '' : 'is-inactive'}`}>
-                <div className="roster-person-head">
-                  <div>
-                    <h3>{person.name}</h3>
-                    <p>{person.roleOrDepartment || rosterCategoryLabels[person.category]}</p>
-                  </div>
-                  <span className={`status-badge roster-category-badge roster-category-${person.category}`}>
-                    {rosterCategoryLabels[person.category]}
-                  </span>
-                </div>
-
-                <div className="roster-person-meta">
-                  {person.email ? <span>{person.email}</span> : null}
-                  {person.phone ? <span>{person.phone}</span> : null}
-                  {!person.active ? <span>Inactive</span> : null}
-                </div>
-
-                {person.notes ? <p className="roster-person-notes">{person.notes}</p> : null}
-
-                <div className="vw-actions-row roster-card-actions">
-                  <button className="vw-inline-action" type="button" onClick={() => handleEdit(person)}>Edit</button>
-                  <button className="vw-inline-action" type="button" onClick={() => handleToggleActive(person)} disabled={saving}>
-                    {person.active ? 'Mark Inactive' : 'Mark Active'}
-                  </button>
-                  <button className="vw-inline-action vw-inline-action-danger" type="button" onClick={() => handleDelete(person)} disabled={deletingId === person.id}>
-                    {deletingId === person.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+          <p className="pd-help pd-import-caution">
+            <Icon name="alert" />
+            People are saved individually. An import may partially succeed;
+            confirmed records appear in your roster immediately.
+          </p>
+          {importError && <ErrorNotice>{importError}</ErrorNotice>}
+          {importState === 'success' && (
+            <p className="pd-saved-message" role="status">
+              <Icon name="check" />
+              All {progress.total} people were saved.
+            </p>
+          )}
+        </Overlay>
+      )}
     </div>
   )
 }
-
 export default RosterPage
