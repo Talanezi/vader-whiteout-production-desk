@@ -5,7 +5,9 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
-    "start:dev": "nest start --watch"
+    "start:dev": "nest start --watch",
+    "migration:run": "node dist/shotlists/migrate.js",
+    "migration:revert": "node dist/shotlists/migrate.js --revert"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -23,7 +25,10 @@
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "yjs": "13.6.27",
+    "@hocuspocus/server": "2.15.3",
+    "ws": "8.18.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
@@ -33,6 +38,7 @@
     "@types/node": "^22.10.1",
     "@types/passport-jwt": "^4.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "@types/ws": "8.18.1"
   }
 }

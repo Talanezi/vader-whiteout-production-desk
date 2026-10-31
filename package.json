@@ -2,6 +2,6 @@
   "name": "vader-whiteout-production-desk-root",
   "private": true,
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   }
 }

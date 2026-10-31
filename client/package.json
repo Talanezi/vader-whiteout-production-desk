@@ -11,7 +11,14 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^6.30.3"
+    "react-router-dom": "^6.30.3",
+    "yjs": "13.6.27",
+    "@hocuspocus/provider": "2.15.3",
+    "y-codemirror.next": "0.3.6",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.6",
+    "metal-fx": "2.0.11",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

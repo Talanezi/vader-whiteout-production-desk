@@ -45,7 +45,7 @@ if (
     args: ['--window-size=1440,1000'],
   })
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
+    viewport: null,
     serviceWorkers: 'block',
   })
   // A fresh non-persistent context never reads or writes the user's real profile.

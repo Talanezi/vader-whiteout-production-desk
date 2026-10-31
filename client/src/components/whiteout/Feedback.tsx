@@ -10,29 +10,67 @@ import {
 import { createPortal } from 'react-dom'
 import { IconButton, Button } from './Button'
 import Icon from './Icon'
-type Toast = { id: number; text: string }
-const ToastContext = createContext<(text: string) => void>(() => {})
+type ToastOptions = {
+  state?: 'pending' | 'success' | 'error'
+  action?: { label: string; run: () => void }
+  id?: number
+}
+type Toast = ToastOptions & { id: number; text: string }
+type Notify = ((text: string, options?: ToastOptions) => number) & {
+  promise: <T>(
+    operation: Promise<T>,
+    labels: {
+      pending: string
+      success: string | ((result: T) => string)
+      error: string
+    },
+  ) => Promise<T>
+}
+const ToastContext = createContext<Notify>(
+  Object.assign(() => 0, { promise: async <T,>(p: Promise<T>) => p }),
+)
 function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
   const timer = useRef<number | undefined>(undefined)
   const stop = () => clearTimeout(timer.current)
   const resume = () => {
     stop()
-    timer.current = window.setTimeout(dismiss, 6000)
+    if (item.state !== 'pending')
+      timer.current = window.setTimeout(
+        dismiss,
+        item.state === 'error' || item.action ? 10000 : 6000,
+      )
   }
   useEffect(() => {
     resume()
     return stop
-  }, [])
+  }, [item.state, item.text])
   return (
     <div
-      className="pd-toast"
+      className={`pd-toast pd-toast-${item.state || 'success'}`}
+      data-state={item.state || 'success'}
       onMouseEnter={stop}
       onMouseLeave={resume}
       onFocus={stop}
       onBlur={resume}
     >
-      <Icon name="check" />
+      {item.state === 'pending' ? (
+        <span className="pd-spinner" />
+      ) : (
+        <Icon name={item.state === 'error' ? 'alert' : 'check'} />
+      )}
       <span>{item.text}</span>
+      {item.action && (
+        <button
+          type="button"
+          className="pd-toast-action"
+          onClick={() => {
+            item.action!.run()
+            dismiss()
+          }}
+        >
+          {item.action.label}
+        </button>
+      )}
       <IconButton name="close" label="Dismiss notification" onClick={dismiss} />
     </div>
   )
@@ -40,13 +78,42 @@ function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]),
     sequence = useRef(0)
-  const notify = useCallback(
-    (text: string) =>
-      setItems((old) => [...old.slice(-2), { id: ++sequence.current, text }]),
-    [],
-  )
+  const notify = useCallback((text: string, options: ToastOptions = {}) => {
+    const id = options.id || ++sequence.current
+    setItems((old) =>
+      old.some((x) => x.id === id)
+        ? old.map((x) => (x.id === id ? { ...options, id, text } : x))
+        : [...old.slice(-2), { ...options, id, text }],
+    )
+    return id
+  }, [])
+  const value = Object.assign(notify, {
+    promise: async <T,>(
+      operation: Promise<T>,
+      labels: {
+        pending: string
+        success: string | ((result: T) => string)
+        error: string
+      },
+    ) => {
+      const id = notify(labels.pending, { state: 'pending' })
+      try {
+        const result = await operation
+        notify(
+          typeof labels.success === 'function'
+            ? labels.success(result)
+            : labels.success,
+          { id, state: 'success' },
+        )
+        return result
+      } catch (e) {
+        notify(labels.error, { id, state: 'error' })
+        throw e
+      }
+    },
+  })
   return (
-    <ToastContext.Provider value={notify}>
+    <ToastContext.Provider value={value}>
       {children}
       {createPortal(
         <div

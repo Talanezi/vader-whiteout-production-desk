@@ -3,9 +3,12 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { IconButton } from './whiteout/Button'
 import Icon from './whiteout/Icon'
 import DeskEmblem from './whiteout/DeskEmblem'
+import CreateMenu from './whiteout/CreateMenu'
 import { Overlay } from './whiteout/Overlay'
 import { ToastProvider } from './whiteout/Feedback'
 import '../styles/whiteout.css'
+import '../styles/shotlists.css'
+import { getAuthToken } from '../lib/api'
 
 function AppShell() {
   const location = useLocation()
@@ -17,6 +20,9 @@ function AppShell() {
     }
   })
   const [mobileOpen, setMobileOpen] = useState(false)
+  const shotWorkspace =
+    /^\/shotlists\/[^/]+$/.test(location.pathname) &&
+    !location.pathname.endsWith('/new')
   const editor = /^\/callsheets\/.+\/edit$/.test(location.pathname)
   useEffect(() => {
     setMobileOpen(false)
@@ -48,6 +54,16 @@ function AppShell() {
         <span className="pd-nav-text">Call sheets</span>
       </NavLink>
       <NavLink
+        to="/shotlists"
+        title={collapsed ? 'Shot lists' : undefined}
+        className={({ isActive }) =>
+          `pd-nav-link ${isActive ? 'is-active' : ''}`
+        }
+      >
+        <Icon name="shots" />
+        <span className="pd-nav-text">Shot lists</span>
+      </NavLink>
+      <NavLink
         to="/roster"
         title={collapsed ? 'Roster' : undefined}
         className={({ isActive }) =>
@@ -77,6 +93,11 @@ function AppShell() {
               <small>Production Desk</small>
             </span>
           </Link>
+          {getAuthToken() && (
+            <div className="pd-sidebar-create">
+              <CreateMenu />
+            </div>
+          )}
           {navigation}
           <div className="pd-sidebar-bottom">
             <a
@@ -119,10 +140,21 @@ function AppShell() {
               <DeskEmblem />
               <span>Production Desk</span>
             </Link>
+            {getAuthToken() && (
+              <div className="pd-mobile-create">
+                <CreateMenu />
+              </div>
+            )}
           </header>
           <main
             id="workspace"
-            className={editor ? 'pd-content pd-legacy' : 'pd-content'}
+            className={
+              editor
+                ? 'pd-content pd-legacy'
+                : shotWorkspace
+                  ? 'pd-content pd-shot-content'
+                  : 'pd-content'
+            }
           >
             <Outlet />
           </main>
@@ -134,14 +166,6 @@ function AppShell() {
             title="Production Desk"
             onClose={() => setMobileOpen(false)}
           >
-            <Link
-              to="/callsheets/new"
-              className="pd-button pd-button-primary"
-              onClick={() => setMobileOpen(false)}
-            >
-              <Icon name="plus" />
-              New call sheet
-            </Link>
             <div onClick={() => setMobileOpen(false)}>{navigation}</div>
             <a href="/apps/" className="pd-nav-link">
               <Icon name="grid" />

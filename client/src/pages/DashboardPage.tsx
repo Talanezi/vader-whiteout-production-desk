@@ -158,12 +158,7 @@ function DashboardPage() {
     <div className="pd-page">
       {!unauthorized && (
         <>
-          <PageHeader title="Call sheets">
-            <Link className="pd-button pd-button-primary" to="/callsheets/new">
-              <Icon name="plus" />
-              New call sheet
-            </Link>
-          </PageHeader>
+          <PageHeader title="Call sheets" />
         </>
       )}
       {actionError && (
@@ -223,18 +218,7 @@ function DashboardPage() {
               {loadError}
             </EmptyState>
           ) : !items.length ? (
-            <EmptyState
-              title="No call sheets yet"
-              action={
-                <Link
-                  to="/callsheets/new"
-                  className="pd-button pd-button-primary"
-                >
-                  <Icon name="plus" />
-                  Create your first call sheet
-                </Link>
-              }
-            ></EmptyState>
+            <EmptyState title="No call sheets yet" />
           ) : !filtered.length ? (
             <EmptyState
               kind="search"

@@ -1,4 +1,4 @@
-FROM node:18-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npm install
 COPY server/src ./src
 RUN npm run build
 
-FROM node:18-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 
 WORKDIR /app/server
 

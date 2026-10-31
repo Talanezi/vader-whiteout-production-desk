@@ -8,6 +8,7 @@ import { CallsheetsModule } from './callsheets/callsheets.module';
 import { CallSheetDraftEntity } from './callsheets/entities/callsheet-draft.entity';
 import { RosterPersonEntity } from './roster/entities/roster-person.entity';
 import { RosterModule } from './roster/roster.module';
+import { ShotlistsModule } from './shotlists/shotlists.module';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { RosterModule } from './roster/roster.module';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: false,
         ssl: configService.get<string>('DATABASE_URL')?.includes('railway')
           ? { rejectUnauthorized: false }
           : false,
@@ -30,6 +31,7 @@ import { RosterModule } from './roster/roster.module';
     CallsheetsModule,
     RosterModule,
     AuthModule,
+    ShotlistsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

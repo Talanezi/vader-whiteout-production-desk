@@ -25,6 +25,7 @@ type Props = {
   compact?: boolean
   disabled?: boolean
   onChange?: (value: string) => void
+  width?: number
   portal?: boolean
 }
 /** Independent origin-aware menu, with collision handling and full keyboard input. */
@@ -38,6 +39,7 @@ export default function Menu({
   disabled,
   onChange,
   portal = true,
+  width: desiredWidth,
 }: Props) {
   const [phase, setPhase] = useState<'closed' | 'open' | 'leaving'>('closed')
   const [position, setPosition] = useState<CSSProperties>({
@@ -78,7 +80,10 @@ export default function Menu({
         p = panel.current
       if (!a || !p) return
       const height = Math.min(p.scrollHeight, window.innerHeight - 24),
-        width = Math.min(244, window.innerWidth - 24)
+        width = Math.min(
+          desiredWidth || (compact ? 208 : items.length > 4 ? 228 : 208),
+          window.innerWidth - 24,
+        )
       const above =
         window.innerHeight - a.bottom < height + 12 && a.top > height + 12
       const left = Math.max(
@@ -120,7 +125,7 @@ export default function Menu({
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [mounted, phase, portal, compact])
+  }, [mounted, phase, portal, compact, desiredWidth, items.length])
   // Position first, then focus: hidden elements cannot receive focus on the
   // first opening. This also keeps focus inside a native modal's top layer.
   useLayoutEffect(() => {
@@ -181,6 +186,7 @@ export default function Menu({
         } as CSSProperties
       }
       role="menu"
+      aria-hidden={phase !== 'open' || undefined}
       aria-label={label}
       onKeyDown={(e) => {
         const controls = available(),

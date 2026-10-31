@@ -1,0 +1,4 @@
+**/node_modules/
+**/.DS_Store
+*.log
+!client/qa/m03/artifacts/*.log

@@ -1,5 +1,12 @@
 import type { SVGProps } from 'react'
 export type IconName =
+  | 'shots'
+  | 'undo'
+  | 'redo'
+  | 'share'
+  | 'up'
+  | 'down'
+  | 'columns'
   | 'file'
   | 'people'
   | 'plus'
@@ -27,6 +34,14 @@ export type IconName =
   | 'retry'
   | 'calendar'
 const paths: Record<IconName, string> = {
+  shots: 'M3 5h18v14H3z M3 9h18 M8 5v14 M16 5v14 M3 15h18',
+  undo: 'm9 4-5 5 5 5 M4 9h10a6 6 0 0 1 0 12',
+  redo: 'm15 4 5 5-5 5 M20 9h-10a6 6 0 0 0 0 12',
+  share:
+    'M9 15 15 9 M8 17l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0 M16 7l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0',
+  up: 'm6 14 6-6 6 6',
+  down: 'm6 10 6 6 6-6',
+  columns: 'M3 4h18v16H3z M10 4v16 M16 4v16',
   file: 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',
   people:
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M18 8a3 3 0 0 1 0 6 M22 21v-2a4 4 0 0 0-3-3.9',
