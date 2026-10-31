@@ -5,8 +5,8 @@
 }
 .pd-ui .pd-menu-item {
   min-width: 0;
-  min-height: 37px;
-  padding: 8px 9px;
+  min-height: 32px;
+  padding: 5px 8px;
   line-height: 20px;
 }
 .pd-ui .pd-menu-item svg {
@@ -115,20 +115,6 @@
   overflow: hidden;
   animation: pd-create-open 260ms var(--pd-ease) both;
 }
-.pd-create-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 10px 13px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--pd-rule);
-  color: var(--pd-muted);
-  font-size: 11px;
-}
-.pd-create-heading svg {
-  width: 14px;
-  transform: rotate(45deg);
-}
 .pd-create-panel button {
   display: flex;
   align-items: center;
@@ -171,34 +157,62 @@
   opacity: 1;
   transform: none;
 }
-.pd-create-panel .pd-create-heading {
-  padding: 5px 10px 12px;
-  margin-bottom: 5px;
-  border-radius: 0;
-  border-bottom: 1px solid var(--pd-rule);
-  color: var(--pd-muted);
-  font-size: 11px;
-}
-.pd-create-panel .pd-create-heading > svg:last-child {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
-  transform: rotate(45deg);
-}
 .pd-mobile-create {
   margin-left: auto;
   width: 108px;
 }
 @keyframes pd-create-open {
   from {
+    width: var(--create-start-width);
+    height: var(--create-start-height);
+    padding: 0;
+    transform: translate(var(--create-shift-x), var(--create-shift-y));
+    border-radius: 22px;
+  }
+  to {
+    height: 100px;
+    transform: translate(0, 0);
+    border-radius: 18px;
+  }
+}
+@keyframes pd-create-actions {
+  from {
     opacity: 0;
-    transform: translateY(-5px) scale(0.91, 0.8);
-    border-radius: 24px;
+    transform: translateY(6px);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
     transform: none;
-    border-radius: 18px;
+    filter: blur(0);
+  }
+}
+.pd-create.is-open .pd-create-pill {
+  opacity: 0;
+  pointer-events: none;
+}
+.pd-create-panel {
+  box-sizing: border-box;
+  height: 100px;
+  padding: 5px;
+  animation: pd-create-open 340ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.pd-create-panel [role='menu'] {
+  animation: pd-create-actions 200ms 95ms both;
+}
+.pd-create-panel button {
+  height: 44px;
+  padding: 9px;
+  white-space: nowrap;
+}
+.pd-create-panel button > svg:first-child {
+  width: 17px;
+  height: 17px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-create-panel,
+  .pd-create-panel [role='menu'] {
+    animation: none !important;
   }
 }
 
@@ -1774,4 +1788,64 @@
   .pd-mode-fusion {
     display: none;
   }
+}
+
+.pd-create-panel.is-closing {
+  pointer-events: none;
+  animation: pd-create-close 220ms cubic-bezier(0.25, 0.7, 0.3, 1) both;
+}
+.pd-create-panel.is-closing [role='menu'] {
+  opacity: 0;
+  animation: none;
+}
+@keyframes pd-create-close {
+  from {
+    height: 100px;
+    transform: translate(0, 0);
+    border-radius: 18px;
+  }
+  to {
+    width: var(--create-start-width);
+    height: var(--create-start-height);
+    padding: 0;
+    transform: translate(var(--create-shift-x), var(--create-shift-y));
+    border-radius: 22px;
+    opacity: 0;
+  }
+}
+
+/* The semantic trigger never remounts when the asynchronous shader arrives. */
+.pd-create-pill {
+  position: relative;
+  z-index: 1;
+}
+.pd-create-metal-host {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  border-radius: 22px;
+}
+.pd-create-metal-host .metal-fx-root {
+  width: 100%;
+  height: 38px;
+}
+.pd-create-metal-surface {
+  display: block;
+  width: 100%;
+  height: 38px;
+  border-radius: 22px;
+  background: linear-gradient(
+    140deg,
+    #273b4b,
+    #15212d 45%,
+    #101922 65%,
+    #26394a
+  );
+}
+.pd-create[data-metal='webgl'] .pd-create-pill {
+  background: transparent;
+}
+.pd-create.is-open .pd-create-metal-host {
+  opacity: 0;
 }

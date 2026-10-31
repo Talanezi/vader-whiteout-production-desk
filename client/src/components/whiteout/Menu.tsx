@@ -81,7 +81,15 @@ export default function Menu({
       if (!a || !p) return
       const height = Math.min(p.scrollHeight, window.innerHeight - 24),
         width = Math.min(
-          desiredWidth || (compact ? 208 : items.length > 4 ? 228 : 208),
+          desiredWidth ||
+            (compact
+              ? 176
+              : Math.max(
+                  a.width,
+                  items.some((item) => item.icon) && value !== undefined
+                    ? 184
+                    : 164,
+                )),
           window.innerWidth - 24,
         )
       const above =
@@ -125,7 +133,7 @@ export default function Menu({
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [mounted, phase, portal, compact, desiredWidth, items.length])
+  }, [mounted, phase, portal, compact, desiredWidth, items, value])
   // Position first, then focus: hidden elements cannot receive focus on the
   // first opening. This also keeps focus inside a native modal's top layer.
   useLayoutEffect(() => {

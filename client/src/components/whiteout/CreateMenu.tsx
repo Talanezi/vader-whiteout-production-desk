@@ -1,16 +1,33 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { usePopover } from './Popover'
 import Icon from './Icon'
 
-const Metal = lazy(() =>
-  import('metal-fx').then((m) => ({ default: m.MetalFx })),
-)
+const Metal = lazy(() => import('./ReactiveMetal'))
 export default function CreateMenu() {
-  const pop = usePopover(244, true),
+  const pop = usePopover(202, true),
     navigate = useNavigate(),
     host = useRef<HTMLDivElement>(null)
+  const [rendered, setRendered] = useState(false)
+  useLayoutEffect(() => {
+    if (pop.open) {
+      setRendered(true)
+      return
+    }
+    const timer = setTimeout(
+      () => setRendered(false),
+      matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220,
+    )
+    return () => clearTimeout(timer)
+  }, [pop.open])
   const [active, setActive] = useState(false),
     [visible, setVisible] = useState(true),
     [hidden, setHidden] = useState(document.hidden)
@@ -71,7 +88,7 @@ export default function CreateMenu() {
   return (
     <div
       ref={host}
-      className={`pd-create ${pop.open ? 'is-open' : ''}`}
+      className={`pd-create ${pop.open || rendered ? 'is-open' : ''}`}
       data-metal={webgl && !reduced ? 'webgl' : 'static'}
       data-paused={!active || !visible || hidden || reduced}
       onPointerEnter={() => setActive(true)}
@@ -81,29 +98,31 @@ export default function CreateMenu() {
         if (!e.currentTarget.contains(e.relatedTarget)) setActive(false)
       }}
     >
-      {webgl && !reduced ? (
-        <Suspense fallback={trigger}>
-          <Metal
-            preset="silver"
-            theme="dark"
-            strength={0.55}
-            disableGlow
-            normalizeHostStyles={false}
-            paused={!active || !visible || hidden}
-            borderRadius={20}
-          >
-            {trigger}
-          </Metal>
-        </Suspense>
-      ) : (
-        trigger
+      {trigger}
+      {webgl && !reduced && (
+        <span className="pd-create-metal-host" aria-hidden="true">
+          <Suspense fallback={null}>
+            <Metal paused={!active || !visible || hidden}>
+              <span className="pd-create-metal-surface" />
+            </Metal>
+          </Suspense>
+        </span>
       )}
-      {pop.open &&
+      {(pop.open || rendered) &&
         createPortal(
           <div
             ref={pop.panel}
-            style={pop.style}
-            className="pd-ui pd-create-panel"
+            style={
+              {
+                ...pop.style,
+                '--create-start-width': `${pop.trigger.current?.getBoundingClientRect().width || 180}px`,
+                '--create-start-height': '38px',
+                '--create-shift-x': `${(pop.trigger.current?.getBoundingClientRect().left || 0) - Number(pop.style.left || 0)}px`,
+                '--create-shift-y': `${(pop.trigger.current?.getBoundingClientRect().top || 0) - Number(pop.style.top || 0)}px`,
+              } as import('react').CSSProperties
+            }
+            className={`pd-ui pd-create-panel ${!pop.open ? 'is-closing' : ''}`}
+            aria-hidden={!pop.open || undefined}
             onKeyDown={(e) => {
               const buttons = [
                   ...e.currentTarget.querySelectorAll<HTMLButtonElement>(
@@ -132,15 +151,6 @@ export default function CreateMenu() {
               }
             }}
           >
-            <button
-              type="button"
-              className="pd-create-heading"
-              aria-label="Close creation menu"
-              onClick={() => pop.close()}
-            >
-              <span>Create</span>
-              <Icon name="plus" />
-            </button>
             <div role="menu" id={pop.id} aria-label="Create">
               {[
                 ['file', 'New Call Sheet', '/callsheets/new'],
@@ -149,6 +159,7 @@ export default function CreateMenu() {
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={!pop.open}
                   key={path}
                   onClick={() => {
                     pop.close()

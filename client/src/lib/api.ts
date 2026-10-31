@@ -2,7 +2,9 @@ import type { CallSheetDraft, RosterPerson } from '../data/mockCallSheet'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
-  'http://localhost:3001/api'
+  (import.meta.env.DEV
+    ? 'http://localhost:3001/api'
+    : 'https://vader-whiteout-production-desk-production.up.railway.app/api')
 
 const SCHEDULER_TOKEN_KEY = 'token'
 

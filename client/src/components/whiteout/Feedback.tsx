@@ -154,7 +154,7 @@ export function ErrorNotice({
           children.includes('session has expired') && (
             <a
               className="pd-session-link"
-              href={`/scheduler/login?returnTo=${encodeURIComponent('/productiondesk/' + window.location.hash)}`}
+              href={`/scheduler/#/login?returnTo=${encodeURIComponent('/productiondesk/' + window.location.hash)}`}
             >
               Sign in
               <Icon name="arrow" />
@@ -224,7 +224,7 @@ export function SessionState() {
       <h1 id="pd-session-title">Sign in to Production Desk</h1>
       <a
         className="pd-button pd-button-primary"
-        href={`/scheduler/login?returnTo=${encodeURIComponent(destination)}`}
+        href={`/scheduler/#/login?returnTo=${encodeURIComponent(destination)}`}
       >
         Sign in
         <Icon name="arrow" />

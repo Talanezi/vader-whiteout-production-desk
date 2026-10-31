@@ -4,6 +4,10 @@
     "pass": true
   },
   {
+    "name": "Admin workflow: verified members cannot self-grant; protected owner can approve/revoke centrally with audit, account binding and self-lockout prevention",
+    "pass": true
+  },
+  {
     "name": "Actual Scheduler registry: independent verification/evidence required; account/assignment binding, revoke, audit and recreated-account denial",
     "pass": true
   },

@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Compact All statuses menu",
+    "pass": true,
+    "triggerWidth": 140.453125,
+    "menuWidth": 164,
+    "rowHeights": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      32
+    ]
+  },
+  {
+    "name": "Compact Production date menu",
+    "pass": true,
+    "triggerWidth": 164.953125,
+    "menuWidth": 184,
+    "rowHeights": [
+      32,
+      32
+    ]
+  },
+  {
+    "name": "Actual Metal WebGL canvas and cursor-bend integration",
+    "pass": true,
+    "bendHookAttached": true,
+    "cursorDeformationActive": true
+  },
+  {
+    "name": "Connected origin morph, two actions, no duplicated header/close, compact geometry and Escape focus",
+    "pass": true,
+    "trigger": {
+      "x": 28,
+      "y": 108,
+      "width": 175,
+      "height": 38
+    },
+    "expanded": {
+      "x": 28,
+      "y": 108,
+      "width": 202,
+      "height": 100
+    }
+  },
+  {
+    "name": "Both Create routes remain functional",
+    "pass": true
+  },
+  {
+    "name": "Mobile placement and reduced-motion fallback",
+    "pass": true
+  }
+]

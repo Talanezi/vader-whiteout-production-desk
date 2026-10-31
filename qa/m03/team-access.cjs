@@ -187,6 +187,83 @@ async function main() {
     pass(
       'Actual Scheduler /api/me response includes protected membership; signup and profile DTOs reject injected verification claims',
     )
+    const { ProductionTeamController } = require(
+      path.join(scheduler, 'build/src/users/production-team.controller'),
+    )
+    const candidate = {
+      ID: 7,
+      Email: 'new-crew@example.test',
+      Department: 'Production',
+      Role: 'Producer',
+      Name: 'New approved crew',
+    }
+    await db.query(
+      `INSERT INTO ${schema}."user" VALUES(7,'new-crew@example.test','Production','Producer')`,
+    )
+    const adminController = new ProductionTeamController(
+      service,
+      {
+        find: async () => [identity, candidate],
+        findOneBy: async ({ ID }) => (ID === 7 ? candidate : identity),
+      },
+      db,
+    )
+    await assert.rejects(() => adminController.list(identity), /administrator/)
+    await assert.rejects(
+      () =>
+        adminController.manage(identity, '7', 'verify', {
+          department: 'Production',
+          role: 'Producer',
+          evidence: 'Self-grant must fail',
+        }),
+      /administrator/,
+    )
+    await repo.save({
+      Key: 'production-team-admin:v1:1',
+      Value: JSON.stringify({
+        enabled: true,
+        userID: 1,
+        email: identity.Email,
+      }),
+    })
+    assert.equal(await service.productionTeamAdmin(identity), true)
+    await adminController.manage(identity, '7', 'verify', {
+      department: 'Production',
+      role: 'Producer',
+      evidence: 'Independent crew roster and account ownership confirmed',
+    })
+    assert.ok(
+      verifiedMembership(
+        (await repo.findOneBy({ Key: membershipKey(7) })).Value,
+        candidate,
+      ),
+    )
+    await assert.rejects(
+      () =>
+        adminController.manage(identity, '1', 'revoke', {
+          evidence: 'Do not lock out owner',
+        }),
+      /own access/,
+    )
+    await adminController.manage(identity, '7', 'revoke', {
+      evidence: 'Production member departed',
+    })
+    assert.equal(
+      verifiedMembership(
+        (await repo.findOneBy({ Key: membershipKey(7) })).Value,
+        candidate,
+      ),
+      null,
+    )
+    await assert.rejects(
+      () => manageProductionMembership(db, { ...input, expectedUserID: 7 }),
+      /Account changed/,
+    )
+    await repo.delete({ Key: 'production-team-admin:v1:1' })
+    await repo.delete({ Key: membershipKey(7) })
+    pass(
+      'Admin workflow: verified members cannot self-grant; protected owner can approve/revoke centrally with audit, account binding and self-lockout prevention',
+    )
     const raw = await read()
     assert.equal(verifiedMembership(raw, identity).verified, true)
     for (const altered of [
@@ -205,7 +282,14 @@ async function main() {
       assert.equal(verifiedMembership(raw, identity), null)
     await manageProductionMembership(db, { ...input, action: 'revoke' })
     assert.equal(verifiedMembership(await read(), identity), null)
-    assert.equal(await repo.count(), 3) // current record + append-only verify/revoke evidence records
+    assert.equal(
+      (await repo.find()).filter(
+        (row) =>
+          row.Key.startsWith('production-team-audit:') &&
+          JSON.parse(row.Value).record.userID === 1,
+      ).length,
+      2,
+    ) // current record + append-only verify/revoke evidence records
     await db.query(`DELETE FROM ${schema}."user" WHERE id=1`)
     await db.query(
       `INSERT INTO ${schema}."user" VALUES(2,'person@example.test','Creative','Director')`,

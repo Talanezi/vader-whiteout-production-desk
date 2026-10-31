@@ -1,0 +1,53 @@
+{
+  "pass": true,
+  "checks": {
+    "team-access.json": {
+      "pass": true,
+      "groups": 6
+    },
+    "integration.json": {
+      "pass": true,
+      "groups": 9
+    },
+    "security-and-migration.json": {
+      "pass": true,
+      "groups": 4
+    },
+    "legacy-api.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "browser.json": {
+      "pass": true,
+      "groups": 7
+    },
+    "workflows.json": {
+      "pass": true,
+      "groups": 5
+    },
+    "engines-and-viewport.json": {
+      "pass": true,
+      "groups": 10
+    },
+    "zoom.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "metal-fallback.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "workbook-persistence.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "m02-regression/verification.json": {
+      "pass": true,
+      "groups": 21
+    }
+  },
+  "focusedVisualGroups": 6,
+  "productionBundleSmoke": true,
+  "liveAuthentication": "Pending normal owner browser sign-in; no support token minted and no production test document created.",
+  "schedulerCI": "Existing SQLite CreatorDigestPendingSince timestamp incompatibility reproduced on the previous commit as well."
+}

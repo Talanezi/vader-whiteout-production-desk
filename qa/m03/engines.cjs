@@ -90,7 +90,7 @@ async function main() {
     await p.screenshot({ path: path.join(out, '01-dashboard.png') })
     await p.getByRole('button', { name: 'All statuses', exact: true }).click()
     let menu = await p.getByRole('menu').boundingBox()
-    assert.ok(menu.width >= 210 && menu.width <= 250)
+    assert.ok(menu.width >= 160 && menu.width <= 195)
     assert.ok(
       (await p
         .locator('.pd-menu-item')
@@ -103,7 +103,7 @@ async function main() {
       .getByRole('button', { name: 'Production date', exact: true })
       .click()
     menu = await p.getByRole('menu').boundingBox()
-    assert.ok(menu.width >= 190 && menu.width <= 230)
+    assert.ok(menu.width >= 160 && menu.width <= 195)
     await p.screenshot({ path: path.join(out, '03-compact-sort.png') })
     await p.keyboard.press('Escape')
     await p
