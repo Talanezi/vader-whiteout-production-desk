@@ -48,6 +48,25 @@
   },
   "focusedVisualGroups": 6,
   "productionBundleSmoke": true,
-  "liveAuthentication": "Pending normal owner browser sign-in; no support token minted and no production test document created.",
-  "schedulerCI": "Existing SQLite CreatorDigestPendingSince timestamp incompatibility reproduced on the previous commit as well."
+  "liveAuthentication": "Passed through the normal owner browser session: list discovery, document creation, owner-only admin screen, WebSocket Saved receipt and durable reload.",
+  "schedulerCI": "Existing SQLite CreatorDigestPendingSince timestamp incompatibility reproduced on the previous commit as well.",
+  "productionMigration": {
+    "pass": true,
+    "migration": "ShotLists1793426400000",
+    "type": "additive up migration only",
+    "legacyBefore": {
+      "callsheets": 8,
+      "roster": 26
+    },
+    "legacyAfter": {
+      "callsheets": 8,
+      "roster": 26
+    },
+    "tablesCreated": [
+      "shot_list_documents",
+      "shot_list_members"
+    ],
+    "destructiveMigration": false
+  },
+  "firstProductionDocument": "Whiteout \u2014 Shot List (kept for the team, no scenes or shots added)"
 }

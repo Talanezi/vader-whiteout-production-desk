@@ -1,0 +1,35 @@
+{
+  "pass": true,
+  "session": "Normal owner sign-in, no manufactured token or API interception",
+  "documentUrl": "https://vaderwhiteout.com/productiondesk/#/shotlists/8f5d1c57-4032-49b9-8a00-36ce71ca1e72",
+  "documentTitle": "Whiteout \u2014 Shot List",
+  "createdThroughAuthenticatedUI": true,
+  "websocketSyncedAndPersisted": true,
+  "savedAfterReload": true,
+  "currentSync": "saved",
+  "productionAdminScreenLoaded": true,
+  "statusMenu": {
+    "height": 204,
+    "rowHeights": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      32
+    ],
+    "width": 164
+  },
+  "sortMenu": {
+    "height": 76,
+    "rowHeights": [
+      32,
+      32
+    ],
+    "width": 184
+  },
+  "existingCallSheetsPreserved": 8,
+  "existingRosterPeoplePreserved": 26,
+  "newScenes": 0,
+  "newShots": 0
+}

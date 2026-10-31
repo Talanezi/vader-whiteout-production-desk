@@ -1,0 +1,18 @@
+{
+  "pass": true,
+  "migration": "ShotLists1793426400000",
+  "type": "additive up migration only",
+  "legacyBefore": {
+    "callsheets": 8,
+    "roster": 26
+  },
+  "legacyAfter": {
+    "callsheets": 8,
+    "roster": 26
+  },
+  "tablesCreated": [
+    "shot_list_documents",
+    "shot_list_members"
+  ],
+  "destructiveMigration": false
+}

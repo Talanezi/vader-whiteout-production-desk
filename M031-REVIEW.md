@@ -32,6 +32,14 @@ A fresh production bundle uses `/productiondesk/` and the Railway HTTPS API. `qa
 
 Evidence: [focused screenshots and results](client/qa/m031/artifacts/), [full verification log](client/qa/m031/artifacts/verification.log), [visual metrics](client/qa/m031/artifacts/visual.json), [verification summary](client/qa/m031/artifacts/verification-summary.json). [RELEASING.md](RELEASING.md) records the autonomous Git/Railway/fresh-frontend workflow.
 
-## Live verification boundary
+## Completed live verification
 
-Owner central verification and admin bootstrap completed against the real production database through the approved Railway connection; the new Scheduler deployment is healthy and its admin route rejects anonymous access. A normal production sign-in is still required to finish observing authenticated HTTP and WebSocket behavior through the actual owner's browser session. The sign-in tab is open. No support token was minted, no production test document was created, and mocked QA is not claimed as live-auth proof. Final URLs, commit hashes and deployed versions are reported with the release handoff.
+Normal owner sign-in exposed an additional deployment prerequisite: the M03 Shot Lists migration had never been applied, so authenticated discovery reached SQL but failed with `relation shot_list_documents does not exist`. The existing additive `ShotLists1793426400000` up migration was applied transactionally. It created only the new Shot Lists tables and ledger; the 8 existing call sheets and 26 roster people were preserved. No down/destructive migration was run.
+
+Authenticated discovery then succeeded. With the owner's authorization, the first real production document, **Whiteout — Shot List**, was created through the normal deployed UI and retained for the team. It reached **Saved** with the owner's collaborator identity, and reached **Saved** again after a full page reload. This verifies actual authenticated HTTP creation/session loading, production WebSocket authentication/sync, server persistence acknowledgment and durable reload. No support token, credential extraction or intercepted production API response was used. No scenes or shots were added.
+
+The production owner-only crew screen loaded successfully through the same normal session. The actual live status menu measures 164px with 32px rows; sorting measures 184px with 32px rows. Both dismiss through Escape, and the deployed Create surface contains exactly its two actions without a duplicate heading or separate close control.
+
+Evidence: [live-auth-verification.json](client/qa/m031/artifacts/live-auth-verification.json), [production migration verification](client/qa/m031/artifacts/production-migration-verification.json). Live screenshots remain in the owner's local release artifact folder rather than publishing private production screenshots in the repository.
+
+The retained first document is available at https://vaderwhiteout.com/productiondesk/#/shotlists/8f5d1c57-4032-49b9-8a00-36ce71ca1e72. No further owner-authentication verification remains blocked. The pre-existing Scheduler SQLite CI issue described above remains a separate limitation.
