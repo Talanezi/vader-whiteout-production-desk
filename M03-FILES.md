@@ -1,5 +1,7 @@
 # M03 changed files
 
+The subsequent access-control correction is indexed separately in [access-changed-files.json](client/qa/m03/artifacts/access-changed-files.json) and [M03-ACCESS-CONTROL.md](M03-ACCESS-CONTROL.md). The list below records the earlier recovery.
+
 Paths are relative to Production Desk. HEAD remains the user’s M02 commit; M03 is uncommitted and unstaged.
 
 ## Source, configuration, tests and documentation

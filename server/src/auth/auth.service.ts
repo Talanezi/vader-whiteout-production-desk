@@ -8,6 +8,9 @@ type SchedulerMeResponse = {
   email?: string;
   Name?: string;
   name?: string;
+  department?: unknown;
+  role?: unknown;
+  productionMembership?: unknown;
 };
 
 @Injectable()
@@ -44,6 +47,9 @@ export class AuthService {
       userID: Number(userID),
       email,
       name,
+      department: user.department,
+      role: user.role,
+      productionMembership: user.productionMembership,
     };
   }
 

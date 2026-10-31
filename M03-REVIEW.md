@@ -1,5 +1,7 @@
 # M03 — Collaborative Shot Lists + signature UI
 
+Access-control correction: [M03-ACCESS-CONTROL.md](M03-ACCESS-CONTROL.md) documents the current central team-verification policy and release prerequisites. The original ID allowlist/document ACL design has been replaced.
+
 Implemented locally from the user's M02 commit `d74ef1bcb0c273dd8a81b5210a0a9a2efc6dad31`
 on `ui/m03-collaborative-shotlists`. The M02 baseline was clean before branching.
 No commit, push, merge, production migration or deployment was performed. M04–M12
@@ -42,7 +44,7 @@ The additive TypeORM migration `ShotLists1793426400000` creates:
 | Table | Purpose |
 |---|---|
 | `shot_list_documents` | UUID, name, validated creator ID, authoritative Yjs binary `bytea`, server-created/server-updated timestamps. |
-| `shot_list_members` | `(document_id, user_id)` membership boundary and lookup index. |
+| `shot_list_members` | Legacy M03 table retained for migration history; unused by current authorization. |
 
 The Yjs document contains `meta`, `scenes`, `shots` and an import-batch ledger.
 Scenes and shots are nested shared maps with permanent UUIDs. Narrative fields
@@ -81,13 +83,23 @@ when the local editor loses focus. Remote selection does not navigate or scroll
 the local workspace.
 
 The existing `AuthService.verifySchedulerToken` remains the authentication
-authority. HTTP uses the existing Scheduler guard. WebSocket authentication sends
-the token in the protocol message, never in a URL, and authorizes the requested
-document before loading it. Each document requires both an approved Scheduler ID
-and membership. Connections are rechecked on inbound messages and periodically
-while idle. Revoked members are disconnected. Noncanonical/guessed document IDs,
-uppercase UUID aliases, unapproved origins and query-string credentials are
-rejected. Browser cross-tab unauthenticated document broadcasting is disabled.
+authority. HTTP uses the existing Scheduler guard. Both HTTP and WebSocket
+require Scheduler's independently verified production-team membership claim,
+bound to the authenticated account and one of the eight eligible department/role
+assignments. All eligible members have equal access to every existing and new
+list. Public signup roles alone grant nothing. There is no numeric ID environment
+allowlist or document-by-document invitation requirement. Discovery includes all
+documents, and creation writes no member grants. The old membership table is
+retained without being used as authorization evidence.
+
+WebSocket authentication sends the token in the protocol message, never in a URL.
+The full identity is refreshed on inbound/idle revalidation within the 30-second
+window; revocation or reassignment removes access. Noncanonical/guessed document
+IDs, uppercase UUID aliases, unapproved origins and query-string credentials are
+rejected. Browser cross-tab unauthenticated broadcasting remains disabled.
+Scheduler's protected server configuration stores the central verification and
+operator audit records. Its signup/profile API cannot write them. See the access
+correction report and Scheduler operator guide for the verification trust boundary.
 
 The WebSocket endpoint shares the Nest HTTP server at
 `/api/shotlists/collaboration`. An advisory lock enforces one collaboration writer
@@ -226,11 +238,16 @@ the compatible engine and exact commands are documented.
 
 ## H. Files and boundaries
 
-[M03-FILES.md](M03-FILES.md) and the scope-audit artifact list every changed file.
-Only the Production Desk repository changed. Backend authentication, legacy
-Call Sheet/Roster/PDF/mail implementation files, the M02 emblem, M01 site,
-Scheduler, Equipment and published bundles were preserved. No input workbook
-or real production record was changed. No real email was sent.
+The original implementation file index remains in [M03-FILES.md](M03-FILES.md).
+The subsequent access correction intentionally changes Production Desk's identity
+metadata/Shot Lists authorization and Scheduler's central membership response and
+operator tooling. Its exact two-repository file list is in
+[access-changed-files.json](client/qa/m03/artifacts/access-changed-files.json).
+The original scope-audit is historical evidence for the original M03 session.
+No frontend design/source, existing call-sheet/roster/PDF/mail implementation,
+Scheduler JWT/signup authentication mechanism, existing migration, published
+bundle or tracked dependency tree changed in this correction. Other repositories
+and the supplied workbook remain unchanged. No real email was sent.
 
 ## I. Deployment prerequisites — not performed
 
@@ -244,14 +261,16 @@ or real production record was changed. No real email was sent.
    `npm run migration:run --prefix server`. It only creates the new tables and
    migration ledger. Existing Call Sheet/Roster schema must already exist;
    automatic schema synchronization is disabled. No migration runs on app startup.
-4. Set `SHOTLIST_COLLABORATOR_IDS` to comma-separated **validated real Scheduler
-   user IDs**, and `SHOTLIST_ALLOWED_ORIGINS` to exact comma-separated frontend
-   origins, including protocol and without paths/trailing slashes. No real values
-   or secrets were invented or configured. An empty allowlist denies Shot Lists.
-5. New lists enroll the configured collaborators. To add a person to an existing
-   list, explicitly add its `(document_id, user_id)` membership as well. Removing
-   membership revokes that document; removing an ID from the allowlist revokes
-   Shot Lists globally. All approved members can edit; no role tiers exist.
+4. Release Scheduler's protected `productionMembership` response and verify
+   the real confirmed crew centrally using its trusted database-operator CLI.
+   Signup-selected department/role and email verification alone are insufficient.
+   No new environment ID list is needed. Keep `SHOTLIST_ALLOWED_ORIGINS` set to
+   exact frontend origins as before.
+5. Existing documents automatically become visible/editable to every eligible
+   verified collaborator. No per-document grants, membership backfill or new
+   production data migration is required. The legacy `shot_list_members` rows
+   remain intact but have no authorization effect. Empty/unverified central
+   registries intentionally grant no Shot Lists access.
 6. Run **one collaboration replica**. Preserve HTTP WebSocket upgrades for
    `/api/shotlists/collaboration` on the same public backend port. The advisory
    lock intentionally prevents a second independent writer from starting.
@@ -266,9 +285,12 @@ are never production prerequisites.
 
 ## J. Git state
 
-Branch: `ui/m03-collaborative-shotlists`. HEAD remains the user's M02 commit
-`d74ef1bcb0c273dd8a81b5210a0a9a2efc6dad31`. M03 is present as modified/new files for
-review. Codex did not commit, stage, push, merge or deploy any changes.
+The original M03 was prepared on `ui/m03-collaborative-shotlists` from M02.
+The user subsequently committed M03 as `ef9157a7`; the current access-control
+correction is unstaged on `main`. Scheduler changes are unstaged on `master`.
+Current statuses are saved in
+[access-git-status.txt](client/qa/m03/artifacts/access-git-status.txt).
+Codex did not commit, stage, push, merge or deploy this correction.
 
 ## K. Limits and review access
 

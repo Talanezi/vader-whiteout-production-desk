@@ -2,10 +2,25 @@
 
 Run from the Production Desk repository root with Node 22 and installed Chrome.
 All commands below use a dedicated loopback PostgreSQL database and QA identities.
-The existing Scheduler verifier runs unchanged against a separate local contract
-stub. No production database, login, PDF renderer or mail delivery is used.
+The existing Scheduler session verifier uses a separate loopback contract stub
+that emits claims through the actual Scheduler membership-verification helper. No production database, login, PDF renderer or mail delivery is used.
 
 ## Prepare isolated dependencies and builds
+
+The central team verification uses the actual Scheduler code. Build it first:
+
+```sh
+node qa/m03/scheduler-prepare.cjs --install
+```
+
+This installs Scheduler's locked dependencies and builds its server under
+`/tmp/whiteout-membership-scheduler`. It changes no Scheduler dependency trees or
+published bundles. No native bcrypt/SQLite code is needed for these membership
+tests. `M03_SCHEDULER_RUNTIME` selects another build directory; set
+`M03_SCHEDULER_BUILD` to its compiled `build/src/users/production-membership.js`
+when starting the local stack with a custom location.
+
+
 
 ```sh
 node qa/m03/prepare.cjs --install
@@ -95,7 +110,7 @@ M03_WORKBOOK='/Users/thameralanezi/Downloads/Shot List - Vader_ Whiteout.xlsx' \
 node qa/m03/verify.cjs
 ```
 
-The runner stops on a failed command. It runs real multi-client synchronization,
+The runner stops on a failed command. It starts with actual Scheduler registry/admin/response/DTO tests and production-wide HTTP/WebSocket role authorization, then runs real multi-client synchronization,
 server restart, authorization/revocation, reversible migrations, legacy API CRUD,
 synthetic/actual workbook tests, UI workflows, remote carets, six viewport sizes,
 WebKit, native Chrome 200% zoom, parser tests and the complete 21-group M02 suite.
@@ -116,3 +131,5 @@ separate Vite entry used for QA, not an application route or production entry.
 
 See `M03-REVIEW.md` for migration, membership, origin and single-replica
 prerequisites. These commands do not configure Railway or deploy anything.
+
+Central team verification and current release prerequisites: [M03-ACCESS-CONTROL.md](../../M03-ACCESS-CONTROL.md). No `SHOTLIST_COLLABORATOR_IDS` or document grants are used.

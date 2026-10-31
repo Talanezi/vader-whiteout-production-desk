@@ -121,10 +121,7 @@ async function main() {
     p.setAwarenessField('user', { name: 'Revocation test' })
     for (let i = 0; i < 100 && !p.synced; i++) await wait(100)
     assert.ok(p.synced)
-    await db.query(
-      'DELETE FROM shot_list_members WHERE document_id=$1 AND user_id=102',
-      [list.id],
-    )
+    await fetch('http://127.0.0.1:4311/qa/team/revoke/102', { method: 'POST' })
     for (let i = 0; i < 330 && !closed; i++) await wait(100)
     assert.ok(
       closed,
@@ -132,8 +129,9 @@ async function main() {
     )
     p.destroy()
     socket.destroy()
+    await fetch('http://127.0.0.1:4311/qa/team/restore/102', { method: 'POST' })
     results.push({
-      name: 'An already connected, idle collaborator is disconnected after document membership revocation',
+      name: 'An already connected, idle collaborator is disconnected after centralized production-team membership revocation',
       pass: true,
     })
     for (const [suffix, origin] of [

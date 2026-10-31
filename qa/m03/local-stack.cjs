@@ -42,6 +42,61 @@ async function main() {
     { userID: 103, name: 'Samira Okafor', email: 'ad@example.test' },
     { userID: 999, name: 'Unapproved User', email: 'unapproved@example.test' },
   ]
+  const { verifiedMembership } = require(
+    process.env.M03_SCHEDULER_BUILD ||
+      '/tmp/whiteout-membership-scheduler/build/src/users/production-membership.js',
+  )
+  const assignments = [
+    [101, 'Creative', 'Director'],
+    [102, 'Creative', 'Director of Photography'],
+    [103, 'Production', '1st Assistant Director'],
+    [104, 'Production', 'Executive Producer'],
+    [105, 'Production', 'Producer'],
+    [106, 'Production', 'Co-Producer'],
+    [107, 'Production', 'Associate Producer'],
+    [108, 'Production', '2nd Assistant Director'],
+    [109, 'Creative', 'Actor'],
+    [110, 'Production', 'Producer'],
+    [111, 'Creative', 'Director'],
+  ]
+  for (const [id, department, role] of assignments) {
+    let user = users.find((u) => u.userID === id)
+    if (!user) {
+      user = {
+        userID: id,
+        name: 'QA ' + role,
+        email: `team-${id}@example.test`,
+      }
+      users.push(user)
+    }
+    Object.assign(user, { department, role })
+  }
+  // A public signup can claim Director, but cannot write the protected registry.
+  Object.assign(
+    users.find((u) => u.userID === 999),
+    { department: 'Creative', role: 'Director' },
+  )
+  const memberships = new Map(
+    assignments
+      .filter(([id]) => id !== 110)
+      .map(([id, department, role]) => {
+        const user = users.find((u) => u.userID === id)
+        return [
+          id,
+          JSON.stringify({
+            version: 1,
+            status: id === 111 ? 'revoked' : 'verified',
+            userID: id,
+            email: user.email,
+            department,
+            role,
+            verifiedAt: new Date().toISOString(),
+            verifiedBy: 'QA producer',
+            evidence: 'Independent controlled QA team roster',
+          }),
+        ]
+      }),
+  )
   const tokens = Object.fromEntries(
     users.map((user) => [String(user.userID), randomBytes(24).toString('hex')]),
   )
@@ -53,7 +108,37 @@ async function main() {
         (u) => tokens[String(u.userID)] === token && !revoked.has(u.userID),
       )
       res.writeHead(user ? 200 : 401, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(user || { message: 'Invalid QA session' }))
+      res.end(
+        JSON.stringify(
+          user
+            ? {
+                ...user,
+                productionMembership: verifiedMembership(
+                  memberships.get(user.userID) || null,
+                  {
+                    ID: user.userID,
+                    Email: user.email,
+                    Department: user.department,
+                    Role: user.role,
+                  },
+                ),
+              }
+            : { message: 'Invalid QA session' },
+        ),
+      )
+      return
+    }
+    if (req.url?.startsWith('/qa/team/') && req.method === 'POST') {
+      const [, , , action, id] = req.url.split('/')
+      const record = JSON.parse(memberships.get(Number(id)) || 'null')
+      if (!record) {
+        res.writeHead(404)
+        res.end()
+        return
+      }
+      record.status = action === 'restore' ? 'verified' : 'revoked'
+      memberships.set(Number(id), JSON.stringify(record))
+      res.end('ok')
       return
     }
     // Test-controller endpoint is bound to loopback in this QA process only.
@@ -73,14 +158,13 @@ async function main() {
   await new Promise((r) => authority.listen(4311, '127.0.0.1', r))
   const databaseUrl =
     'postgresql://whiteout_qa:local-qa-only@127.0.0.1:55432/whiteout_m03'
-  await require('./legacy-bootstrap.cjs')(databaseUrl,runtime)
+  await require('./legacy-bootstrap.cjs')(databaseUrl, runtime)
   const env = {
     ...process.env,
     DATABASE_URL: databaseUrl,
     SCHEDULER_API_BASE_URL: 'http://127.0.0.1:4311',
     PORT: '4310',
     HOST: '127.0.0.1',
-    SHOTLIST_COLLABORATOR_IDS: '101,102,103',
     SHOTLIST_ALLOWED_ORIGINS: 'http://127.0.0.1:5175,http://localhost:5175',
     NODE_PATH: [
       path.join(runtime, 'server/node_modules'),
@@ -148,7 +232,10 @@ async function main() {
   const stop = async () => {
     control.close()
     authority.close()
-    const stopped=server && server.exitCode===null ? new Promise(resolve=>server.once('exit',resolve)) : Promise.resolve()
+    const stopped =
+      server && server.exitCode === null
+        ? new Promise((resolve) => server.once('exit', resolve))
+        : Promise.resolve()
     server?.kill('SIGTERM')
     await stopped
     await pg.stop()

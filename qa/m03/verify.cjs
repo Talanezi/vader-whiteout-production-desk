@@ -26,6 +26,7 @@ const env = {
 if (!env.M03_WORKBOOK || !fs.existsSync(env.M03_WORKBOOK))
   throw new Error('Set M03_WORKBOOK to the supplied .xlsx file.')
 const commands = [
+  [process.execPath, ['qa/m03/team-access.cjs']],
   [process.execPath, ['qa/m03/integration.cjs']],
   [process.execPath, ['qa/m03/security-and-migration.cjs']],
   [process.execPath, ['qa/m03/legacy-api.cjs']],

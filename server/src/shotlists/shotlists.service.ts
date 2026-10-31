@@ -12,7 +12,24 @@ import { AuthService } from '../auth/auth.service';
 import type { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
 
-export type Collaborator = { userID: number; name: string; email: string };
+export type Collaborator = {
+  userID: number;
+  name: string;
+  email: string;
+  department?: unknown;
+  role?: unknown;
+  productionMembership?: unknown;
+};
+const editingRoles = new Map([
+  ['Executive Producer', 'Production'],
+  ['Producer', 'Production'],
+  ['Co-Producer', 'Production'],
+  ['Associate Producer', 'Production'],
+  ['1st Assistant Director', 'Production'],
+  ['2nd Assistant Director', 'Production'],
+  ['Director', 'Creative'],
+  ['Director of Photography', 'Creative'],
+]);
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -31,18 +48,27 @@ export class ShotlistsService implements OnModuleDestroy {
     private readonly auth: AuthService,
   ) {}
 
-  private allowed() {
-    return new Set(
-      (process.env.SHOTLIST_COLLABORATOR_IDS || '')
-        .split(',')
-        .map((x) => x.trim())
-        .filter((x) => /^\d+$/.test(x)),
-    );
-  }
   private approved(user: Collaborator) {
-    if (!this.allowed().has(String(user.userID)))
+    const membership = user.productionMembership as Record<
+      string,
+      unknown
+    > | null;
+    if (
+      !membership ||
+      membership.verified !== true ||
+      !Number.isSafeInteger(user.userID) ||
+      membership.userID !== user.userID ||
+      membership.email !== user.email.toLowerCase() ||
+      typeof user.role !== 'string' ||
+      !editingRoles.has(user.role) ||
+      editingRoles.get(user.role) !== user.department ||
+      membership.department !== user.department ||
+      membership.role !== user.role ||
+      typeof membership.verifiedAt !== 'string' ||
+      !Number.isFinite(Date.parse(membership.verifiedAt))
+    )
       throw new ForbiddenException(
-        'Shot-list access is not enabled for this account.',
+        'Verified production-team membership in an eligible role is required.',
       );
   }
   async authorize(id: string, user: Collaborator) {
@@ -50,8 +76,8 @@ export class ShotlistsService implements OnModuleDestroy {
     if (!uuid.test(id))
       throw new ForbiddenException('Shot list is unavailable.');
     const [row] = await this.db.query(
-      'SELECT document_id FROM shot_list_members WHERE document_id=$1 AND user_id=$2',
-      [id, user.userID],
+      'SELECT id FROM shot_list_documents WHERE id=$1',
+      [id],
     );
     if (!row) throw new ForbiddenException('Shot list is unavailable.');
   }
@@ -60,8 +86,7 @@ export class ShotlistsService implements OnModuleDestroy {
     return {
       items: await this.db.query(
         `SELECT d.id,d.name,d.created_at AS "createdAt",d.updated_at AS "updatedAt"
-      FROM shot_list_documents d JOIN shot_list_members m ON m.document_id=d.id WHERE m.user_id=$1 ORDER BY d.updated_at DESC`,
-        [user.userID],
+      FROM shot_list_documents d ORDER BY d.updated_at DESC`,
       ),
     };
   }
@@ -78,11 +103,6 @@ export class ShotlistsService implements OnModuleDestroy {
         'INSERT INTO shot_list_documents(id,name,owner_user_id,state) VALUES($1,$2,$3,$4)',
         [id, name.trim(), user.userID, Buffer.from(Y.encodeStateAsUpdate(doc))],
       );
-      for (const member of this.allowed())
-        await manager.query('INSERT INTO shot_list_members VALUES($1,$2)', [
-          id,
-          member,
-        ]);
     });
     doc.destroy();
     return { id, name: name.trim() };
@@ -165,13 +185,16 @@ export class ShotlistsService implements OnModuleDestroy {
         return { user, token, checkedAt: Date.now() };
       },
       beforeHandleMessage: async ({ documentName, context }) => {
-        await this.authorize(documentName, context.user);
+        // Refresh the full authorization identity, not only the session validity.
+        // Recheck before handling the first message after the freshness window.
         if (Date.now() - context.checkedAt > 30000) {
           const user = await this.auth.verifySchedulerToken(context.token);
           if (user.userID !== context.user.userID)
             throw new Error('Session changed');
+          await this.authorize(documentName, user);
+          context.user = user;
           context.checkedAt = Date.now();
-        }
+        } else await this.authorize(documentName, context.user);
       },
       onLoadDocument: async ({ documentName, document }) => {
         const [row] = await this.db.query(
@@ -220,7 +243,11 @@ export class ShotlistsService implements OnModuleDestroy {
             const user = await this.auth.verifySchedulerToken(
               connection.context.token,
             );
+            if (user.userID !== connection.context.user.userID)
+              throw new Error('Session changed');
             await this.authorize(doc.name, user);
+            connection.context.user = user;
+            connection.context.checkedAt = Date.now();
           })().catch(() =>
             connection.close({
               code: 4403,

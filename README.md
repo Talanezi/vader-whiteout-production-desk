@@ -11,3 +11,4 @@ Use Node 22. The frontend is in `client/`; the Nest/PostgreSQL backend is in
 M03's additive migration runs only when explicitly requested. Automatic schema
 synchronization is disabled. The local QA instructions use a dedicated loopback
 database and test identities; they do not configure or deploy production services.
+Current Shot Lists authorization and release requirements: [M03-ACCESS-CONTROL.md](M03-ACCESS-CONTROL.md).
