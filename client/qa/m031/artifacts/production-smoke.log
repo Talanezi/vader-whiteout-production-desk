@@ -1,0 +1,27 @@
+{
+  "pass": true,
+  "checks": [
+    "Production title, signed-out state and Scheduler return path",
+    "Hash route /",
+    "Hash route /roster",
+    "Hash route /callsheets/new",
+    "Hash route /shotlists",
+    "Hash route /shotlists/new",
+    "Lazy shot workspace and production WSS target",
+    "M02/M03 APIs target production HTTPS endpoint",
+    "Release CSS renders the M02/M03 sidebar",
+    "No uncaught browser errors or missing assets"
+  ],
+  "requests": [
+    "https://vader-whiteout-production-desk-production.up.railway.app/api/callsheets",
+    "https://vader-whiteout-production-desk-production.up.railway.app/api/roster",
+    "https://vader-whiteout-production-desk-production.up.railway.app/api/shotlists",
+    "https://vader-whiteout-production-desk-production.up.railway.app/api/shotlists/10000000-0000-4000-8000-000000000001/session"
+  ],
+  "sockets": [
+    "wss://vader-whiteout-production-desk-production.up.railway.app/api/shotlists/collaboration"
+  ],
+  "errors": [],
+  "badAssets": [],
+  "productionNetworkWrites": false
+}

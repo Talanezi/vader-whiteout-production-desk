@@ -1,0 +1,41 @@
+
+> cabbagemeet-client@0.1.0 build
+> react-scripts build
+
+Creating an optimized production build...
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Compiled with warnings.
+
+[eslint] 
+src/components/availabilities/AvailabilitiesRow.tsx
+  Line 431:9:  'canUseTemplate' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  Line 442:9:  'onTemplateSelectChange' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 446:9:  'onSaveTemplate' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  Line 494:9:  'onApplyTemplate' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+src/components/availabilities/WeeklyTemplatesStrip.tsx
+  Line 490:9:  'onApplyTemplate' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  Line 565:9:  'startBuilderDrag' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+File sizes after gzip:
+
+  174.64 kB (-9 B)  scheduler-client-build/static/js/main.1e2028f2.js
+  35.23 kB          scheduler-client-build/static/css/main.b11e94e3.css
+
+The project was built assuming it is hosted at /scheduler/.
+You can control this with the homepage field in your package.json.
+
+The ../../../../tmp/m031/scheduler-client-build folder is ready to be deployed.
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
