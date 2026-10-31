@@ -1,0 +1,38 @@
+{
+  "vader-whiteout-production-desk": {
+    "head": "ef9157a7714c5dc73ff3ad7a735e4a1538c786ec",
+    "branch": "main",
+    "files": {
+      "M03-REVIEW.md": "c8738691b3d5b9264d451c6d86a3fdcf56e6bdb72b4794f010a603e55b4cbc3f",
+      "README.md": "711bbecc50614903d0fd8d4ecb2c26dc529aef7c5732e70fcd890990c0a9cb2e",
+      "qa/m03/README.md": "b34067ffacb292d395e99aad8c8831c42648fc91b798e808b21cd60783dc2869",
+      "qa/m03/local-stack.cjs": "81da6ac79bcbd09f15655499b06b31ec86732127c479705321f82d0e9439e6eb",
+      "qa/m03/security-and-migration.cjs": "f282f34e5977573739f20c03791a54804bfe943430fd36d5db754b3c9dede594",
+      "qa/m03/verify.cjs": "e24619466fd8442a154b92a4b5284c1f8e1f75db2a9a8fb0f6c741c5ab5856b6",
+      "server/src/auth/auth.service.ts": "aa263f9d235058fa69282640350f59c4864e7d084e184ffcb02133d57d3d1890",
+      "server/src/shotlists/shotlists.service.ts": "c56e0047505ea35ba0750d2c27194633f97c40c7df3ead1c302448a7757fc417",
+      "M03-ACCESS-CONTROL.md": "02f7728bac80f5d042299748004b13d82cf3ab98c87db964988692885ee904c9",
+      "qa/m03/scheduler-prepare.cjs": "0eafd48440ac9e1da70718643b0761d194a2c4f50deab0df7d96ebf282d90132",
+      "qa/m03/team-access.cjs": "4291fba8ccf520a9e330fbfbf6c386eb7fc4073ce91708f7a2842671d11f01f9",
+      "M03-FILES.md": "b3d5f1a60d4a88ea2f69200e5dc6ee980362c3985dd944dfb55d275844bb179d"
+    },
+    "staged": []
+  },
+  "vader-whiteout-scheduler": {
+    "head": "0eed3e84137a235502f827460a939efcd7727681",
+    "branch": "master",
+    "files": {
+      "server/package.json": "e5040ae4861887b2bfc557cb8b7bc14ec93996e2c4950d0060005c4bd0898cbb",
+      "server/src/users/user-response.ts": "43f9f62a25d1b13e5420b713d5c20f154e52e91e23f3ebd132c33eceb711b102",
+      "server/src/users/users.controller.ts": "1a455aa6d7de54b929ddbc39e83b2b197c40994787ca9ab981538089c0deab8c",
+      "server/src/users/users.module.ts": "3d8d14e7de7c26f90d9232693861ecf04e2e94a5226d0c7e946f7dd45b80aca6",
+      "server/src/users/users.service.ts": "57b9075bd728948dbc060a47bb22b73ec13102ca2de1f74c0c9b8e6511382b89",
+      "server/test/users.e2e-spec.ts": "0b20835d5903408e7da5b537b437cd6f86bec421d3fced382406a499c0be7f4a",
+      "PRODUCTION-TEAM.md": "08aae9a9ce15f4ca15e4a3153e94aead9a5552f80df26f0d0272a8a4d9030989",
+      "server/src/users/production-membership.ts": "b54467d396c6668c04fa3d486a871a1da661fd2484bfcb1d0c3a47f5e973b4ea",
+      "server/src/users/production-membership-admin.ts": "5468bb0843c25fc537193646917ce9dc87e4dcd00e4eeeab29c4119f7ce75349",
+      "server/src/users/production-membership-cli.ts": "d550460c160579a4c0137b599849be033137a1b3b6170e7dc51fc415520719b6"
+    },
+    "staged": []
+  }
+}

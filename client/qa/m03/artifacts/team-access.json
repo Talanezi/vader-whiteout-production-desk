@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Actual Scheduler /api/me response includes protected membership; signup and profile DTOs reject injected verification claims",
+    "pass": true
+  },
+  {
+    "name": "Actual Scheduler registry: independent verification/evidence required; account/assignment binding, revoke, audit and recreated-account denial",
+    "pass": true
+  },
+  {
+    "name": "All eight eligible verified roles discover old documents, create lists and merge real WebSocket edits without per-document grants",
+    "pass": true
+  },
+  {
+    "name": "HTTP list/create/session/export/import and WebSocket deny verified ineligible role, unverified Producer, revoked Director and self-selected Director",
+    "pass": true
+  },
+  {
+    "name": "Central revocation denies HTTP immediately and disconnects an already connected collaborator within the revalidation window",
+    "pass": true
+  }
+]

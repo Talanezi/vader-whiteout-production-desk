@@ -1,0 +1,28 @@
+/Users/thameralanezi/Developer/Vader-Whiteout/vader-whiteout-production-desk
+## main...origin/main [ahead 1]
+ M M03-REVIEW.md
+ M README.md
+ M qa/m03/README.md
+ M qa/m03/local-stack.cjs
+ M qa/m03/security-and-migration.cjs
+ M qa/m03/verify.cjs
+ M server/src/auth/auth.service.ts
+ M server/src/shotlists/shotlists.service.ts
+?? M03-ACCESS-CONTROL.md
+?? M03-RECOVERY.md
+?? client/qa/m03/artifacts/
+?? qa/m03/scheduler-prepare.cjs
+?? qa/m03/team-access.cjs
+
+/Users/thameralanezi/Developer/Vader-Whiteout/vader-whiteout-scheduler
+## master...origin/master
+ M server/package.json
+ M server/src/users/user-response.ts
+ M server/src/users/users.controller.ts
+ M server/src/users/users.module.ts
+ M server/src/users/users.service.ts
+ M server/test/users.e2e-spec.ts
+?? PRODUCTION-TEAM.md
+?? server/src/users/production-membership-admin.ts
+?? server/src/users/production-membership-cli.ts
+?? server/src/users/production-membership.ts

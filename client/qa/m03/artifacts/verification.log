@@ -1,0 +1,121 @@
+RUN qa/m03/integration.cjs
+PASS Atomic append import, exact 9.1/9.10 text IDs, stable UUIDs and idempotent retry against PostgreSQL
+PASS Two authenticated clients edit different structured fields without replacing a record
+PASS Concurrent Y.Text merge and real awareness-relative text ranges remain positioned after edits
+PASS Late third client gets merged state, three-way presence and independent planning order without renumbering
+PASS Interrupted client retains in-memory edits and reconciles independent remote edits on reconnect
+PASS Binary collaborative history and changes survive all clients leaving and an actual Nest server restart
+PASS HTTP and authenticated WebSocket reject unrelated identities, invalid tokens and guessed or malformed document IDs
+PASS Revoked Scheduler test identity is denied on a fresh WebSocket handshake
+PASS Database stores loadable Yjs binary, not a JSON reconstruction
+RUN qa/m03/security-and-migration.cjs
+[HocuspocusProvider] The provided authentication token isn’t allowed to connect to this server. Will try again.
+PASS Additive migration up/down preserves pre-existing call-sheet and roster sentinel rows in a disposable PostgreSQL schema
+PASS Invalid mixed import is rejected before any scene or shot mutation
+PASS An already connected, idle collaborator is disconnected after document membership revocation
+PASS WebSocket upgrade rejects unapproved origins and URL credentials
+RUN qa/m03/legacy-api.cjs
+PASS Existing call-sheet create/list/manual-save/duplicate/delete and roster CRUD use the unchanged authenticated Nest services with real local PostgreSQL. Only records created by this test were deleted. No PDF rendering or email delivery requested.
+RUN qa/m03/import.test.ts
+TAP version 13
+# Subtest: multi-sheet inspection preserves text, displayed formatted identifiers, custom choices, empty fields and excludes reference/template/planning sheets
+ok 1 - multi-sheet inspection preserves text, displayed formatted identifiers, custom choices, empty fields and excludes reference/template/planning sheets
+  ---
+  duration_ms: 18.515417
+  type: 'test'
+  ...
+# Subtest: numeric ambiguity, missing identifiers and duplicates require explicit review; confirmation cannot silently guess
+ok 2 - numeric ambiguity, missing identifiers and duplicates require explicit review; confirmation cannot silently guess
+  ---
+  duration_ms: 7.6205
+  type: 'test'
+  ...
+# Subtest: actual supplied workbook is inspected with seven scene sheets, per-sheet mapping and honest unresolved identifiers/units
+ok 3 - actual supplied workbook is inspected with seven scene sheets, per-sheet mapping and honest unresolved identifiers/units
+  ---
+  duration_ms: 93.913375
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 418.689584
+RUN qa/m03/workbook-persistence.ts
+PASS Actual workbook safe subset: 32 shots persisted and read back field-for-field; 97 rows retained for user review.
+RUN qa/m03/browser.cjs
+PASS Two real authenticated browser editors show avatars, cell boundaries, actual remote carets/ranges and merge narrative edits
+PASS One creation menu, searchable keyboard combobox, inline delete/Escape, durable deletion/restoration and authorized deep-link copy
+PASS Actual workbook mapping/scene preview exposes numeric ambiguity and blocks unreviewed confirmation
+PASS Browser network interruption reports unsaved/disconnected and recovers honestly
+PASS Six viewport sizes: full-width app, local horizontal table scrolling and focused mobile inspector
+PASS Custom date grid keyboard selection, date-only validation, reduced-motion Metal fallback and promise toast transitions
+PASS No uncaught browser errors
+RUN qa/m03/workflows.cjs
+PASS Real UI creates list/scene/shot, validates scene number, pastes TSV into cells and copies selected rows
+PASS Duplicate, collaborative undo/redo, identity-preserving reorder, selected-scene deep link and column customization
+PASS XLSX upload/mapping/confirmation persists through real API and reload with exact text identifier 9.10
+PASS Scene chooser searches displayed labels and moves the same shot UUID to the correct scene UUID when scene numbers repeat
+PASS Date-only selection and month keyboard navigation are stable in UTC+14, UTC−11 and Los Angeles timezones
+RUN qa/m03/engines.cjs
+PASS Chrome native/emulated viewport diagnosis, menu geometry, six WebKit layouts, WebKit Metal/Create and date picker
+RUN qa/m03/zoom.cjs
+PASS Native 200% Chrome zoom reflows shot workspace and keeps inspector combobox within viewport
+RUN qa/m03/fallback.cjs
+PASS WebGL-unavailable fallback and interaction/visibility Metal pausing
+RUN client/qa/m02/parser.test.cjs
+TAP version 13
+# Subtest: imports existing pipe and comma formats, ignores empty/name-less lines, and keeps source rows for retry
+ok 1 - imports existing pipe and comma formats, ignores empty/name-less lines, and keeps source rows for retry
+  ---
+  duration_ms: 0.726583
+  type: 'test'
+  ...
+# Subtest: normalizes original aliases and defaults unknown categories without dropping contacts
+ok 2 - normalizes original aliases and defaults unknown categories without dropping contacts
+  ---
+  duration_ms: 0.49275
+  type: 'test'
+  ...
+# Subtest: preserves optional empty fields; the existing parser does not pretend to handle quoted CSV
+ok 3 - preserves optional empty fields; the existing parser does not pretend to handle quoted CSV
+  ---
+  duration_ms: 0.097875
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 209.811209
+RUN client/qa/m02/verify.cjs
+PASS Call-sheet search, all statuses, sort, distribution details, duplicate, PDF, delete cancel/failure/retry, menu keys and return focus
+PASS Sidebar collapse survives routes and reload
+PASS Roster filtering, add/edit returned records, failed save retains form, pending/saved states, stable button width, focus containment/return, unsaved guard, active switch confirmation, delete, scroll recovery
+PASS Import preview, category normalization, partial successes retained, failed rows preserved, retry without confirmed duplicates
+PASS Distinct state: signed-out
+PASS Distinct state: expired-session
+PASS Distinct state: api-error
+PASS Distinct state: empty
+PASS Distinct state: loading
+PASS Responsive dashboard, roster, drawer, navigation 1440×900
+PASS Responsive dashboard, roster, drawer, navigation 1280×800
+PASS Responsive dashboard, roster, drawer, navigation 1024×768
+PASS Responsive dashboard, roster, drawer, navigation 768×1024
+PASS Responsive dashboard, roster, drawer, navigation 390×844
+PASS Responsive dashboard, roster, drawer, navigation 360×800
+PASS All six template POST payloads, existing editor route/fields/save/PDF/distribution/sidebar/mobile and return route; no emails
+PASS Long names/emails, empty fields and reduced-motion overlays
+PASS Touch menu, mobile navigation and person save
+PASS Native 200% Chrome zoom: dashboard/roster reflow and collision-aware menu within person drawer
+PASS Browser Back guards unsaved person edits and pending imports; cancel retains contents, explicit discard navigates, imports complete once
+PASS No uncaught browser errors
+All M03 and M02 verification passed.

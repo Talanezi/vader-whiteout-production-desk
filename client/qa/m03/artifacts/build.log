@@ -1,0 +1,13 @@
+vite v6.4.2 building for production...
+transforming...
+✓ 120 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../../../../tmp/whiteout-m03-research/client-dist/index.html                         0.50 kB │ gzip:   0.32 kB
+../../../../../../tmp/whiteout-m03-research/client-dist/assets/index-DdlZYHAv.css         86.12 kB │ gzip:  16.76 kB
+../../../../../../tmp/whiteout-m03-research/client-dist/assets/index.es-8xSGpJT4.js      111.78 kB │ gzip:  38.17 kB
+../../../../../../tmp/whiteout-m03-research/client-dist/assets/ShotListPage-D7ziCw07.js  367.67 kB │ gzip: 116.13 kB
+../../../../../../tmp/whiteout-m03-research/client-dist/assets/shotImport-CUkJF-J1.js    371.27 kB │ gzip: 126.00 kB
+../../../../../../tmp/whiteout-m03-research/client-dist/assets/index-0YtseoW3.js         378.54 kB │ gzip: 113.64 kB
+✓ built in 1.33s
+M03 isolated builds complete. Source dependencies, caches and bundles remain untouched.

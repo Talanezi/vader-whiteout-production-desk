@@ -1,0 +1,200 @@
+{
+  "pass": true,
+  "files": [
+    {
+      "file": "client-dist/index.html",
+      "byteIdentical": true,
+      "originalSHA256": "49ce31300a30994511f7c66568f613cd3277c371fecc71010c85333553e0963c"
+    },
+    {
+      "file": "client-dist/licenses/m03-third-party.txt",
+      "byteIdentical": true,
+      "originalSHA256": "e791f15d915fd5bd821b8aceaaf227375ec2657bcba97f3de3f418a5ba1d7f0a"
+    },
+    {
+      "file": "client-dist/assets/shotImport-CUkJF-J1.js",
+      "byteIdentical": true,
+      "originalSHA256": "9d23d180bcac984ad6f03fa654b7cd45618f894a1e2c4a914cdb409d92f5f001"
+    },
+    {
+      "file": "client-dist/assets/index-DdlZYHAv.css",
+      "byteIdentical": true,
+      "originalSHA256": "34e81b51b9e8a98359284d3d51f8bf03a842b00c42032b166cc607cd23c07585"
+    },
+    {
+      "file": "client-dist/assets/ShotListPage-D7ziCw07.js",
+      "byteIdentical": true,
+      "originalSHA256": "c4101d1872b3af7b40a06f550732ce96c248045d0459561f8a6b79d1b38312da"
+    },
+    {
+      "file": "client-dist/assets/index-0YtseoW3.js",
+      "byteIdentical": true,
+      "originalSHA256": "117063ba4f5af6a129f5d245dcde22a0c76befb43f7b43f600710ffa0ab55131"
+    },
+    {
+      "file": "client-dist/assets/index.es-8xSGpJT4.js",
+      "byteIdentical": true,
+      "originalSHA256": "a3a99ea6b4c75473a84bad4413016fee0603c5fff3d4ee67c37f6fc743b20d6f"
+    },
+    {
+      "file": "server-dist/app.controller.js",
+      "byteIdentical": true,
+      "originalSHA256": "b937a8db93b8f4c932add269f3661f2185813f9b15e3dd737f97287586714cc6"
+    },
+    {
+      "file": "server-dist/main.js",
+      "byteIdentical": true,
+      "originalSHA256": "401a5e7bbe18d06db72971d5edf854a5a8808e293867d237e63cf134474c06d4"
+    },
+    {
+      "file": "server-dist/app.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "75267cfecf634135386ab79f9cc40f90f491c97a9a221146aa36dcdb97ec4ee0"
+    },
+    {
+      "file": "server-dist/app.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "e9a63bebd4f4a5390e679c5fe6d6ebd51f121092b7777ab979f96c6ca224fa8c"
+    },
+    {
+      "file": "server-dist/roster/roster.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "c93057879bc9be408ac988ce86fa0b3fc7b9aac29da639e5b5e3f0437299abf5"
+    },
+    {
+      "file": "server-dist/roster/roster.controller.js",
+      "byteIdentical": true,
+      "originalSHA256": "bf6b0fb281be424bb108165c8df8228c9bdc39221c68438277da0193ac019b41"
+    },
+    {
+      "file": "server-dist/roster/roster.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "51f57dd4c5ad4190ae35361255131ba12ee64565f30fc96e11b4adbabc4a2e76"
+    },
+    {
+      "file": "server-dist/roster/entities/roster-person.entity.js",
+      "byteIdentical": true,
+      "originalSHA256": "81946ee532ed47eb15a5cb6843fee75951b7ce858877e387deb2afdbe0a6c835"
+    },
+    {
+      "file": "server-dist/auth/scheduler-auth.guard.js",
+      "byteIdentical": true,
+      "originalSHA256": "3b2ca4ad3179d09da778c352ac06343719d609b698b7b2d92f824654f82fafdf"
+    },
+    {
+      "file": "server-dist/auth/auth.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "1d5a91d44157f8270f65790797721ca7494eb6afbd5786ccf8178deb7ad5c1be"
+    },
+    {
+      "file": "server-dist/auth/jwt.strategy.js",
+      "byteIdentical": true,
+      "originalSHA256": "545a4484d168eade8eee50bcbd3ffa1939a364309f29a51eeb4b74f77b0f8ad1"
+    },
+    {
+      "file": "server-dist/auth/auth.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "dd8e53c650c277c61de3b62d1c0389f1449897087965530e6bf1fd2d15fce749"
+    },
+    {
+      "file": "server-dist/auth/jwt-auth.guard.js",
+      "byteIdentical": true,
+      "originalSHA256": "2999374cbeb9074417bef9adf113a6deaff7a8cc18f88c1d5cac3f7dee432262"
+    },
+    {
+      "file": "server-dist/auth/auth.controller.js",
+      "byteIdentical": true,
+      "originalSHA256": "78b17dba60a92c6133e440a1eae9f62c9ee8f3158abd8a0bd2c450ed4d2cba40"
+    },
+    {
+      "file": "server-dist/auth/dto/login.dto.js",
+      "byteIdentical": true,
+      "originalSHA256": "94f8e3b0660350f752f6832fa0c95294432e3455ce8fec262c4fbc022b676b69"
+    },
+    {
+      "file": "server-dist/mail/mail.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "49864e4df05a65b45af34b5eb88f825f5b1e94894fe7c28ffcc22901dabc6491"
+    },
+    {
+      "file": "server-dist/mail/mail.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "699b030ebbfac8d5504446fffa4709c18a29437fd7ca984704c6e11b9100fc06"
+    },
+    {
+      "file": "server-dist/users/user.entity.js",
+      "byteIdentical": true,
+      "originalSHA256": "5d4451002bce7716ade5e00902fd5067e47a463913068cbdda23880af5b8a663"
+    },
+    {
+      "file": "server-dist/callsheets/callsheets.store.js",
+      "byteIdentical": true,
+      "originalSHA256": "cbf1baadfc57286a196a23d0a3e600ebe1cd02ed738b485384cbb1300345090d"
+    },
+    {
+      "file": "server-dist/callsheets/callsheets.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "0f7567136e8979ad1366e48d890bfce86fab88d80391f8014a7e22e06a2bd824"
+    },
+    {
+      "file": "server-dist/callsheets/callsheet.types.js",
+      "byteIdentical": true,
+      "originalSHA256": "d453849c6b51d0e747ef915e79dab7f97e0675a46b189dbc7c6ebb39e45eaff2"
+    },
+    {
+      "file": "server-dist/callsheets/callsheets.controller.js",
+      "byteIdentical": true,
+      "originalSHA256": "5da4ee7731beeee399932aff4e6be9b8554ceccbba4cbc7a179ae2b942ee5a0f"
+    },
+    {
+      "file": "server-dist/callsheets/callsheets.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "e8c4b09ef6c11f976022e98ec56891e4dc471880fb525458c9be80b08fba8e34"
+    },
+    {
+      "file": "server-dist/callsheets/pdf/build-callsheet-latex.js",
+      "byteIdentical": true,
+      "originalSHA256": "7532f20af9c46b83f06c5eb7e28f7669edb4e434d5700ff3bffca2264c57145e"
+    },
+    {
+      "file": "server-dist/callsheets/pdf/compile-latex-to-pdf.js",
+      "byteIdentical": true,
+      "originalSHA256": "411b580d8b65c5202c5b6dd4bfc674faf141598b1dc2920ff8a33a912a0688e7"
+    },
+    {
+      "file": "server-dist/callsheets/email/build-callsheet-email.js",
+      "byteIdentical": true,
+      "originalSHA256": "d828828cccd881ec70f4227f083169ccf18c2cb857c83faa982a85ee3419be26"
+    },
+    {
+      "file": "server-dist/callsheets/entities/callsheet-draft.entity.js",
+      "byteIdentical": true,
+      "originalSHA256": "0947dec0194d892e563cac40417adefcf00c75fd207798abfca207b41bf89d1c"
+    },
+    {
+      "file": "server-dist/shotlists/shotlists.migration.js",
+      "byteIdentical": true,
+      "originalSHA256": "dc9c93069f197e20b648d6e5177d5816ace67d4a7cce178c5c24082ff51322d6"
+    },
+    {
+      "file": "server-dist/shotlists/shotlists.module.js",
+      "byteIdentical": true,
+      "originalSHA256": "1267ff1ac02a806afc6a6c592db84a8fb45699bc15bc65278bfe6112c0359afc"
+    },
+    {
+      "file": "server-dist/shotlists/migrate.js",
+      "byteIdentical": true,
+      "originalSHA256": "ce7ea4990b96f7443e9e834a4f6f9cb6d89230004a74b89602caccd41a2ac389"
+    },
+    {
+      "file": "server-dist/shotlists/shotlists.service.js",
+      "byteIdentical": true,
+      "originalSHA256": "44951bdaa34d69d999fe61f30dedbabc56d40e485d473a9e2055b33697126560"
+    },
+    {
+      "file": "server-dist/shotlists/shotlists.controller.js",
+      "byteIdentical": true,
+      "originalSHA256": "620bbee9488223f103eecaa3d2ccf3b63ac5449aab01a31b5e2674d016fae571"
+    }
+  ]
+}

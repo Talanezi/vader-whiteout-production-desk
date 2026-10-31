@@ -1,0 +1,11 @@
+{
+  "pass": true,
+  "source": "Shot List - Vader_ Whiteout.xlsx",
+  "inspectedScenes": 7,
+  "inspectedShotRows": 129,
+  "importedScenes": 1,
+  "importedShots": 32,
+  "excludedForReviewOrUnspecifiedUnits": 97,
+  "comparison": "Every mapped field and source record read back identically from the actual local API/PostgreSQL document. No ambiguous identifier was approved or guessed.",
+  "productionDataChanged": false
+}

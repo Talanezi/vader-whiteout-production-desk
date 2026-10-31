@@ -1,0 +1,57 @@
+{
+  "pass": true,
+  "policy": "Scheduler centrally verified team assignment; equal editing rights across all old/new documents for eight eligible roles",
+  "checks": {
+    "team-access.json": {
+      "pass": true,
+      "groups": 5
+    },
+    "integration.json": {
+      "pass": true,
+      "groups": 9
+    },
+    "security-and-migration.json": {
+      "pass": true,
+      "groups": 4
+    },
+    "legacy-api.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "browser.json": {
+      "pass": true,
+      "groups": 7
+    },
+    "workflows.json": {
+      "pass": true,
+      "groups": 5
+    },
+    "engines-and-viewport.json": {
+      "pass": true,
+      "groups": 10
+    },
+    "zoom.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "metal-fallback.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "workbook-persistence.json": {
+      "pass": true,
+      "groups": 1
+    },
+    "m02-regression/verification.json": {
+      "pass": true,
+      "groups": 21
+    }
+  },
+  "schedulerBuild": true,
+  "productionDeskBuild": true,
+  "frontendSourceAndProductionBuildUnchanged": true,
+  "newMigrations": false,
+  "productionDataChanged": false,
+  "releaseRequirement": "Release Scheduler claim + Production Desk policy, independently verify actual crew membership/assignment/account ownership once centrally. No environment ID list or document grants.",
+  "schedulerTestBoundary": "Actual registry/admin/user-response/DTO code tested with disposable PostgreSQL schema; real Production Desk HTTP/WebSocket stack. Complete Scheduler authentication/calendar E2E suite not run."
+}

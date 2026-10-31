@@ -1,0 +1,5 @@
+PASS Real UI creates list/scene/shot, validates scene number, pastes TSV into cells and copies selected rows
+PASS Duplicate, collaborative undo/redo, identity-preserving reorder, selected-scene deep link and column customization
+PASS XLSX upload/mapping/confirmation persists through real API and reload with exact text identifier 9.10
+PASS Scene chooser searches displayed labels and moves the same shot UUID to the correct scene UUID when scene numbers repeat
+PASS Date-only selection and month keyboard navigation are stable in UTC+14, UTC−11 and Los Angeles timezones

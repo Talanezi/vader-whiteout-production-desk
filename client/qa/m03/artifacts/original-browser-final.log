@@ -1,0 +1,7 @@
+PASS Two real authenticated browser editors show avatars, cell boundaries, actual remote carets/ranges and merge narrative edits
+PASS One creation menu, searchable keyboard combobox, inline delete/Escape, durable deletion/restoration and authorized deep-link copy
+PASS Actual workbook mapping/scene preview exposes numeric ambiguity and blocks unreviewed confirmation
+PASS Browser network interruption reports unsaved/disconnected and recovers honestly
+PASS Six viewport sizes: full-width app, local horizontal table scrolling and focused mobile inspector
+PASS Custom date grid keyboard selection, date-only validation, reduced-motion Metal fallback and promise toast transitions
+PASS No uncaught browser errors

@@ -1,0 +1,4 @@
+{
+  "pass": true,
+  "name": "Existing call-sheet create/list/manual-save/duplicate/delete and roster CRUD use the unchanged authenticated Nest services with real local PostgreSQL. Only records created by this test were deleted. No PDF rendering or email delivery requested."
+}

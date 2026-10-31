@@ -1,0 +1,142 @@
+[
+  {
+    "name": "old-fixed-emulation",
+    "pass": true,
+    "measurements": [
+      {
+        "requestedWindow": 1280,
+        "outer": 1280,
+        "inner": 1440,
+        "visual": 1440,
+        "root": 1440,
+        "scroll": 1440,
+        "background": "rgb(8, 11, 18)"
+      },
+      {
+        "requestedWindow": 1600,
+        "outer": 1600,
+        "inner": 1440,
+        "visual": 1440,
+        "root": 1440,
+        "scroll": 1440,
+        "background": "rgb(8, 11, 18)"
+      }
+    ]
+  },
+  {
+    "name": "native-window",
+    "pass": true,
+    "measurements": [
+      {
+        "requestedWindow": 1280,
+        "outer": 1280,
+        "inner": 1280,
+        "visual": 1280,
+        "root": 1280,
+        "scroll": 1280,
+        "background": "rgb(8, 11, 18)"
+      },
+      {
+        "requestedWindow": 1600,
+        "outer": 1600,
+        "inner": 1600,
+        "visual": 1600,
+        "root": 1600,
+        "scroll": 1600,
+        "background": "rgb(8, 11, 18)"
+      }
+    ]
+  },
+  {
+    "name": "Compact status/sort geometry, keyboard menus and collapsed emblem/Create control",
+    "pass": true
+  },
+  {
+    "name": "WebKit 1440x900",
+    "pass": true,
+    "metrics": {
+      "inner": 1440,
+      "root": 1440,
+      "scroll": 1440,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit 1280x800",
+    "pass": true,
+    "metrics": {
+      "inner": 1280,
+      "root": 1280,
+      "scroll": 1280,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit 1024x768",
+    "pass": true,
+    "metrics": {
+      "inner": 1024,
+      "root": 1024,
+      "scroll": 1024,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit 768x1024",
+    "pass": true,
+    "metrics": {
+      "inner": 768,
+      "root": 768,
+      "scroll": 768,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit 390x844",
+    "pass": true,
+    "metrics": {
+      "inner": 390,
+      "root": 390,
+      "scroll": 390,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit 360x800",
+    "pass": true,
+    "metrics": {
+      "inner": 360,
+      "root": 360,
+      "scroll": 360,
+      "dpr": 1,
+      "metal": [
+        "webgl",
+        "webgl"
+      ]
+    }
+  },
+  {
+    "name": "WebKit custom date-only calendar keyboard selection",
+    "pass": true
+  }
+]

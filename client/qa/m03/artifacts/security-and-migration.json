@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Additive migration up/down preserves pre-existing call-sheet and roster sentinel rows in a disposable PostgreSQL schema",
+    "pass": true
+  },
+  {
+    "name": "Invalid mixed import is rejected before any scene or shot mutation",
+    "pass": true
+  },
+  {
+    "name": "An already connected, idle collaborator is disconnected after centralized production-team membership revocation",
+    "pass": true
+  },
+  {
+    "name": "WebSocket upgrade rejects unapproved origins and URL credentials",
+    "pass": true
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Atomic append import, exact 9.1/9.10 text IDs, stable UUIDs and idempotent retry against PostgreSQL",
+    "pass": true
+  },
+  {
+    "name": "Two authenticated clients edit different structured fields without replacing a record",
+    "pass": true
+  },
+  {
+    "name": "Concurrent Y.Text merge and real awareness-relative text ranges remain positioned after edits",
+    "pass": true
+  },
+  {
+    "name": "Late third client gets merged state, three-way presence and independent planning order without renumbering",
+    "pass": true
+  },
+  {
+    "name": "Interrupted client retains in-memory edits and reconciles independent remote edits on reconnect",
+    "pass": true
+  },
+  {
+    "name": "Binary collaborative history and changes survive all clients leaving and an actual Nest server restart",
+    "pass": true
+  },
+  {
+    "name": "HTTP and authenticated WebSocket reject unrelated identities, invalid tokens and guessed or malformed document IDs",
+    "pass": true
+  },
+  {
+    "name": "Revoked Scheduler test identity is denied on a fresh WebSocket handshake",
+    "pass": true
+  },
+  {
+    "name": "Database stores loadable Yjs binary, not a JSON reconstruction",
+    "pass": true
+  }
+]
