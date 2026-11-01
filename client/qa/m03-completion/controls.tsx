@@ -1,6 +1,7 @@
 // Isolated Vite QA fixture; not imported by the application or built for release.
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import DotsLoader from '../../src/components/whiteout/DotsLoader'
 import DrawCheckbox from '../../src/components/whiteout/DrawCheckbox'
 import '../../src/App.css'
 import '../../src/styles/whiteout.css'
@@ -18,6 +19,7 @@ function States() {
       }}
     >
       <h1>Shot List checkboxes</h1>
+      <DotsLoader />
       <div style={{ display: 'grid', gap: 20, marginTop: 30 }}>
         <label>
           <DrawCheckbox

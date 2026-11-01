@@ -21,6 +21,8 @@ import CollaborativeText from '../components/shots/CollaborativeText'
 import ShotImport from '../components/shots/ShotImport'
 import type { PrintView } from '../lib/shotPrint'
 import ShotGrid from '../components/shots/ShotGrid'
+import ShotChoice from '../components/shots/ShotChoice'
+import { choiceFields } from '../lib/shotChoices'
 import ShootDays from '../components/shots/ShootDays'
 import ShotPdf from '../components/shots/ShotPdf'
 import {
@@ -29,11 +31,11 @@ import {
   addScene,
   addShot,
   change,
-  choices,
   fields,
   narrativeFields,
   ordered,
   reorder,
+  shotOperation,
   scenes,
   shots,
   str,
@@ -237,25 +239,47 @@ export default function ShotListPage() {
       provider.on('stateless', ack)
     })
   }
-  async function remove(s: RecordMap) {
+  const deletionPending = useRef(new Set<string>())
+  async function removeRecords(records: RecordMap[]) {
     if (!c.connected)
-      throw new Error('Reconnect before deleting. The shot is retained.')
-    const toast = notify('Deleting shot…', { state: 'pending' })
-    setDeleting((old) => new Set(old).add(str(s, 'id')))
-    change(c.doc, s, 'deleted', true, c.session?.user.id)
+      throw new Error('Reconnect before deleting. The shots are retained.')
+    const targets = records.filter(
+      (s) => !s.get('deleted') && !deletionPending.current.has(str(s, 'id')),
+    )
+    if (!targets.length) return
+    const ids = targets.map((s) => str(s, 'id'))
+    ids.forEach((id) => deletionPending.current.add(id))
+    const label = targets.length === 1 ? 'Shot' : `${targets.length} shots`
+    const toast = notify(
+      `Deleting ${targets.length === 1 ? 'shot' : targets.length + ' shots'}…`,
+      { state: 'pending' },
+    )
+    setDeleting((old) => new Set([...old, ...ids]))
+    const mark = (deleted: boolean) =>
+      shotOperation(
+        c.doc,
+        () =>
+          targets.forEach((s) =>
+            change(c.doc, s, 'deleted', deleted, c.session?.user.id),
+          ),
+        'local',
+      )
+    mark(true)
     try {
       await waitForSaved()
-      notify('Shot deleted.', {
+      setMulti((old) => new Set([...old].filter((id) => !ids.includes(id))))
+      notify(`${label} deleted.`, {
         id: toast,
         state: 'success',
         action: {
           label: 'Restore',
           run: () => {
-            change(c.doc, s, 'deleted', false, c.session?.user.id)
+            mark(false)
             void notify
               .promise(waitForSaved(), {
-                pending: 'Restoring shot…',
-                success: 'Shot restored.',
+                pending: 'Restoring shots…',
+                success:
+                  targets.length === 1 ? 'Shot restored.' : 'Shots restored.',
                 error: 'Restoration is not saved yet. Keep this window open.',
               })
               .catch(() => {})
@@ -263,16 +287,16 @@ export default function ShotListPage() {
         },
       })
     } catch (e) {
-      change(c.doc, s, 'deleted', false, c.session?.user.id)
-      notify('Deletion failed. Shot retained.', { id: toast, state: 'error' })
+      mark(false)
+      notify('Deletion failed. Shots retained.', { id: toast, state: 'error' })
       throw e
     } finally {
-      setDeleting((old) => {
-        const next = new Set(old)
-        next.delete(str(s, 'id'))
-        return next
-      })
+      ids.forEach((id) => deletionPending.current.delete(id))
+      setDeleting((old) => new Set([...old].filter((id) => !ids.includes(id))))
     }
+  }
+  async function remove(s: RecordMap) {
+    await removeRecords([s])
   }
   function edit(s: RecordMap, field: ShotField, value: string) {
     if (narrativeFields.includes(field)) {
@@ -315,11 +339,12 @@ export default function ShotListPage() {
             compact={!detail}
             onFocus={() => selectCell(s, field)}
           />
-        ) : choices[field] ? (
-          <Combobox
+        ) : choiceFields.includes(field) ? (
+          <ShotChoice
+            doc={c.doc}
+            field={field}
             label={label}
             value={str(s, field)}
-            options={choices[field]!}
             onChange={(v) => edit(s, field, v)}
             onFocus={() => selectCell(s, field)}
           />
@@ -755,12 +780,6 @@ export default function ShotListPage() {
                       }
                     />
                   )}
-                  <IconButton
-                    name="expand"
-                    label="Open shot inspector"
-                    disabled={!current}
-                    onClick={() => setInspector(!inspector)}
-                  />
                 </div>
               </div>
               {mode === 'shooting' ? (
@@ -809,7 +828,14 @@ export default function ShotListPage() {
                   user={c.session!.user.id}
                   role={c.session!.user.role}
                   department={c.session!.user.department}
-                  onAssign={() => setDayOpen(true)}
+                  onWaitForSaved={waitForSaved}
+                  onDeleteSelected={(ids) =>
+                    removeRecords(
+                      ids
+                        .map((id) => shots(c.doc).get(id))
+                        .filter((s): s is RecordMap => !!s),
+                    )
+                  }
                   actions={(s, index) => (
                     <div>
                       <IconButton

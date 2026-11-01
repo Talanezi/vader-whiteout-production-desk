@@ -21,7 +21,11 @@ const DrawCheckbox = forwardRef<
         }}
       />
       <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16">
-        <path className="pd-draw-tick" d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+        <path
+          pathLength="1"
+          className="pd-draw-tick"
+          d="M3.5 8.5 6.5 11.5 12.5 4.5"
+        />
         <path className="pd-draw-bar" d="M4 8h8" />
       </svg>
     </span>

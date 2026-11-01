@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom'
 import { IconButton, Button } from './Button'
 import Icon from './Icon'
+import DotsLoader from './DotsLoader'
 type ToastOptions = {
   state?: 'pending' | 'success' | 'error'
   action?: { label: string; run: () => void }
@@ -54,7 +55,7 @@ function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
       onBlur={resume}
     >
       {item.state === 'pending' ? (
-        <span className="pd-spinner" />
+        <DotsLoader />
       ) : (
         <Icon name={item.state === 'error' ? 'alert' : 'check'} />
       )}
@@ -171,7 +172,7 @@ export function LoadingRows({ label }: { label: string }) {
   return (
     <div className="pd-loading" role="status" aria-live="polite">
       <span className="pd-loading-caption">
-        <span className="pd-spinner" />
+        <DotsLoader />
         {label}
       </span>
       {[0, 1, 2, 3].map((i) => (

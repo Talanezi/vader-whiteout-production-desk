@@ -17,7 +17,7 @@ import { ErrorNotice } from '../whiteout/Feedback'
 import { ordered, scenes, shots, str } from '../../lib/shotDocument'
 import { days, validAssignments } from '../../lib/shotSchedule'
 import { shotApiBase } from '../../lib/shotApi'
-import { presets, widths } from '../../lib/shotColumns'
+import { printPresets as presets, widths } from '../../lib/shotColumns'
 import { getAuthToken } from '../../lib/api'
 import {
   printFit,

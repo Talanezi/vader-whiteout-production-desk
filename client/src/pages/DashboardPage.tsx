@@ -1,3 +1,4 @@
+import DocumentRow from '../components/whiteout/DocumentRow'
 import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { CallSheetDraft } from '../data/mockCallSheet'
@@ -229,10 +230,17 @@ function DashboardPage() {
                         )
                         .join(' · ')
                       return (
-                        <tr key={item.id} aria-busy={!!pending[item.id]}>
+                        <DocumentRow
+                          to={`/callsheets/${item.id}/edit`}
+                          key={item.id}
+                          aria-busy={!!pending[item.id]}
+                        >
                           <td className="pd-document-title">
                             <div>
-                              <Link to={`/callsheets/${item.id}/edit`}>
+                              <Link
+                                className="pd-document-link"
+                                to={`/callsheets/${item.id}/edit`}
+                              >
                                 {title}
                               </Link>
                               <small>
@@ -332,7 +340,7 @@ function DashboardPage() {
                               ]}
                             />
                           </td>
-                        </tr>
+                        </DocumentRow>
                       )
                     })}
                   </tbody>

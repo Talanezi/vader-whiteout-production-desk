@@ -38,16 +38,20 @@ export const presets: Record<string, GridField[]> = {
     'estimatedMinutes',
   ],
   Cinematography: [
-    'subject',
-    'framing',
-    'angle',
+    'coverage',
     'camera',
+    'framing',
+    'subject',
+    'angle',
     'lens',
     'equipment',
     'movement',
     'notes',
     'focusNotes',
     'lightingNotes',
+    'scriptSeconds',
+    'setupMinutes',
+    'estimatedMinutes',
   ],
   'AD / Planning': [
     'scene',
@@ -63,6 +67,23 @@ export const presets: Record<string, GridField[]> = {
     (f) => f !== 'number',
   ) as GridField[],
 }
+// Print presets are deliberately independent of editing-grid preset migrations.
+export const printPresets: Record<string, GridField[]> = {
+  ...presets,
+  Cinematography: [
+    'subject',
+    'framing',
+    'angle',
+    'camera',
+    'lens',
+    'equipment',
+    'movement',
+    'notes',
+    'focusNotes',
+    'lightingNotes',
+  ],
+}
+const previousCinematography = printPresets.Cinematography
 export const label = (field: string) =>
   (
     ({
@@ -115,6 +136,29 @@ export function readColumnPreferences(key: string) {
             size <= 760,
         ),
       )
+    const chosenOrder =
+      order?.filter((field) => visible.includes(field as GridField)) || visible
+    const standardCinematography =
+      saved.preset === 'Cinematography' &&
+      [previousCinematography, presets.Cinematography].some(
+        (standard) =>
+          visible.length === standard.length &&
+          standard.every((field) => visible.includes(field)) &&
+          JSON.stringify(chosenOrder) === JSON.stringify(standard),
+      )
+    // Only a recognized standard preset migrates; an old manual order is genuinely custom.
+    if (standardCinematography)
+      return {
+        visible: presets.Cinematography,
+        order: [
+          ...presets.Cinematography,
+          ...(order || []).filter(
+            (field) => !presets.Cinematography.includes(field as GridField),
+          ),
+        ],
+        sizes: sizes as Record<string, number>,
+        preset: 'Cinematography',
+      }
     return {
       visible,
       order,
@@ -122,7 +166,9 @@ export function readColumnPreferences(key: string) {
       preset:
         typeof saved.preset === 'string' &&
         (saved.preset === 'Custom' || presets[saved.preset])
-          ? saved.preset
+          ? saved.preset === 'Cinematography'
+            ? 'Custom'
+            : saved.preset
           : 'Custom',
     }
   } catch {

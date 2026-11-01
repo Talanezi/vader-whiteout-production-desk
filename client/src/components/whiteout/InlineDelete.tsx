@@ -4,7 +4,11 @@ export default function InlineDelete({
   label,
   onConfirm,
   initialConfirm = false,
+  triggerLabel,
+  onStart,
 }: {
+  triggerLabel?: string
+  onStart?: () => void
   initialConfirm?: boolean
   label: string
   onConfirm: () => Promise<void>
@@ -37,18 +41,32 @@ export default function InlineDelete({
     >
       <button
         ref={trigger}
-        className="pd-icon-button"
+        className={
+          triggerLabel ? 'pd-button pd-button-danger' : 'pd-icon-button'
+        }
         type="button"
-        aria-label={`Delete ${label}`}
+        aria-label={triggerLabel || `Delete ${label}`}
         aria-expanded={state !== 'idle'}
         disabled={state === 'pending'}
-        onClick={() => (state === 'idle' ? setState('confirm') : close())}
+        onClick={() => {
+          if (state === 'idle') {
+            onStart?.()
+            setState('confirm')
+          } else close()
+        }}
       >
         <Icon name="trash" />
+        {triggerLabel && <span>{triggerLabel}</span>}
       </button>
       {state !== 'idle' && (
         <span className="pd-delete-confirm">
-          <span>{state === 'pending' ? 'Deleting…' : 'Delete?'}</span>
+          <span>
+            {state === 'pending'
+              ? 'Deleting…'
+              : triggerLabel
+                ? `Delete ${label}?`
+                : 'Delete?'}
+          </span>
           <button
             data-confirm
             type="button"

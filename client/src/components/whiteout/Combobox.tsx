@@ -13,6 +13,7 @@ export default function Combobox({
   clearable = true,
   labels = {},
   onFocus,
+  onEditChoices,
 }: {
   label: string
   value: string
@@ -22,6 +23,7 @@ export default function Combobox({
   clearable?: boolean
   labels?: Record<string, string>
   onFocus?: () => void
+  onEditChoices?: () => void
 }) {
   const optionValues = options.map((option) =>
     typeof option === 'string' ? option : option.value,
@@ -39,7 +41,8 @@ export default function Combobox({
       ? displayLabels[value]
       : value
   const pop = usePopover(232),
-    input = useRef<HTMLInputElement>(null)
+    input = useRef<HTMLInputElement>(null),
+    editChoices = useRef<HTMLButtonElement>(null)
   const [query, setQuery] = useState(''),
     [active, setActive] = useState(0)
   const filtered = [
@@ -153,7 +156,9 @@ export default function Combobox({
                   }
                   if (e.key === 'Tab') {
                     e.preventDefault()
-                    pop.tab(e.shiftKey)
+                    if (onEditChoices && !e.shiftKey)
+                      editChoices.current?.focus()
+                    else pop.tab(e.shiftKey)
                   }
                 }}
               />
@@ -198,6 +203,27 @@ export default function Combobox({
               ))}
               {!values.length && <p>No matches</p>}
             </div>
+            {onEditChoices && (
+              <button
+                type="button"
+                className="pd-combo-edit"
+                ref={editChoices}
+                onKeyDown={(e) => {
+                  if (e.key === 'Tab') {
+                    e.preventDefault()
+                    if (e.shiftKey) input.current?.focus()
+                    else pop.tab(false)
+                  }
+                }}
+                onClick={() => {
+                  pop.close()
+                  onEditChoices()
+                }}
+              >
+                <Icon name="edit" />
+                Edit choices
+              </button>
+            )}
           </div>,
           pop.target,
         )}

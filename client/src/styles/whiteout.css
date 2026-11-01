@@ -1886,3 +1886,68 @@
     transform: none;
   }
 }
+/* Shared document-row navigation keeps native links and independent controls. */
+.pd-documents .pd-document-row {
+  cursor: pointer;
+}
+.pd-documents .pd-document-row:hover td {
+  background: #101b27;
+}
+.pd-documents .pd-document-row:has(.pd-document-link:focus-visible) {
+  outline: 2px solid var(--pd-accent);
+  outline-offset: -2px;
+}
+/* Pending indicators never inherit the toast text's flex growth. */
+.pd-toast > span:not(.pd-dots-loader) {
+  flex: 1;
+  min-width: 0;
+}
+.pd-dots-loader,
+.pd-toast > .pd-dots-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 22px;
+  height: 16px;
+  max-width: 22px;
+  flex: 0 0 22px;
+  overflow: hidden;
+  color: var(--pd-accent);
+}
+.pd-dots-loader.is-small {
+  width: 18px;
+  max-width: 18px;
+  flex-basis: 18px;
+}
+.pd-dots-loader > i {
+  display: block;
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pd-dots-breathe 1.4s ease-in-out infinite;
+}
+.pd-dots-loader > i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.pd-dots-loader > i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+@keyframes pd-dots-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-dots-loader > i {
+    animation: none;
+    opacity: 0.65;
+  }
+}

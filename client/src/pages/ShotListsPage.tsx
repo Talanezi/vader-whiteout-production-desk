@@ -1,6 +1,7 @@
+import DocumentRow from '../components/whiteout/DocumentRow'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { PageHeader } from '../components/whiteout/Workspace'
+import { PageHeader, SearchField } from '../components/whiteout/Workspace'
 import {
   EmptyState,
   ErrorNotice,
@@ -24,6 +25,8 @@ export default function ShotListsPage() {
     [deleteId, setDeleteId] = useState('')
   const [deletePending, setDeletePending] = useState(false),
     [deleteError, setDeleteError] = useState<string | null>(null)
+  const [search, setSearch] = useState(''),
+    [sort, setSort] = useState<'production_date' | 'title'>('production_date')
   const creating = location.pathname.endsWith('/new')
   const [items, setItems] = useState<ShotListMetadata[]>([]),
     [loading, setLoading] = useState(true),
@@ -33,6 +36,19 @@ export default function ShotListsPage() {
     [dateValid, setDateValid] = useState(true)
   const [name, setName] = useState(''),
     [pending, setPending] = useState(false)
+  const filtered = items
+    .filter((item) =>
+      item.name.toLowerCase().includes(search.trim().toLowerCase()),
+    )
+    .sort((a, b) => {
+      const title = a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+      if (sort === 'title') return title
+      const date = (item: ShotListMetadata) =>
+        item.dates?.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0]
+      const x = date(a),
+        y = date(b)
+      return x && y ? x.localeCompare(y) || title : x ? -1 : y ? 1 : title
+    })
   useEffect(() => {
     if (!token) {
       setLoading(false)
@@ -79,8 +95,38 @@ export default function ShotListsPage() {
     <div className="pd-page">
       <PageHeader title="Shot lists" />
       {error && <ErrorNotice>{error}</ErrorNotice>}
+      <div className="pd-toolbar">
+        <SearchField
+          label="Search shot lists"
+          placeholder="Search shot lists..."
+          value={search}
+          onChange={setSearch}
+        />
+        <div className="pd-toolbar-options">
+          <Menu
+            label={sort === 'title' ? 'Title A–Z' : 'Production date'}
+            icon="sort"
+            value={sort}
+            items={[
+              {
+                value: 'production_date',
+                label: 'Production date',
+                icon: 'calendar',
+              },
+              { value: 'title', label: 'Title A–Z', icon: 'sort' },
+            ]}
+            onChange={(v) => setSort(v as typeof sort)}
+          />
+        </div>
+      </div>
       {loading ? (
         <LoadingRows label="Loading shot lists…" />
+      ) : items.length && !filtered.length ? (
+        <EmptyState
+          kind="search"
+          title="No matching shot lists"
+          action={<Button onClick={() => setSearch('')}>Clear search</Button>}
+        />
       ) : items.length ? (
         <div className="pd-table-wrap">
           <table
@@ -98,11 +144,16 @@ export default function ShotListsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
+              {filtered.map((item) => (
+                <DocumentRow to={`/shotlists/${item.id}`} key={item.id}>
                   <td className="pd-document-title">
                     <div>
-                      <Link to={`/shotlists/${item.id}`}>{item.name}</Link>
+                      <Link
+                        className="pd-document-link"
+                        to={`/shotlists/${item.id}`}
+                      >
+                        {item.name}
+                      </Link>
                     </div>
                   </td>
                   <td data-label="Scenes / Shots">
@@ -125,7 +176,7 @@ export default function ShotListsPage() {
                           .join(' – ')
                       : '—'}
                   </td>
-                  <td>
+                  <td className="pd-row-actions">
                     <Menu
                       label={`Actions for ${item.name}`}
                       compact
@@ -152,7 +203,7 @@ export default function ShotListsPage() {
                       ]}
                     />
                   </td>
-                </tr>
+                </DocumentRow>
               ))}
             </tbody>
           </table>

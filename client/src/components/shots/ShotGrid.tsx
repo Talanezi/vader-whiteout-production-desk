@@ -50,7 +50,7 @@ import {
 } from '../../lib/shotColumns'
 import ColumnManager from './ColumnManager'
 import { Button } from '../whiteout/Button'
-import Combobox from '../whiteout/Combobox'
+import InlineDelete from '../whiteout/InlineDelete'
 
 type Props = {
   undo: Y.UndoManager
@@ -72,7 +72,8 @@ type Props = {
   role?: string
   department?: string
   user: number
-  onAssign: () => void
+  onWaitForSaved: () => Promise<void>
+  onDeleteSelected: (ids: string[]) => Promise<void>
 }
 function Row({
   record,
@@ -154,9 +155,40 @@ export default function ShotGrid(p: Props) {
         ),
       ],
     ),
-    [dragged, setDragged] = useState(''),
-    [bulkField, setBulkField] = useState<ShotField>('camera'),
-    [bulkValue, setBulkValue] = useState('')
+    [dragged, setDragged] = useState('')
+  const [copyState, setCopyState] = useState<'idle' | 'pending' | 'success'>(
+      'idle',
+    ),
+    [duplicateState, setDuplicateState] = useState<
+      'idle' | 'pending' | 'success'
+    >('idle'),
+    [deleteSelection, setDeleteSelection] = useState<string[]>([])
+  const duplicatePending = useRef(false),
+    copyTimer = useRef<number | undefined>(undefined),
+    duplicateTimer = useRef<number | undefined>(undefined)
+  useEffect(
+    () => () => {
+      clearTimeout(copyTimer.current)
+      clearTimeout(duplicateTimer.current)
+    },
+    [],
+  )
+  const selectionSignature = [...p.multi]
+    .sort()
+    .map((id) => id + ':' + !!shots(p.doc).get(id)?.get('deleted'))
+    .join(',')
+  useEffect(() => {
+    clearTimeout(copyTimer.current)
+    setCopyState('idle')
+    if (!duplicatePending.current) {
+      clearTimeout(duplicateTimer.current)
+      setDuplicateState('idle')
+    }
+    const activeIds = [...p.multi].filter(
+      (id) => shots(p.doc).has(id) && !shots(p.doc).get(id)?.get('deleted'),
+    )
+    if (activeIds.length !== p.multi.size) p.onMulti(new Set(activeIds))
+  }, [selectionSignature])
   const [active, setActive] = useState({ row: 0, col: 0 }),
     [anchor, setAnchor] = useState<{ row: number; col: number } | null>(null),
     [extent, setExtent] = useState<{ row: number; col: number } | null>(null)
@@ -458,6 +490,7 @@ export default function ShotGrid(p: Props) {
     )
   }
   function key(e: React.KeyboardEvent) {
+    if (!e.currentTarget.contains(e.target as Node)) return
     const target = e.target as HTMLElement,
       editing =
         target.matches('input,textarea,[contenteditable=true]') ||
@@ -630,73 +663,88 @@ export default function ShotGrid(p: Props) {
         <div className="pd-shot-selection">
           <span>{p.multi.size} selected</span>
           <Button
-            onClick={() =>
-              navigator.clipboard
-                .writeText(
+            aria-label="Copy selected"
+            className={`pd-selection-feedback ${copyState === 'success' ? 'is-copied' : ''}`}
+            icon="copy"
+            state={copyState}
+            successLabel="Copied"
+            pendingLabel="Copying…"
+            onClick={async () => {
+              clearTimeout(copyTimer.current)
+              setCopyState('pending')
+              try {
+                await navigator.clipboard.writeText(
                   formatMatrix(
                     selectedRecords().map((s) =>
                       shown.map((f) => valueFor(s, f)),
                     ),
                   ),
                 )
-                .catch(() => p.onError('Clipboard unavailable.'))
-            }
+                setCopyState('success')
+                clearTimeout(copyTimer.current)
+                copyTimer.current = window.setTimeout(
+                  () => setCopyState('idle'),
+                  1800,
+                )
+              } catch {
+                setCopyState('idle')
+                p.onError('Clipboard unavailable.')
+              }
+            }}
           >
             Copy selected
           </Button>
           <Button
-            onClick={() =>
-              shotOperation(
-                p.doc,
-                () =>
-                  selectedRecords().forEach((s) =>
-                    addShot(p.doc, str(s, 'sceneId'), p.user, s),
-                  ),
-                'local',
-              )
-            }
-          >
-            Duplicate selected
-          </Button>
-          <Combobox
-            label="Bulk field"
-            labels={fields}
-            value={bulkField}
-            options={Object.keys(fields)}
-            onChange={(v) => setBulkField(v as ShotField)}
-            custom={false}
-          />
-          <input
-            aria-label="Bulk value"
-            value={bulkValue}
-            onChange={(e) => setBulkValue(e.target.value)}
-          />
-          <Button
-            onClick={() => {
+            aria-label="Duplicate selected"
+            className={`pd-selection-feedback ${duplicateState === 'success' ? 'is-duplicated' : ''}`}
+            icon="copy"
+            state={duplicateState}
+            successLabel="Duplicated"
+            pendingLabel="Duplicating…"
+            onClick={async () => {
+              if (duplicatePending.current) return
+              clearTimeout(duplicateTimer.current)
+              duplicatePending.current = true
+              setDuplicateState('pending')
               try {
-                validateValue(bulkField, bulkValue)
-                if (
-                  bulkValue === '' &&
-                  !confirm('Clear the selected field on all selected shots?')
-                )
-                  return
                 shotOperation(
                   p.doc,
                   () =>
                     selectedRecords().forEach((s) =>
-                      edit(s, bulkField, bulkValue),
+                      addShot(p.doc, str(s, 'sceneId'), p.user, s),
                     ),
                   'local',
                 )
-              } catch (e) {
-                p.onError((e as Error).message)
+                await p.onWaitForSaved()
+                setDuplicateState('success')
+                clearTimeout(duplicateTimer.current)
+                duplicateTimer.current = window.setTimeout(
+                  () => setDuplicateState('idle'),
+                  1800,
+                )
+              } catch {
+                setDuplicateState('idle')
+                p.onError(
+                  'Duplicates are not saved yet. Keep this window open.',
+                )
+              } finally {
+                duplicatePending.current = false
               }
             }}
           >
-            Apply
+            Duplicate selected
           </Button>
-          <Button onClick={p.onAssign}>Assign day</Button>
-          <Button onClick={() => p.onMulti(new Set())}>Clear</Button>
+          <Button onClick={() => p.onMulti(new Set())}>Clear selection</Button>
+          <InlineDelete
+            triggerLabel="Delete selected"
+            label={`${deleteSelection.length || p.multi.size} selected ${(deleteSelection.length || p.multi.size) === 1 ? 'shot' : 'shots'}`}
+            onStart={() =>
+              setDeleteSelection(selectedRecords().map((s) => str(s, 'id')))
+            }
+            onConfirm={async () => {
+              await p.onDeleteSelected(deleteSelection)
+            }}
+          />
         </div>
       )}
       <div
@@ -819,24 +867,28 @@ export default function ShotGrid(p: Props) {
             <thead>
               <tr>
                 <th className="pd-pin-grip">
-                  <DrawCheckbox
-                    aria-label="Select all visible shots"
-                    indeterminate={
-                      rows.some((s) => p.multi.has(str(s, 'id'))) &&
-                      !rows.every((s) => p.multi.has(str(s, 'id')))
-                    }
-                    checked={
-                      rows.length > 0 &&
-                      rows.every((s) => p.multi.has(str(s, 'id')))
-                    }
-                    onChange={(e) =>
-                      p.onMulti(
-                        new Set(
-                          e.target.checked ? rows.map((s) => str(s, 'id')) : [],
-                        ),
-                      )
-                    }
-                  />
+                  <div className="pd-selection-cell">
+                    <DrawCheckbox
+                      aria-label="Select all visible shots"
+                      indeterminate={
+                        rows.some((s) => p.multi.has(str(s, 'id'))) &&
+                        !rows.every((s) => p.multi.has(str(s, 'id')))
+                      }
+                      checked={
+                        rows.length > 0 &&
+                        rows.every((s) => p.multi.has(str(s, 'id')))
+                      }
+                      onChange={(e) =>
+                        p.onMulti(
+                          new Set(
+                            e.target.checked
+                              ? rows.map((s) => str(s, 'id'))
+                              : [],
+                          ),
+                        )
+                      }
+                    />
+                  </div>
                 </th>
                 {shown.map((f) => (
                   <th key={f} className={f === 'number' ? 'pd-pin-number' : ''}>
@@ -947,50 +999,54 @@ export default function ShotGrid(p: Props) {
                       {(handle) => (
                         <>
                           <td className="pd-pin-grip">
-                            <button
-                              ref={handle}
-                              className="pd-row-grip"
-                              aria-label={`Reorder shot ${str(record, 'number')}`}
-                              disabled={p.filtered}
-                              title={
-                                p.filtered
-                                  ? 'Clear search before dragging'
-                                  : 'Drag to reorder; Space and arrows for keyboard'
-                              }
-                            >
-                              ⠿
-                            </button>
-                            <DrawCheckbox
-                              aria-label={`Select shot ${str(record, 'number')}`}
-                              checked={p.multi.has(str(record, 'id'))}
-                              onChange={(e) => {
-                                const next = new Set(p.multi)
-                                if (
-                                  (e.nativeEvent as MouseEvent).shiftKey &&
-                                  selectionAnchor.current
-                                ) {
-                                  const start = rows.findIndex(
-                                      (row) =>
-                                        str(row, 'id') ===
-                                        selectionAnchor.current,
-                                    ),
-                                    end = rows.indexOf(record)
-                                  rows
-                                    .slice(
-                                      Math.min(start, end),
-                                      Math.max(start, end) + 1,
-                                    )
-                                    .forEach((row) => next.add(str(row, 'id')))
-                                  p.onMulti(next)
-                                  return
+                            <div className="pd-selection-cell">
+                              <button
+                                ref={handle}
+                                className="pd-row-grip"
+                                aria-label={`Reorder shot ${str(record, 'number')}`}
+                                disabled={p.filtered}
+                                title={
+                                  p.filtered
+                                    ? 'Clear search before dragging'
+                                    : 'Drag to reorder; Space and arrows for keyboard'
                                 }
-                                selectionAnchor.current = str(record, 'id')
-                                e.target.checked
-                                  ? next.add(str(record, 'id'))
-                                  : next.delete(str(record, 'id'))
-                                p.onMulti(next)
-                              }}
-                            />
+                              >
+                                ⠿
+                              </button>
+                              <DrawCheckbox
+                                aria-label={`Select shot ${str(record, 'number')}`}
+                                checked={p.multi.has(str(record, 'id'))}
+                                onChange={(e) => {
+                                  const next = new Set(p.multi)
+                                  if (
+                                    (e.nativeEvent as MouseEvent).shiftKey &&
+                                    selectionAnchor.current
+                                  ) {
+                                    const start = rows.findIndex(
+                                        (row) =>
+                                          str(row, 'id') ===
+                                          selectionAnchor.current,
+                                      ),
+                                      end = rows.indexOf(record)
+                                    rows
+                                      .slice(
+                                        Math.min(start, end),
+                                        Math.max(start, end) + 1,
+                                      )
+                                      .forEach((row) =>
+                                        next.add(str(row, 'id')),
+                                      )
+                                    p.onMulti(next)
+                                    return
+                                  }
+                                  selectionAnchor.current = str(record, 'id')
+                                  e.target.checked
+                                    ? next.add(str(record, 'id'))
+                                    : next.delete(str(record, 'id'))
+                                  p.onMulti(next)
+                                }}
+                              />
+                            </div>
                           </td>
                           {shown.map((f, col) => {
                             const range =
