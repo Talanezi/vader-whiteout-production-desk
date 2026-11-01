@@ -57,11 +57,9 @@ export default function ShotListPage() {
   const [width, setWidth] = useState(304),
     [columnOpen, setColumnOpen] = useState(false)
   const [railCollapsed, setRailCollapsed] = useState(false),
-    [focused, setFocused] = useState(false),
     [dayOpen, setDayOpen] = useState(false),
     [pdfOpen, setPdfOpen] = useState(false)
-  const printView = useRef<PrintView | undefined>(undefined),
-    previousLayout = useRef({ rail: false, inspector: false })
+  const printView = useRef<PrintView | undefined>(undefined)
   const [printContext, setPrintContext] = useState<PrintView>()
   const [importBusy, setImportBusy] = useState(false)
   const [importing, setImporting] = useState(false),
@@ -135,7 +133,7 @@ export default function ShotListPage() {
     }
   }, [c.saved, c.connected])
   useEffect(() => {
-    if (sceneId) setMode('scene')
+    if (sceneId && query.get('isolate') === '1') setMode('scene')
   }, [sceneId])
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
@@ -165,8 +163,15 @@ export default function ShotListPage() {
   }
   function selectScene(sid: string) {
     setQuery({ scene: sid }, { replace: true })
-    setMode('scene')
+    setMode('all')
     setMobileScenes(false)
+    requestAnimationFrame(() => {
+      const first = allShots.find((s) => str(s, 'sceneId') === sid)
+      if (first)
+        grid.current?.dispatchEvent(
+          new CustomEvent('pd-scroll-to-shot', { detail: str(first, 'id') }),
+        )
+    })
   }
   function openScene(scene: 'new' | RecordMap) {
     setSceneNumber(scene === 'new' ? '' : str(scene, 'number'))
@@ -414,7 +419,7 @@ export default function ShotListPage() {
       <div className="pd-inspector-heading">
         <div>
           <span>Shot</span>
-          <h2>{str(current, 'number') || 'Unnumbered'}</h2>
+          <h2>{displayShot(c.doc, current) || 'Unnumbered'}</h2>
         </div>
         <IconButton
           name="close"
@@ -588,7 +593,7 @@ export default function ShotListPage() {
             onClick={async () => {
               try {
                 const link = new URL(window.location.href)
-                link.hash = `/shotlists/${id}${mode === 'scene' && selectedScene ? `?scene=${selectedScene}` : ''}`
+                link.hash = `/shotlists/${id}${mode === 'scene' && selectedScene ? `?scene=${selectedScene}&isolate=1` : ''}`
                 await navigator.clipboard.writeText(link.toString())
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2200)
@@ -625,7 +630,12 @@ export default function ShotListPage() {
                 value={mode}
                 onChange={(v) => {
                   setMode(v)
-                  if (v !== 'scene') setQuery({}, { replace: true })
+                  if (v === 'scene')
+                    setQuery(
+                      { scene: selectedScene, isolate: '1' },
+                      { replace: true },
+                    )
+                  else setQuery({}, { replace: true })
                 }}
               />
               <button
@@ -659,22 +669,6 @@ export default function ShotListPage() {
                 />
               </div>
 
-              <Button
-                aria-pressed={focused}
-                onClick={() => {
-                  if (!focused) {
-                    previousLayout.current = { rail: railCollapsed, inspector }
-                    setRailCollapsed(true)
-                    setInspector(false)
-                  } else {
-                    setRailCollapsed(previousLayout.current.rail)
-                    setInspector(previousLayout.current.inspector)
-                  }
-                  setFocused(!focused)
-                }}
-              >
-                {focused ? 'Restore layout' : 'Focus'}
-              </Button>
               <IconButton
                 name="columns"
                 disabled={mode === 'shooting'}
@@ -804,7 +798,10 @@ export default function ShotListPage() {
                   onCloseColumns={() => setColumnOpen(false)}
                   tableRef={grid}
                   onError={(message) => notify(message, { state: 'error' })}
+                  key={c.session!.user.id}
                   user={c.session!.user.id}
+                  role={c.session!.user.role}
+                  department={c.session!.user.department}
                   onAssign={() => setDayOpen(true)}
                   actions={(s, index) => (
                     <div>

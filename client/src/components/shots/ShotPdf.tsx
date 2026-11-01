@@ -1,3 +1,4 @@
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import {
   Component,
   type ReactNode,
@@ -91,12 +92,7 @@ export default function ShotPdf({
             ? 'area'
             : 'current',
     ),
-    [layout, setLayout] = useState<PrintSpec['layout']>(() =>
-      printFit(view?.columns || defaults, 'letter', 'landscape', 'normal')
-        .readable
-        ? 'table'
-        : 'expanded',
-    ),
+    [layout, setLayout] = useState<PrintSpec['layout']>('table'),
     [paper, setPaper] = useState<PrintSpec['paper']>('letter'),
     [orientation, setOrientation] =
       useState<PrintSpec['orientation']>('landscape'),
@@ -124,14 +120,6 @@ export default function ShotPdf({
           'id',
         ),
     ),
-    [profile, setProfile] = useState<'compact' | 'standard' | 'detailed'>(
-      'standard',
-    ),
-    [notes, setNotes] = useState(true),
-    [summaries, setSummaries] = useState(true),
-    [reportMode, setReportMode] = useState<'creative' | 'shooting' | 'both'>(
-      'creative',
-    ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [generated, setGenerated] = useState<{
@@ -143,8 +131,7 @@ export default function ShotPdf({
     [printPreset, setPrintPreset] = useState('Current grid'),
     [retry, setRetry] = useState(0)
   const [previewReady, setPreviewReady] = useState('')
-  const layoutChosen = useRef(false),
-    requestNumber = useRef(0),
+  const requestNumber = useRef(0),
     cache = useRef(new Map<string, Uint8Array>())
   function setColumns(
     value: PrintColumn[] | ((old: PrintColumn[]) => PrintColumn[]),
@@ -203,7 +190,6 @@ export default function ShotPdf({
       scaling,
       text,
       groupScenes,
-      report: { mode: reportMode, profile, notes, summaries },
     },
     signature = JSON.stringify(spec) + ':' + revision,
     changed = !!generated && generated.signature !== signature,
@@ -240,49 +226,52 @@ export default function ShotPdf({
       return
     }
     setBusy(true)
-    const timer = window.setTimeout(async () => {
-      try {
-        let bytes = cache.current.get(signature)
-        if (!bytes) {
-          const response = await fetch(`${shotApiBase}/shotlists/${id}/pdf`, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              Authorization: `Bearer ${getAuthToken() || ''}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(spec),
-          })
-          if (!response.ok) {
-            const result = await response.json().catch(() => ({}))
-            throw Error(result.message || 'PDF preview failed.')
+    const timer = window.setTimeout(
+      async () => {
+        try {
+          let bytes = cache.current.get(signature)
+          if (!bytes) {
+            const response = await fetch(`${shotApiBase}/shotlists/${id}/pdf`, {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                Authorization: `Bearer ${getAuthToken() || ''}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(spec),
+            })
+            if (!response.ok) {
+              const result = await response.json().catch(() => ({}))
+              throw Error(result.message || 'PDF preview failed.')
+            }
+            if (
+              !response.headers.get('content-type')?.includes('application/pdf')
+            )
+              throw Error('The service did not return a PDF.')
+            bytes = new Uint8Array(await response.arrayBuffer())
           }
-          if (
-            !response.headers.get('content-type')?.includes('application/pdf')
-          )
-            throw Error('The service did not return a PDF.')
-          bytes = new Uint8Array(await response.arrayBuffer())
+          if (controller.signal.aborted || number !== requestNumber.current)
+            return
+          cache.current.set(signature, bytes)
+          if (cache.current.size > 6)
+            cache.current.delete(cache.current.keys().next().value!)
+          setGenerated({
+            url: URL.createObjectURL(
+              new Blob([bytes.slice()], { type: 'application/pdf' }),
+            ),
+            bytes,
+            signature,
+          })
+          setError('')
+        } catch (e) {
+          if (!controller.signal.aborted && number === requestNumber.current)
+            setError((e as Error).message)
+        } finally {
+          if (number === requestNumber.current) setBusy(false)
         }
-        if (controller.signal.aborted || number !== requestNumber.current)
-          return
-        cache.current.set(signature, bytes)
-        if (cache.current.size > 6)
-          cache.current.delete(cache.current.keys().next().value!)
-        setGenerated({
-          url: URL.createObjectURL(
-            new Blob([bytes.slice()], { type: 'application/pdf' }),
-          ),
-          bytes,
-          signature,
-        })
-        setError('')
-      } catch (e) {
-        if (!controller.signal.aborted && number === requestNumber.current)
-          setError((e as Error).message)
-      } finally {
-        if (number === requestNumber.current) setBusy(false)
-      }
-    }, 500)
+      },
+      generated ? 500 : 0,
+    )
     return () => {
       clearTimeout(timer)
       controller.abort()
@@ -303,14 +292,6 @@ export default function ShotPdf({
               })),
             ] as PrintColumn[])
     setColumnState(next)
-    if (
-      !layoutChosen.current &&
-      !printFit(next, paper, orientation, margins).readable &&
-      layout === 'table'
-    ) {
-      setLayout('expanded')
-      setText('wrap')
-    }
   }
   function move(index: number, delta: number) {
     setColumns((old) => {
@@ -411,8 +392,7 @@ export default function ShotPdf({
             <div className="pd-print-scene-picker">
               {allScenes.map((scene) => (
                 <label key={str(scene, 'id')}>
-                  <input
-                    type="checkbox"
+                  <DrawCheckbox
                     checked={sceneIds.includes(str(scene, 'id'))}
                     onChange={(e) =>
                       setScenes((old) =>
@@ -448,14 +428,11 @@ export default function ShotPdf({
                 value={layout}
                 options={[
                   { value: 'table', label: 'Compact Table' },
-                  { value: 'expanded', label: 'Expanded Technical' },
                   { value: 'exact', label: 'Exact Grid' },
-                  { value: 'report', label: 'Detailed Production Report' },
                 ]}
                 custom={false}
                 clearable={false}
                 onChange={(v) => {
-                  layoutChosen.current = true
                   setLayout(v as PrintSpec['layout'])
                   if (v === 'table') setScaling('fit-width')
                   if (v === 'exact') setScaling('readable')
@@ -504,7 +481,7 @@ export default function ShotPdf({
               />
             </div>
           </div>
-          {layout !== 'report' ? (
+          {
             <>
               {layout !== 'expanded' && (
                 <div className="pd-print-setting">
@@ -552,17 +529,17 @@ export default function ShotPdf({
               </div>
               {blocked && (
                 <div className="pd-print-warning" role="alert">
-                  These fields would shrink below 8 pt.{' '}
+                  These fields would shrink below 4 pt.{' '}
                   <Button
                     onClick={() =>
                       layout === 'exact'
                         ? setScaling('readable')
-                        : setLayout('expanded')
+                        : (setLayout('exact'), setScaling('readable'))
                     }
                   >
                     {layout === 'exact'
                       ? 'Use readable bands'
-                      : 'Use Expanded Technical'}
+                      : 'Use horizontal tiling'}
                   </Button>
                   <span>
                     Or choose fewer fields, landscape or narrower margins.
@@ -597,8 +574,7 @@ export default function ShotPdf({
                 </p>
                 {columns.map((column, index) => (
                   <div className="pd-print-column-row" key={column.field}>
-                    <input
-                      type="checkbox"
+                    <DrawCheckbox
                       aria-label={`Print ${printLabels[column.field]}`}
                       checked
                       disabled={column.field === 'number'}
@@ -629,8 +605,7 @@ export default function ShotPdf({
                   .filter((c) => !columns.some((x) => x.field === c.field))
                   .map((column) => (
                     <label className="pd-print-column-row" key={column.field}>
-                      <input
-                        type="checkbox"
+                      <DrawCheckbox
                         aria-label={`Print ${printLabels[column.field]}`}
                         checked={false}
                         onChange={() => setColumns((old) => [...old, column])}
@@ -640,68 +615,14 @@ export default function ShotPdf({
                   ))}
               </details>
               <label className="pd-print-groups">
-                <input
-                  type="checkbox"
+                <DrawCheckbox
                   checked={groupScenes}
                   onChange={(e) => setGroups(e.target.checked)}
                 />{' '}
                 Scene dividers
               </label>
             </>
-          ) : (
-            <>
-              <div className="pd-pdf-options">
-                <Combobox
-                  label="Report profile"
-                  value={profile}
-                  options={['compact', 'standard', 'detailed']}
-                  onChange={(v) => setProfile(v as typeof profile)}
-                  custom={false}
-                  clearable={false}
-                />
-                <Combobox
-                  label="Report sections"
-                  value={scope === 'day' ? 'shooting' : reportMode}
-                  options={
-                    scope === 'day'
-                      ? [{ value: 'shooting', label: 'Shooting Order' }]
-                      : [
-                          { value: 'creative', label: 'Creative Shot List' },
-                          ...(shootDays.length
-                            ? [
-                                {
-                                  value: 'both',
-                                  label: 'Creative + Shooting Order',
-                                },
-                              ]
-                            : []),
-                        ]
-                  }
-                  onChange={(v) => setReportMode(v as typeof reportMode)}
-                  custom={false}
-                  clearable={false}
-                />
-              </div>
-              <div className="pd-pdf-checks">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={notes}
-                    onChange={(e) => setNotes(e.target.checked)}
-                  />{' '}
-                  Expanded technical notes
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={summaries}
-                    onChange={(e) => setSummaries(e.target.checked)}
-                  />{' '}
-                  Scene summaries
-                </label>
-              </div>
-            </>
-          )}
+          }
           {!saved && (
             <p role="status" className="pd-muted">
               Waiting for saved changes before generating.

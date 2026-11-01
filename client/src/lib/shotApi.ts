@@ -36,5 +36,5 @@ export type ShotListMetadata = {
   dates?: string[]
 }
 export type ShotSession = ShotListMetadata & {
-  user: { id: number; name: string; color: string }
+  user: { id: number; name: string; color: string; role?: string; department?: string }
 }

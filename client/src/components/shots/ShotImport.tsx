@@ -1,3 +1,4 @@
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import { useEffect, useRef, useState } from 'react'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
@@ -337,8 +338,7 @@ export default function ShotImport({
                       }}
                     />
                     <label>
-                      <input
-                        type="checkbox"
+                      <DrawCheckbox
                         aria-label={`Include ${sheet.name}`}
                         checked={sheet.include}
                         disabled={
@@ -503,8 +503,7 @@ export default function ShotImport({
                         }}
                       />
                       <label>
-                        <input
-                          type="checkbox"
+                        <DrawCheckbox
                           checked={sheet.scheduleReviewed}
                           onChange={(e) => {
                             sheet.scheduleReviewed = e.target.checked
@@ -582,8 +581,7 @@ export default function ShotImport({
                         className={!row.reviewed ? 'needs-review' : ''}
                       >
                         <td>
-                          <input
-                            type="checkbox"
+                          <DrawCheckbox
                             aria-label={`Include row ${row.row} in ${sheet.name}`}
                             checked={row.include}
                             onChange={(e) => {
@@ -659,8 +657,7 @@ export default function ShotImport({
                             <span>{row.issues.join(' ')}</span>
                           )}
                           <label>
-                            <input
-                              type="checkbox"
+                            <DrawCheckbox
                               checked={row.reviewed}
                               onChange={(e) => {
                                 row.reviewed = e.target.checked

@@ -103,14 +103,7 @@ export function printFit(
               ? [841.89, 595.28]
               : [595.28, 841.89],
     available = page[0] - (2 * (margins === 'narrow' ? 8 : 12) * 72) / 25.4,
-    scale = Math.min(
-      1,
-      (available - columns.length * 4.8) /
-        columns.reduce(
-          (sum, c) =>
-            sum + Math.max(c.field === 'number' ? 58 : 34, c.width * 0.65),
-          0,
-        ),
-    )
-  return { font: 9 * scale, page, readable: 9 * scale >= 8 }
+    scale = Math.min(1, available / 724)
+  const font = (columns.length > 12 ? 4.2 : columns.length > 9 ? 6 : 8) * scale
+  return { font, page, readable: font >= 4 }
 }

@@ -9,11 +9,9 @@ import {
   useToast,
 } from '../components/whiteout/Feedback'
 import { Button } from '../components/whiteout/Button'
-import { Overlay } from '../components/whiteout/Overlay'
+import { Overlay, Confirm } from '../components/whiteout/Overlay'
 import DatePicker from '../components/whiteout/DatePicker'
 import Menu from '../components/whiteout/Menu'
-import InlineDelete from '../components/whiteout/InlineDelete'
-import Icon from '../components/whiteout/Icon'
 import { getAuthToken } from '../lib/api'
 import { shotRequest, type ShotListMetadata } from '../lib/shotApi'
 
@@ -24,6 +22,8 @@ export default function ShotListsPage() {
     token = getAuthToken()
   const [renaming, setRenaming] = useState<ShotListMetadata | null>(null),
     [deleteId, setDeleteId] = useState('')
+  const [deletePending, setDeletePending] = useState(false),
+    [deleteError, setDeleteError] = useState<string | null>(null)
   const creating = location.pathname.endsWith('/new')
   const [items, setItems] = useState<ShotListMetadata[]>([]),
     [loading, setLoading] = useState(true),
@@ -82,66 +82,80 @@ export default function ShotListsPage() {
       {loading ? (
         <LoadingRows label="Loading shot lists…" />
       ) : items.length ? (
-        <div className="pd-shot-list-index">
-          {items.map((item) => (
-            <div className="pd-shot-index-row" key={item.id}>
-              <Link to={`/shotlists/${item.id}`}>
-                <strong>
-                  {item.name}
-                  <small>
+        <div className="pd-table-wrap">
+          <table
+            className="pd-table pd-documents"
+            aria-label="Production shot lists"
+          >
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Scenes / Shots</th>
+                <th>Planned shoot date</th>
+                <th>
+                  <span className="pd-sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td className="pd-document-title">
+                    <div>
+                      <Link to={`/shotlists/${item.id}`}>{item.name}</Link>
+                    </div>
+                  </td>
+                  <td data-label="Scenes / Shots">
                     {item.sceneCount ?? 0} scenes · {item.shotCount ?? 0} shots
-                  </small>
-                </strong>
-                <span>
-                  {item.dates?.length
-                    ? item.dates.length === 1
-                      ? item.dates[0]
-                      : `${item.dates[0]} – ${item.dates[item.dates.length - 1]}`
-                    : 'Not scheduled'}
-                </span>
-                <Icon name="arrow" />
-              </Link>
-              <Menu
-                label={`Actions for ${item.name}`}
-                compact
-                items={[
-                  {
-                    value: 'open',
-                    label: 'Open',
-                    onSelect: () => navigate(`/shotlists/${item.id}`),
-                  },
-                  {
-                    value: 'rename',
-                    label: 'Rename',
-                    onSelect: () => {
-                      setName(item.name)
-                      setRenaming(item)
-                    },
-                  },
-                  {
-                    value: 'delete',
-                    label: 'Delete',
-                    danger: true,
-                    onSelect: () => setDeleteId(item.id),
-                  },
-                ]}
-              />
-              {deleteId === item.id && (
-                <InlineDelete
-                  initialConfirm
-                  label={`shot list ${item.name}`}
-                  onConfirm={async () => {
-                    await shotRequest(`/${item.id}/manage`, {
-                      action: 'archive',
-                    })
-                    setItems((old) => old.filter((i) => i.id !== item.id))
-                    setDeleteId('')
-                    notify('Shot list archived.')
-                  }}
-                />
-              )}
-            </div>
-          ))}
+                  </td>
+                  <td data-label="Planned shoot date">
+                    {item.dates?.length
+                      ? item.dates
+                          .map((d) =>
+                            new Date(d + 'T12:00:00Z').toLocaleDateString(
+                              'en-US',
+                              {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                timeZone: 'UTC',
+                              },
+                            ),
+                          )
+                          .join(' – ')
+                      : '—'}
+                  </td>
+                  <td>
+                    <Menu
+                      label={`Actions for ${item.name}`}
+                      compact
+                      items={[
+                        {
+                          value: 'open',
+                          label: 'Open',
+                          onSelect: () => navigate(`/shotlists/${item.id}`),
+                        },
+                        {
+                          value: 'rename',
+                          label: 'Rename',
+                          onSelect: () => {
+                            setName(item.name)
+                            setRenaming(item)
+                          },
+                        },
+                        {
+                          value: 'delete',
+                          label: 'Delete',
+                          danger: true,
+                          onSelect: () => setDeleteId(item.id),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <EmptyState
@@ -159,6 +173,32 @@ export default function ShotListsPage() {
               </Button>
             ) : undefined
           }
+        />
+      )}
+      {deleteId && (
+        <Confirm
+          title="Delete this shot list?"
+          description={`“${items.find((i) => i.id === deleteId)?.name || 'Shot List'}” will be removed from your production documents.`}
+          pending={deletePending}
+          error={deleteError}
+          onCancel={() => {
+            setDeleteId('')
+            setDeleteError(null)
+          }}
+          onConfirm={async () => {
+            setDeletePending(true)
+            setDeleteError(null)
+            try {
+              await shotRequest(`/${deleteId}/manage`, { action: 'archive' })
+              setItems((old) => old.filter((i) => i.id !== deleteId))
+              setDeleteId('')
+              notify('Shot list archived.')
+            } catch (e) {
+              setDeleteError((e as Error).message)
+            } finally {
+              setDeletePending(false)
+            }
+          }}
         />
       )}
       {renaming && (

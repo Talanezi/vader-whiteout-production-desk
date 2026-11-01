@@ -12,11 +12,10 @@ import { AuthService } from '../auth/auth.service';
 import {
   snapshot,
   metadata,
-  buildShotLatex,
   type PrintOptions,
 } from './pdf/shotlist-report';
-import { buildTablePrint, type TablePrintSpec } from './pdf/table-print';
-import { compileShotlist } from './pdf/compile-shotlist';
+import type { TablePrintSpec } from './pdf/table-print';
+import { renderSpreadsheet } from './pdf/spreadsheet';
 import type { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
 
@@ -174,6 +173,8 @@ export class ShotlistsService implements OnModuleDestroy {
       ...metadata,
       user: {
         id: user.userID,
+        role: user.role,
+        department: user.department,
         name: user.name,
         color: colors[user.userID % colors.length],
       },
@@ -418,11 +419,7 @@ export class ShotlistsService implements OnModuleDestroy {
     const doc = new Y.Doc();
     try {
       Y.applyUpdate(doc, row.state);
-      return await compileShotlist(
-        'version' in options
-          ? buildTablePrint(snapshot(doc), options as TablePrintSpec).source
-          : buildShotLatex(snapshot(doc), options as PrintOptions),
-      );
+      return await renderSpreadsheet(snapshot(doc), options as TablePrintSpec);
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : 'PDF generation failed.',

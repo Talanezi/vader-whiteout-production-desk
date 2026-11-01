@@ -2051,7 +2051,7 @@
   border-bottom: 1px solid #273440;
   cursor: grab;
 }
-.pd-column-manager-row span {
+.pd-column-manager-row > span:not(.pd-draw-checkbox) {
   flex: 1;
   font-size: 12px;
 }
@@ -2761,4 +2761,119 @@
 
 .pd-print-preview[aria-busy="true"] canvas {
   opacity: 0.55;
+}
+.pd-draw-checkbox {
+  display: inline-flex;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  vertical-align: middle;
+}
+.pd-draw-checkbox input[type="checkbox"] {
+  appearance: none !important;
+  margin: 0 !important;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #536779;
+  border-radius: 3px;
+  background: #16212c;
+  cursor: pointer;
+}
+.pd-draw-checkbox input:checked,
+.pd-draw-checkbox input:indeterminate {
+  background: #8ed8ff;
+  border-color: #8ed8ff;
+}
+.pd-draw-checkbox input:focus-visible {
+  outline: 2px solid #b9e8ff;
+  outline-offset: 3px;
+}
+.pd-draw-checkbox input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pd-draw-checkbox svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  fill: none;
+  stroke: #10202b;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pd-draw-tick {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  transition: stroke-dashoffset 0.18s ease;
+}
+.pd-draw-checkbox input:checked + svg .pd-draw-tick {
+  stroke-dashoffset: 0;
+}
+.pd-draw-bar {
+  display: none;
+}
+.pd-draw-checkbox input:indeterminate + svg .pd-draw-bar {
+  display: block;
+}
+.pd-draw-checkbox input:indeterminate + svg .pd-draw-tick {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-draw-tick {
+    transition: none;
+  }
+}
+.pd-column-manager-row > button:not(.pd-column-drag) {
+  visibility: hidden;
+}
+.pd-column-manager-row:hover > button,
+.pd-column-manager-row:focus-within > button {
+  visibility: visible;
+}
+.pd-column-drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.pd-ui.pd-column-manager {
+  max-height: min(760px, 90dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pd-column-manager .pd-overlay-header {
+  flex: none;
+  padding: 16px 20px;
+}
+.pd-column-manager .pd-overlay-header h2 {
+  font:
+    600 16px Inter,
+    system-ui;
+  letter-spacing: 0;
+}
+.pd-column-manager .pd-overlay-body {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+  padding: 16px 20px;
+}
+.pd-column-manager .pd-overlay-footer {
+  flex: none;
+  padding: 12px 20px;
+}
+.pd-column-manager .pd-column-manager-footer {
+  margin: 0;
+  flex-wrap: wrap;
+}
+.pd-column-manager .pd-search {
+  width: 100%;
+  margin: 10px 0;
+}
+.pd-draw-checkbox svg {
+  width: 16px;
+  height: 16px;
+  max-width: 16px;
+  max-height: 16px;
 }

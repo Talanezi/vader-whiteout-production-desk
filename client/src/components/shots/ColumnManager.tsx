@@ -1,11 +1,14 @@
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { ColumnSizingState } from '@tanstack/react-table'
 import { fields } from '../../lib/shotDocument'
 import { presets, label, type GridField } from '../../lib/shotColumns'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
-import Combobox from '../whiteout/Combobox'
+import Menu from '../whiteout/Menu'
+import { SearchField } from '../whiteout/Workspace'
 type Props = {
+  defaultPreset: string
   preset: string
   applyPreset: (name: string) => void
   visible: GridField[]
@@ -43,30 +46,42 @@ export default function ColumnManager(p: Props) {
       title="Columns and layout"
       className="pd-column-manager"
       onClose={p.onClose}
+      footer={
+        <div className="pd-column-manager-footer">
+          <Button onClick={() => p.setSizes({})}>Reset column widths</Button>
+          <Button
+            onClick={() => {
+              p.setSizes({})
+              p.applyPreset(p.defaultPreset)
+            }}
+          >
+            Restore default layout
+          </Button>
+        </div>
+      }
     >
-      <Combobox
-        label="View preset"
-        options={[...Object.keys(presets), 'Custom']}
+      <Menu
+        label={p.preset}
+        ariaLabel="View preset"
         value={p.preset}
+        items={[...Object.keys(presets), 'Custom'].map((value) => ({
+          value,
+          label: value,
+        }))}
         onChange={p.applyPreset}
-        custom={false}
-        clearable={false}
       />
-      <input
-        aria-label="Search columns"
+      <SearchField
+        label="Search columns"
         placeholder="Find a field…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={setSearch}
       />
-      <p className="pd-muted">Shot identity and selection stay pinned.</p>
       {all
         .filter((f) => label(f).toLowerCase().includes(search.toLowerCase()))
         .map((f) => (
           <div
             className="pd-column-manager-row"
             key={f}
-            draggable
-            onDragStart={() => (dragged.current = f)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => {
               if (!all.includes(dragged.current) || dragged.current === f)
@@ -77,8 +92,22 @@ export default function ColumnManager(p: Props) {
               p.setPreset('Custom')
             }}
           >
-            <input
-              type="checkbox"
+            <button
+              className="pd-column-drag"
+              aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+              draggable
+              aria-label={`Drag ${label(f)} column`}
+              onDragStart={() => (dragged.current = f)}
+              onKeyDown={(e) => {
+                if (e.altKey && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
+                  e.preventDefault()
+                  move(f, e.key === 'ArrowUp' ? -1 : 1)
+                }
+              }}
+            >
+              ⠿
+            </button>
+            <DrawCheckbox
               aria-label={`Show ${label(f)}`}
               checked={p.visible.includes(f as GridField)}
               onChange={(e) => {
@@ -105,31 +134,8 @@ export default function ColumnManager(p: Props) {
             >
               ↓
             </button>
-            <button
-              aria-label={`Reset ${label(f)} width`}
-              onClick={() =>
-                p.setSizes((old) => {
-                  const next = { ...old }
-                  delete next[f]
-                  return next
-                })
-              }
-            >
-              Reset
-            </button>
           </div>
         ))}
-      <div className="pd-column-manager-footer">
-        <Button onClick={() => p.setSizes({})}>Reset widths</Button>
-        <Button
-          onClick={() => {
-            p.setSizes({})
-            p.applyPreset('Essentials')
-          }}
-        >
-          Restore default layout
-        </Button>
-      </div>
     </Overlay>
   )
 }

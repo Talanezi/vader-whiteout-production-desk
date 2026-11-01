@@ -1,3 +1,4 @@
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import { useState, useEffect } from 'react'
 import * as Y from 'yjs'
 import { DragDropProvider, DragOverlay } from '@dnd-kit/react'
@@ -432,16 +433,14 @@ export default function ShootDays({
                 onChange={setSceneFilter}
               />
               <label>
-                <input
-                  type="checkbox"
+                <DrawCheckbox
                   checked={unscheduled}
                   onChange={(e) => setUnscheduled(e.target.checked)}
                 />
                 Unscheduled only
               </label>
               <label>
-                <input
-                  type="checkbox"
+                <DrawCheckbox
                   checked={pickup}
                   onChange={(e) => setPickup(e.target.checked)}
                 />
@@ -450,8 +449,7 @@ export default function ShootDays({
               <div className="pd-day-shot-picker">
                 {available.map((s) => (
                   <label key={str(s, 'id')}>
-                    <input
-                      type="checkbox"
+                    <DrawCheckbox
                       checked={checked.has(str(s, 'id'))}
                       onChange={(e) => {
                         const next = new Set(checked)

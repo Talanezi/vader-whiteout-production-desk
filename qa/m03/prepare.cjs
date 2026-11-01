@@ -134,3 +134,5 @@ run(
 console.log(
   'M03 isolated builds complete. Source dependencies, caches and bundles remain untouched.',
 )
+
+fs.cpSync(path.join(root, 'server/assets'), path.join(runtime, 'assets'), {recursive:true})

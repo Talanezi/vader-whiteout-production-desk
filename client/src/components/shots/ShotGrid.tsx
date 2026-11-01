@@ -1,7 +1,10 @@
+import Menu from '../whiteout/Menu'
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import { useVirtualizer, defaultRangeExtractor } from '@tanstack/react-virtual'
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -66,6 +69,8 @@ type Props = {
   onCloseColumns: () => void
   tableRef: RefObject<HTMLTableElement | null>
   onError: (message: string) => void
+  role?: string
+  department?: string
   user: number
   onAssign: () => void
 }
@@ -120,18 +125,32 @@ function Row({
   )
 }
 export default function ShotGrid(p: Props) {
+  const normalizedRole = (p.role || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const rolePreset = ['directorofphotography', 'dp', 'dop'].includes(
+    normalizedRole,
+  )
+    ? 'Cinematography'
+    : [
+          '1stassistantdirector',
+          '2ndassistantdirector',
+          '1stad',
+          '2ndad',
+        ].includes(normalizedRole)
+      ? 'AD / Planning'
+      : 'Essentials'
   const storageKey = preferenceKey + '.' + p.user
   const initial = useMemo(() => readColumnPreferences(storageKey), [storageKey])
-  const [preset, setPreset] = useState(initial?.preset || 'Essentials'),
+  const [preset, setPreset] = useState(initial?.preset || rolePreset),
     [visible, setVisible] = useState<GridField[]>(
-      initial?.visible || presets.Essentials,
+      initial?.visible || presets[rolePreset],
     ),
     [sizes, setSizes] = useState<ColumnSizingState>(initial?.sizes || {}),
     [order, setOrder] = useState<string[]>(
       initial?.order || [
-        ...presets.Essentials,
+        ...presets[rolePreset],
         ...Object.keys(fields).filter(
-          (f) => f !== 'number' && !presets.Essentials.includes(f as GridField),
+          (f) =>
+            f !== 'number' && !presets[rolePreset].includes(f as GridField),
         ),
       ],
     ),
@@ -194,6 +213,22 @@ export default function ShotGrid(p: Props) {
     element.addEventListener('wheel', wheel, { passive: false })
     return () => element.removeEventListener('wheel', wheel)
   }, [])
+  useLayoutEffect(() => {
+    const table = p.tableRef.current
+    const navigate = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail
+      const index = rows.findIndex((row) => str(row, 'id') === id)
+      if (index < 0) return
+      if (windowed) virtual.scrollToIndex(index, { align: 'start' })
+      requestAnimationFrame(() =>
+        table
+          ?.querySelector<HTMLElement>(`tr[data-shot="${id}"]`)
+          ?.scrollIntoView({ block: 'nearest' }),
+      )
+    }
+    table?.addEventListener('pd-scroll-to-shot', navigate)
+    return () => table?.removeEventListener('pd-scroll-to-shot', navigate)
+  }, [rows, windowed])
   const shown: GridField[] = [
     'number',
     ...(order.filter((f) => visible.includes(f as GridField)) as GridField[]),
@@ -580,15 +615,16 @@ export default function ShotGrid(p: Props) {
   return (
     <>
       <div className="pd-grid-layout-tools">
-        <Combobox
-          label="Grid preset"
+        <Menu
+          label={preset}
+          ariaLabel="Grid preset"
           value={preset}
-          options={[...Object.keys(presets), 'Custom']}
-          custom={false}
-          clearable={false}
+          items={[...Object.keys(presets), 'Custom'].map((value) => ({
+            value,
+            label: value,
+          }))}
           onChange={applyPreset}
         />
-        <span>Scroll horizontally for more fields ↔</span>
       </div>
       {p.multi.size > 0 && (
         <div className="pd-shot-selection">
@@ -783,9 +819,12 @@ export default function ShotGrid(p: Props) {
             <thead>
               <tr>
                 <th className="pd-pin-grip">
-                  <input
-                    type="checkbox"
+                  <DrawCheckbox
                     aria-label="Select all visible shots"
+                    indeterminate={
+                      rows.some((s) => p.multi.has(str(s, 'id'))) &&
+                      !rows.every((s) => p.multi.has(str(s, 'id')))
+                    }
                     checked={
                       rows.length > 0 &&
                       rows.every((s) => p.multi.has(str(s, 'id')))
@@ -921,8 +960,7 @@ export default function ShotGrid(p: Props) {
                             >
                               ⠿
                             </button>
-                            <input
-                              type="checkbox"
+                            <DrawCheckbox
                               aria-label={`Select shot ${str(record, 'number')}`}
                               checked={p.multi.has(str(record, 'id'))}
                               onChange={(e) => {
@@ -1054,6 +1092,7 @@ export default function ShotGrid(p: Props) {
       </div>
       {p.columnOpen && (
         <ColumnManager
+          defaultPreset={rolePreset}
           preset={preset}
           applyPreset={applyPreset}
           visible={visible}

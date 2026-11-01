@@ -32,6 +32,7 @@ COPY --from=builder /app/server/package.json ./package.json
 COPY --from=builder /app/server/package-lock.json ./package-lock.json
 COPY --from=builder /app/server/node_modules ./node_modules
 COPY --from=builder /app/server/dist ./dist
+COPY server/assets ./assets
 
 RUN printf '%s\n' \
 '#!/bin/sh' \

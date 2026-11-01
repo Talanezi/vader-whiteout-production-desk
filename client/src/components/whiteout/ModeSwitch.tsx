@@ -32,9 +32,9 @@ export default function ModeSwitch({
       <Menu
         label={
           value === 'all'
-            ? 'All Shots'
+            ? 'All Scenes'
             : value === 'scene'
-              ? 'Scene View'
+              ? 'Isolate Scene'
               : value === 'shooting'
                 ? 'Shooting Order'
                 : 'Planning Order'
@@ -43,8 +43,8 @@ export default function ModeSwitch({
         width={204}
         onChange={onChange}
         items={[
-          { value: 'all', label: 'All Shots', icon: 'shots' },
-          { value: 'scene', label: 'Scene View', icon: 'file' },
+          { value: 'all', label: 'All Scenes', icon: 'shots' },
+          { value: 'scene', label: 'Isolate Scene', icon: 'file' },
           {
             value: 'planning',
             label: 'Planning Order',
