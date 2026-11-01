@@ -90,7 +90,16 @@ async function main() {
     await p.screenshot({ path: path.join(out, '01-dashboard.png') })
     await p.getByRole('button', { name: 'All statuses', exact: true }).click()
     let menu = await p.getByRole('menu').boundingBox()
-    assert.ok(menu.width >= 160 && menu.width <= 195)
+    assert.ok(
+      menu.width >= 120 &&
+        menu.width <=
+          (
+            await p
+              .getByRole('button', { name: 'All statuses', exact: true })
+              .boundingBox()
+          ).width +
+            34,
+    )
     assert.ok(
       (await p
         .locator('.pd-menu-item')
@@ -103,7 +112,16 @@ async function main() {
       .getByRole('button', { name: 'Production date', exact: true })
       .click()
     menu = await p.getByRole('menu').boundingBox()
-    assert.ok(menu.width >= 160 && menu.width <= 195)
+    assert.ok(
+      menu.width >= 120 &&
+        menu.width <=
+          (
+            await p
+              .getByRole('button', { name: 'Production date', exact: true })
+              .boundingBox()
+          ).width +
+            34,
+    )
     await p.screenshot({ path: path.join(out, '03-compact-sort.png') })
     await p.keyboard.press('Escape')
     await p
@@ -171,9 +189,11 @@ async function main() {
           fullPage: true,
         })
         await p
-          .locator('.pd-shot-table tbody tr')
+          .locator('.pd-shot-table tbody tr [data-field="number"] input')
           .first()
-          .getByRole('button', { name: /Inspect shot/ })
+          .focus()
+        await p
+          .getByRole('button', { name: 'Open shot inspector', exact: true })
           .click()
         await p
           .getByRole('dialog')

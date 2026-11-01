@@ -18,6 +18,10 @@ import { Overlay } from '../components/whiteout/Overlay'
 import { SearchField } from '../components/whiteout/Workspace'
 import CollaborativeText from '../components/shots/CollaborativeText'
 import ShotImport from '../components/shots/ShotImport'
+import type { PrintView } from '../lib/shotPrint'
+import ShotGrid from '../components/shots/ShotGrid'
+import ShootDays from '../components/shots/ShootDays'
+import ShotPdf from '../components/shots/ShotPdf'
 import {
   addScene,
   addShot,
@@ -36,20 +40,6 @@ import {
 import { useShotCollaboration } from '../lib/useShotCollaboration'
 import { getAuthToken } from '../lib/api'
 
-const defaultColumns: ShotField[] = [
-  'coverage',
-  'framing',
-  'camera',
-  'lens',
-  'movement',
-  'estimatedMinutes',
-]
-const shortLabels: Partial<Record<ShotField, string>> = {
-  coverage: 'Action / coverage',
-  estimatedMinutes: 'Est. min',
-  number: 'Shot',
-  equipment: 'Support',
-}
 export default function ShotListPage() {
   const { id = '' } = useParams(),
     [query, setQuery] = useSearchParams()
@@ -63,8 +53,14 @@ export default function ShotListPage() {
     [inspector, setInspector] = useState(false),
     [mobileScenes, setMobileScenes] = useState(false)
   const [width, setWidth] = useState(304),
-    [columns, setColumns] = useState<ShotField[]>(defaultColumns),
     [columnOpen, setColumnOpen] = useState(false)
+  const [railCollapsed, setRailCollapsed] = useState(false),
+    [focused, setFocused] = useState(false),
+    [dayOpen, setDayOpen] = useState(false),
+    [pdfOpen, setPdfOpen] = useState(false)
+  const printView = useRef<PrintView | undefined>(undefined),
+    previousLayout = useRef({ rail: false, inspector: false })
+  const [printContext, setPrintContext] = useState<PrintView>()
   const [importBusy, setImportBusy] = useState(false)
   const [importing, setImporting] = useState(false),
     [sceneDialog, setSceneDialog] = useState<'new' | RecordMap | null>(null)
@@ -594,6 +590,15 @@ export default function ShotListPage() {
             <Icon name={copied ? 'check' : 'share'} />
             <span>{copied ? 'Copied' : 'Copy link'}</span>
           </button>
+          <Button
+            icon="download"
+            onClick={() => {
+              setPrintContext(printView.current)
+              setPdfOpen(true)
+            }}
+          >
+            Download
+          </Button>
         </div>
       </header>
       {c.error && <ErrorNotice>{c.error}</ErrorNotice>}
@@ -640,8 +645,39 @@ export default function ShotListPage() {
                   onClick={() => c.undo.redo()}
                 />
               </div>
+              <Button onClick={() => setDayOpen(true)}>Shoot days</Button>
+              {mode !== 'shooting' && (
+                <Button
+                  aria-pressed={railCollapsed}
+                  onClick={() => setRailCollapsed((v) => !v)}
+                >
+                  {railCollapsed ? 'Show scenes' : 'Hide scenes'}
+                </Button>
+              )}
+              <Button
+                aria-pressed={focused}
+                onClick={() => {
+                  if (!focused) {
+                    previousLayout.current = { rail: railCollapsed, inspector }
+                    setRailCollapsed(true)
+                    setInspector(false)
+                  } else {
+                    setRailCollapsed(previousLayout.current.rail)
+                    setInspector(previousLayout.current.inspector)
+                  }
+                  setFocused(!focused)
+                }}
+              >
+                {focused ? 'Restore layout' : 'Focus'}
+              </Button>
               <IconButton
                 name="columns"
+                disabled={mode === 'shooting'}
+                title={
+                  mode === 'shooting'
+                    ? 'Choose editing columns in a creative view'
+                    : 'Choose columns'
+                }
                 label="Choose columns"
                 onClick={() => setColumnOpen(true)}
               />
@@ -655,6 +691,10 @@ export default function ShotListPage() {
                     openScene('new')
                     return
                   }
+                  if (mode === 'shooting') {
+                    setMode('scene')
+                    setQuery({ scene: selectedScene }, { replace: true })
+                  }
                   const sid = addShot(c.doc, selectedScene, c.session!.user.id)
                   setSelected(sid)
                   focusNewShot(sid)
@@ -666,9 +706,9 @@ export default function ShotListPage() {
             </div>
           </div>
           <div
-            className={`pd-shot-layout ${inspector && current ? 'with-inspector' : ''}`}
+            className={`pd-shot-layout ${inspector && current ? 'with-inspector' : ''} ${railCollapsed || mode === 'shooting' ? 'without-scenes' : ''}`}
           >
-            {sceneRail}
+            {!railCollapsed && mode !== 'shooting' && sceneRail}
             <section className="pd-shot-center" aria-label="Shot table">
               <div className="pd-shot-context">
                 <span>
@@ -697,252 +737,130 @@ export default function ShotListPage() {
                   />
                 </div>
               </div>
-              {multi.size > 0 && (
-                <div className="pd-shot-selection">
-                  <span>{multi.size} selected</span>
-                  <Button
-                    icon="copy"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(
-                          allShots
-                            .filter((s) => multi.has(str(s, 'id')))
-                            .map((s) =>
-                              ['number', ...columns]
-                                .map((f) => str(s, f).replace(/\n/g, ' '))
-                                .join('\t'),
-                            )
-                            .join('\n'),
-                        )
-                        notify('Selected shots copied.')
-                      } catch {
-                        notify('Clipboard unavailable.', { state: 'error' })
-                      }
-                    }}
-                  >
-                    Copy selected
-                  </Button>
-                  <Button onClick={() => setMulti(new Set())}>Clear</Button>
-                </div>
-              )}
-              <div className="pd-shot-table-scroll">
-                <table
-                  ref={grid}
-                  className="pd-shot-table"
-                  onKeyDown={(e) => {
-                    if (
-                      (e.altKey && e.key.startsWith('Arrow')) ||
-                      (e.key === 'Enter' &&
-                        (e.target as HTMLElement).tagName === 'INPUT')
-                    ) {
-                      const inputs = [
-                          ...grid.current!.querySelectorAll<HTMLElement>(
-                            'input:not([type="checkbox"]),.pd-combo-trigger,.cm-content',
-                          ),
-                        ],
-                        index = inputs.indexOf(e.target as HTMLElement)
-                      if (index >= 0) {
-                        e.preventDefault()
-                        const step =
-                          e.key === 'ArrowLeft'
-                            ? -1
-                            : e.key === 'ArrowRight'
-                              ? 1
-                              : (e.key === 'ArrowUp' || e.shiftKey ? -1 : 1) *
-                                (columns.length + 1)
-                        inputs[
-                          Math.max(0, Math.min(inputs.length - 1, index + step))
-                        ]?.focus()
-                      }
+              {mode === 'shooting' ? (
+                <ShootDays
+                  onPrintView={(view) => {
+                    printView.current = view
+                  }}
+                  onSelect={(id) => {
+                    setSelected(id)
+                    setInspector(true)
+                  }}
+                  doc={c.doc}
+                  selected={
+                    multi.size ? [...multi] : selected ? [selected] : []
+                  }
+                  onError={(message) => notify(message, { state: 'error' })}
+                />
+              ) : (
+                <ShotGrid
+                  undo={c.undo}
+                  onPrintView={(view) => {
+                    printView.current = {
+                      ...view,
+                      label:
+                        mode === 'scene'
+                          ? `Scene ${str(scenes(c.doc).get(selectedScene), 'number')}`
+                          : mode === 'planning'
+                            ? 'Planning Order'
+                            : 'All scenes',
                     }
                   }}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData('text/plain')
-                    if (!text.includes('\t')) return
-                    const node = (e.target as HTMLElement).closest<HTMLElement>(
-                        '[data-field]',
-                      ),
-                      rowIndex = visible.findIndex(
-                        (s) => str(s, 'id') === node?.dataset.shotId,
-                      ),
-                      keys: ShotField[] = ['number', ...columns],
-                      col = keys.indexOf(node?.dataset.field as ShotField)
-                    if (rowIndex < 0 || col < 0) return
-                    e.preventDefault()
-                    c.undo.stopCapturing()
-                    c.doc.transact(() => {
-                      text
-                        .replace(/\r/g, '')
-                        .replace(/\n$/, '')
-                        .split('\n')
-                        .forEach((line, i) => {
-                          const s = visible[rowIndex + i]
-                          if (s)
-                            line.split('\t').forEach((value, j) => {
-                              const field = keys[col + j]
-                              if (field) edit(s, field, value)
-                            })
-                        })
-                    }, 'local')
-                    notify('Cells pasted.')
-                  }}
-                >
-                  <thead>
-                    <tr>
-                      <th className="pd-shot-select">
-                        <input
-                          type="checkbox"
-                          aria-label="Select all visible shots"
-                          checked={
-                            visible.length > 0 &&
-                            visible.every((s) => multi.has(str(s, 'id')))
-                          }
-                          onChange={(e) =>
-                            setMulti(
-                              new Set(
-                                e.target.checked
-                                  ? visible.map((s) => str(s, 'id'))
-                                  : [],
+                  doc={c.doc}
+                  rows={visible}
+                  cell={cell}
+                  selected={selected}
+                  onSelect={setSelected}
+                  multi={multi}
+                  onMulti={setMulti}
+                  planning={mode === 'planning'}
+                  filtered={Boolean(search.trim())}
+                  columnOpen={columnOpen}
+                  onCloseColumns={() => setColumnOpen(false)}
+                  tableRef={grid}
+                  onError={(message) => notify(message, { state: 'error' })}
+                  user={c.session!.user.id}
+                  onAssign={() => setDayOpen(true)}
+                  actions={(s, index) => (
+                    <div>
+                      <IconButton
+                        name="expand"
+                        label={`Inspect shot ${str(s, 'number')}`}
+                        onClick={() => {
+                          setSelected(str(s, 'id'))
+                          setInspector(true)
+                        }}
+                      />
+                      <Menu
+                        compact
+                        icon="more"
+                        label={`Actions for shot ${str(s, 'number')}`}
+                        items={[
+                          {
+                            value: 'duplicate',
+                            label: 'Duplicate shot',
+                            icon: 'copy',
+                            onSelect: () => {
+                              const sid = addShot(
+                                c.doc,
+                                str(s, 'sceneId'),
+                                c.session!.user.id,
+                                s,
+                              )
+                              setSelected(sid)
+                              focusNewShot(sid)
+                              notify('Shot duplicated.')
+                            },
+                          },
+                          {
+                            value: 'up',
+                            label: 'Move earlier',
+                            icon: 'up',
+                            disabled:
+                              !!search.trim() ||
+                              index === 0 ||
+                              (mode !== 'planning' &&
+                                str(visible[index - 1], 'sceneId') !==
+                                  str(s, 'sceneId')),
+                            onSelect: () =>
+                              reorder(
+                                c.doc,
+                                visible,
+                                index,
+                                -1,
+                                mode === 'planning',
                               ),
-                            )
-                          }
-                        />
-                      </th>
-                      <th className="pd-shot-number">Shot</th>
-                      {columns.map((f) => (
-                        <th className={`pd-col-${f}`} key={f}>
-                          {shortLabels[f] || fields[f]}
-                        </th>
-                      ))}
-                      <th className="pd-shot-actions">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((s, index) => (
-                      <tr
-                        key={str(s, 'id')}
-                        data-shot={str(s, 'id')}
-                        className={`${selected === str(s, 'id') ? 'is-selected' : ''} ${multi.has(str(s, 'id')) ? 'is-checked' : ''}`}
-                        onClick={() => setSelected(str(s, 'id'))}
-                      >
-                        <td className="pd-shot-select">
-                          <input
-                            type="checkbox"
-                            aria-label={`Select shot ${str(s, 'number') || 'unnumbered'}`}
-                            checked={multi.has(str(s, 'id'))}
-                            onChange={(e) =>
-                              setMulti((old) => {
-                                const next = new Set(old)
-                                e.target.checked
-                                  ? next.add(str(s, 'id'))
-                                  : next.delete(str(s, 'id'))
-                                return next
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="pd-shot-number">
-                          <small>
-                            {str(
-                              allScenes.find(
-                                (scene) =>
-                                  str(scene, 'id') === str(s, 'sceneId'),
+                          },
+                          {
+                            value: 'down',
+                            label: 'Move later',
+                            icon: 'down',
+                            disabled:
+                              !!search.trim() ||
+                              index === visible.length - 1 ||
+                              (mode !== 'planning' &&
+                                str(visible[index + 1], 'sceneId') !==
+                                  str(s, 'sceneId')),
+                            onSelect: () =>
+                              reorder(
+                                c.doc,
+                                visible,
+                                index,
+                                1,
+                                mode === 'planning',
                               ),
-                              'number',
-                            )}
-                          </small>
-                          {cell(s, 'number')}
-                        </td>
-                        {columns.map((f) => (
-                          <td
-                            key={f}
-                            className={`pd-col-${f}`}
-                            data-label={shortLabels[f] || fields[f]}
-                          >
-                            {cell(s, f)}
-                          </td>
-                        ))}
-                        <td className="pd-shot-actions">
-                          <div>
-                            <IconButton
-                              name="expand"
-                              label={`Inspect shot ${str(s, 'number') || 'unnumbered'}`}
-                              onClick={() => {
-                                setSelected(str(s, 'id'))
-                                setInspector(true)
-                              }}
-                            />
-                            <Menu
-                              label={`Actions for shot ${str(s, 'number') || 'unnumbered'}`}
-                              compact
-                              icon="more"
-                              items={[
-                                {
-                                  value: 'duplicate',
-                                  label: 'Duplicate shot',
-                                  icon: 'copy',
-                                  onSelect: () => {
-                                    const sid = addShot(
-                                      c.doc,
-                                      str(s, 'sceneId'),
-                                      c.session!.user.id,
-                                      s,
-                                    )
-                                    setSelected(sid)
-                                    focusNewShot(sid)
-                                    notify('Shot duplicated.')
-                                  },
-                                },
-                                {
-                                  value: 'up',
-                                  label: 'Move earlier',
-                                  icon: 'up',
-                                  disabled:
-                                    (mode !== 'planning' &&
-                                      index > 0 &&
-                                      str(visible[index - 1], 'sceneId') !==
-                                        str(s, 'sceneId')) ||
-                                    index === 0,
-                                  onSelect: () =>
-                                    reorder(
-                                      c.doc,
-                                      visible,
-                                      index,
-                                      -1,
-                                      mode === 'planning',
-                                    ),
-                                },
-                                {
-                                  value: 'down',
-                                  label: 'Move later',
-                                  icon: 'down',
-                                  disabled:
-                                    (mode !== 'planning' &&
-                                      index < visible.length - 1 &&
-                                      str(visible[index + 1], 'sceneId') !==
-                                        str(s, 'sceneId')) ||
-                                    index === visible.length - 1,
-                                  onSelect: () =>
-                                    reorder(
-                                      c.doc,
-                                      visible,
-                                      index,
-                                      1,
-                                      mode === 'planning',
-                                    ),
-                                },
-                              ]}
-                            />
-                            <InlineDelete
-                              label={`shot ${str(s, 'number') || 'unnumbered'}`}
-                              onConfirm={() => remove(s)}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          },
+                        ]}
+                      />
+                      <InlineDelete
+                        label={`shot ${str(s, 'number') || 'unnumbered'}`}
+                        onConfirm={() => remove(s)}
+                      />
+                    </div>
+                  )}
+                />
+              )}
+              <div>
                 {!visible.length && (
                   <div className="pd-shot-empty">
                     <Icon name="shots" />
@@ -965,7 +883,7 @@ export default function ShotListPage() {
                 <span>
                   {allScenes.length} scenes · {allShots.length} shots
                 </span>
-                <span>Alt + arrows to move between cells</span>
+                <span>Arrows · Enter to edit · Shift to select</span>
                 <span>
                   {visible
                     .reduce(
@@ -1076,28 +994,35 @@ export default function ShotListPage() {
           </form>
         </Overlay>
       )}
-      {columnOpen && (
-        <Overlay title="Table columns" onClose={() => setColumnOpen(false)}>
-          <div className="pd-column-choices">
-            {(Object.keys(fields) as ShotField[])
-              .filter((f) => f !== 'number')
-              .map((f) => (
-                <label key={f}>
-                  <input
-                    type="checkbox"
-                    checked={columns.includes(f)}
-                    onChange={(e) =>
-                      setColumns((old) =>
-                        e.target.checked
-                          ? [...old, f]
-                          : old.filter((x) => x !== f),
-                      )
-                    }
-                  />
-                  {fields[f]}
-                </label>
-              ))}
-          </div>
+      {pdfOpen && (
+        <ShotPdf
+          id={id}
+          doc={c.doc}
+          view={printContext}
+          selected={[...multi]}
+          entire={(mode === 'planning'
+            ? allShots
+            : allScenes.flatMap((scene) =>
+                allShots.filter(
+                  (shot) => str(shot, 'sceneId') === str(scene, 'id'),
+                ),
+              )
+          ).map((shot) => ({ shotId: str(shot, 'id') }))}
+          saved={c.saved && c.connected}
+          onClose={() => setPdfOpen(false)}
+        />
+      )}
+      {dayOpen && (
+        <Overlay
+          title="Shooting days"
+          onClose={() => setDayOpen(false)}
+          className="pd-days-dialog"
+        >
+          <ShootDays
+            doc={c.doc}
+            selected={multi.size ? [...multi] : selected ? [selected] : []}
+            onError={(message) => notify(message, { state: 'error' })}
+          />
         </Overlay>
       )}
       {importing && (

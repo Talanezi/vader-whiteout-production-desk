@@ -1,5 +1,17 @@
 import * as Y from 'yjs'
 
+export const operationMeta = 'whiteout-shot-operation'
+export function shotOperation(
+  doc: Y.Doc,
+  action: (transaction: Y.Transaction) => void,
+  origin: unknown = 'local',
+) {
+  doc.transact((transaction) => {
+    transaction.meta.set(operationMeta, true)
+    action(transaction)
+  }, origin)
+}
+
 export type RecordMap = Y.Map<unknown>
 export const narrativeFields = [
   'coverage',
@@ -128,20 +140,44 @@ export function change(
 export function addScene(doc: Y.Doc, number: string, title = '') {
   const id = crypto.randomUUID(),
     map = new Y.Map<unknown>()
-  doc.transact(() => {
-    scenes(doc).set(id, map)
-    map.set('id', id)
-    map.set('number', number)
-    map.set('title', title)
-    map.set(
-      'order',
-      Math.max(
-        0,
-        ...ordered(scenes(doc)).map((s) => Number(s.get('order')) || 0),
-      ) + 1024,
-    )
-  }, 'local')
+  shotOperation(
+    doc,
+    () => {
+      scenes(doc).set(id, map)
+      map.set('id', id)
+      map.set('number', number)
+      map.set('title', title)
+      map.set(
+        'order',
+        Math.max(
+          0,
+          ...ordered(scenes(doc)).map((s) => Number(s.get('order')) || 0),
+        ) + 1024,
+      )
+    },
+    'local',
+  )
   return id
+}
+export function nextShotNumber(doc: Y.Doc, sceneId: string) {
+  const scene = str(scenes(doc).get(sceneId), 'number'),
+    used = new Set(
+      [...shots(doc).values()]
+        .filter((s) => str(s, 'sceneId') === sceneId)
+        .map((s) => str(s, 'number')),
+    )
+  for (let i = 0; i < 100000; i++) {
+    let n = i + 1,
+      label = ''
+    while (n) {
+      n--
+      label = String.fromCharCode(65 + (n % 26)) + label
+      n = Math.floor(n / 26)
+    }
+    const number = scene + '-' + label
+    if (!used.has(number)) return number
+  }
+  throw Error('Too many shot identifiers.')
 }
 export function addShot(
   doc: Y.Doc,
@@ -161,20 +197,26 @@ export function addShot(
     ) + 1024
   const plan =
     Math.max(0, ...all.map((s) => Number(s.get('planningOrder')) || 0)) + 1024
-  doc.transact(() => {
-    shots(doc).set(id, map)
-    for (const key of Object.keys(fields)) {
-      const value = from ? str(from, key) : key === 'camera' ? 'CAM A' : ''
-      map.set(key, narrativeFields.includes(key) ? new Y.Text(value) : value)
-    }
-    map.set('id', id)
-    map.set('sceneId', sceneId)
-    map.set('order', order)
-    map.set('planningOrder', plan)
-    map.set('createdAt', new Date().toISOString())
-    map.set('createdBy', user)
-    map.set('deleted', false)
-  }, 'local')
+  shotOperation(
+    doc,
+    () => {
+      shots(doc).set(id, map)
+      for (const key of Object.keys(fields)) {
+        const value = from ? str(from, key) : key === 'camera' ? 'CAM A' : ''
+        map.set(key, narrativeFields.includes(key) ? new Y.Text(value) : value)
+      }
+      map.set('number', nextShotNumber(doc, sceneId))
+      if (from?.get('source')) map.set('source', str(from, 'source'))
+      map.set('id', id)
+      map.set('sceneId', sceneId)
+      map.set('order', order)
+      map.set('planningOrder', plan)
+      map.set('createdAt', new Date().toISOString())
+      map.set('createdBy', user)
+      map.set('deleted', false)
+    },
+    'local',
+  )
   return id
 }
 export function reorder(
@@ -198,5 +240,9 @@ export function reorder(
       ? Number(after.get(key)) - 2048
       : 0
   const high = after ? Number(after.get(key)) : low + 2048
-  change(doc, list[index], key, (low + high) / 2)
+  shotOperation(
+    doc,
+    () => change(doc, list[index], key, (low + high) / 2),
+    'local',
+  )
 }

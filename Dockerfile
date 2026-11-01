@@ -16,6 +16,8 @@ FROM node:22-bookworm-slim AS runner
 WORKDIR /app/server
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-xetex \
+    fonts-dejavu \
     texlive-latex-base \
     texlive-latex-recommended \
     texlive-latex-extra \

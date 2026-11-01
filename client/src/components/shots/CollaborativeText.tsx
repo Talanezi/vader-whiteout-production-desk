@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
@@ -20,11 +20,13 @@ export default function CollaborativeText({
   onFocus?: () => void
   compact?: boolean
 }) {
+  const [editing, setEditing] = useState(!compact)
   const editor = useRef<EditorView | null>(null)
   const host = useRef<HTMLDivElement>(null),
     focus = useRef(onFocus)
   focus.current = onFocus
   useEffect(() => {
+    if (compact && !editing) return
     undo.addToScope(text)
     const view = new EditorView({
       parent: host.current!,
@@ -68,11 +70,15 @@ export default function CollaborativeText({
       }),
     })
     editor.current = view
+    if (compact && editing) {
+      view.focus()
+      view.dispatch({ selection: { anchor: view.state.doc.length } })
+    }
     return () => {
       editor.current = null
       view.destroy()
     }
-  }, [text, provider, undo])
+  }, [text, provider, undo, editing, compact])
   useEffect(() => {
     editor.current?.contentDOM.setAttribute('aria-label', label)
   }, [label])
@@ -80,6 +86,22 @@ export default function CollaborativeText({
     <div
       ref={host}
       className={`pd-collab-text ${compact ? 'is-compact' : ''}`}
-    />
+      onBlur={(event) => {
+        if (compact && !event.currentTarget.contains(event.relatedTarget))
+          setEditing(false)
+      }}
+    >
+      {compact && !editing && (
+        <button
+          type="button"
+          className="pd-text-preview"
+          aria-label={label}
+          onFocus={() => setEditing(true)}
+          onClick={() => setEditing(true)}
+        >
+          {text.toString() || '—'}
+        </button>
+      )}
+    </div>
   )
 }

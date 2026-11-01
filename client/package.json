@@ -9,16 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.6",
+    "@dnd-kit/dom": "0.5.3",
+    "@dnd-kit/react": "0.5.3",
+    "@hocuspocus/provider": "2.15.3",
+    "@tanstack/react-table": "8.21.3",
+    "@tanstack/react-virtual": "3.14.24",
+    "metal-fx": "2.0.11",
+    "pdfjs-dist": "6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.30.3",
-    "yjs": "13.6.27",
-    "@hocuspocus/provider": "2.15.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "y-codemirror.next": "0.3.6",
-    "@codemirror/state": "6.5.2",
-    "@codemirror/view": "6.38.6",
-    "metal-fx": "2.0.11",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "yjs": "13.6.27"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

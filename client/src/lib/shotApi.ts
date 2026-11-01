@@ -3,7 +3,8 @@ export const shotApiBase =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(
     /\/$/,
     '',
-  ) || (import.meta.env.DEV
+  ) ||
+  (import.meta.env.DEV
     ? 'http://localhost:3001/api'
     : 'https://vader-whiteout-production-desk-production.up.railway.app/api')
 export async function shotRequest<T>(
@@ -25,7 +26,15 @@ export async function shotRequest<T>(
   }
   return response.json()
 }
-export type ShotListMetadata = { id: string; name: string; updatedAt?: string }
+export type ShotListMetadata = {
+  id: string
+  name: string
+  updatedAt?: string
+  sceneCount?: number
+  shotCount?: number
+  scheduledShotCount?: number
+  dates?: string[]
+}
 export type ShotSession = ShotListMetadata & {
   user: { id: number; name: string; color: string }
 }

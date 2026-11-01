@@ -10,6 +10,7 @@ import {
 } from '../components/whiteout/Feedback'
 import { Button } from '../components/whiteout/Button'
 import { Overlay } from '../components/whiteout/Overlay'
+import DatePicker from '../components/whiteout/DatePicker'
 import Icon from '../components/whiteout/Icon'
 import { getAuthToken } from '../lib/api'
 import { shotRequest, type ShotListMetadata } from '../lib/shotApi'
@@ -24,6 +25,8 @@ export default function ShotListsPage() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [attempt, setAttempt] = useState(0)
+  const [firstDate, setFirstDate] = useState(''),
+    [dateValid, setDateValid] = useState(true)
   const [name, setName] = useState(''),
     [pending, setPending] = useState(false)
   useEffect(() => {
@@ -49,12 +52,12 @@ export default function ShotListsPage() {
   }, [token, attempt])
   if (!token || error === 'UNAUTHORIZED') return <SessionState />
   async function create() {
-    if (!name.trim()) return
+    if (!name.trim() || !dateValid) return
     setPending(true)
     setError('')
     try {
       const list = await notify.promise(
-        shotRequest<ShotListMetadata>('', { name: name.trim() }),
+        shotRequest<ShotListMetadata>('', { name: name.trim(), firstDate }),
         {
           pending: 'Creating shot list…',
           success: 'Shot list created.',
@@ -78,17 +81,18 @@ export default function ShotListsPage() {
         <div className="pd-shot-list-index">
           {items.map((item) => (
             <Link to={`/shotlists/${item.id}`} key={item.id}>
-              <span className="pd-list-figure">
-                <Icon name="shots" />
-              </span>
-              <strong>{item.name}</strong>
+              <strong>
+                {item.name}
+                <small>
+                  {item.sceneCount ?? 0} scenes · {item.shotCount ?? 0} shots
+                </small>
+              </strong>
               <span>
-                {item.updatedAt
-                  ? new Date(item.updatedAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })
-                  : ''}
+                {item.dates?.length
+                  ? item.dates.length === 1
+                    ? item.dates[0]
+                    : `${item.dates[0]} – ${item.dates[item.dates.length - 1]}`
+                  : 'Not scheduled'}
               </span>
               <Icon name="arrow" />
             </Link>
@@ -125,7 +129,7 @@ export default function ShotListsPage() {
               <Button
                 variant="primary"
                 icon="plus"
-                disabled={!name.trim()}
+                disabled={!name.trim() || !dateValid}
                 state={pending ? 'pending' : 'idle'}
                 pendingLabel="Creating…"
                 onClick={create}
@@ -153,6 +157,12 @@ export default function ShotListsPage() {
                 required
               />
             </label>
+            <DatePicker
+              label="First planned shooting date (optional)"
+              value={firstDate}
+              onValidityChange={setDateValid}
+              onChange={setFirstDate}
+            />
           </form>
         </Overlay>
       )}

@@ -16,10 +16,14 @@ export default function DatePicker({
   label,
   value,
   onChange,
+  onValidityChange,
+  required = false,
 }: {
   label: string
   value: string
   onChange: (s: string) => void
+  onValidityChange?: (valid: boolean) => void
+  required?: boolean
 }) {
   const pop = usePopover(292),
     initial = parseDateOnly(value) || new Date()
@@ -49,6 +53,7 @@ export default function DatePicker({
     return date
   })
   const pick = (date: Date) => {
+    onValidityChange?.(true)
     onChange(iso(date))
     setError('')
     pop.close()
@@ -86,19 +91,33 @@ export default function DatePicker({
           inputMode="numeric"
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${pop.id}-error` : undefined}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            onValidityChange?.(
+              Boolean(
+                parseDateOnly(e.target.value) || (!required && !e.target.value),
+              ),
+            )
+          }}
           onBlur={() => {
-            if (!draft || parseDateOnly(draft)) {
+            if ((!required && !draft) || parseDateOnly(draft)) {
               onChange(draft)
+              onValidityChange?.(true)
               setError('')
-            } else setError('Enter a valid date as YYYY-MM-DD.')
+            } else {
+              onValidityChange?.(false)
+              setError('Enter a valid date as YYYY-MM-DD.')
+            }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               if (parseDateOnly(draft)) {
                 onChange(draft)
                 setError('')
-              } else setError('Enter a valid date as YYYY-MM-DD.')
+              } else {
+                onValidityChange?.(false)
+                setError('Enter a valid date as YYYY-MM-DD.')
+              }
             }
           }}
         />
@@ -223,15 +242,18 @@ export default function DatePicker({
               <button type="button" onClick={() => pick(new Date())}>
                 Today
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('')
-                  pop.close()
-                }}
-              >
-                Clear
-              </button>
+              {!required && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onValidityChange?.(true)
+                    onChange('')
+                    pop.close()
+                  }}
+                >
+                  Clear
+                </button>
+              )}
             </footer>
           </div>,
           pop.target,

@@ -9,6 +9,14 @@ import { randomUUID, createHash } from 'crypto';
 import { Server, Hocuspocus } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { AuthService } from '../auth/auth.service';
+import {
+  snapshot,
+  metadata,
+  buildShotLatex,
+  type PrintOptions,
+} from './pdf/shotlist-report';
+import { buildTablePrint, type TablePrintSpec } from './pdf/table-print';
+import { compileShotlist } from './pdf/compile-shotlist';
 import type { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
 
@@ -83,21 +91,52 @@ export class ShotlistsService implements OnModuleDestroy {
   }
   async list(user: Collaborator) {
     this.approved(user);
+    const rows = await this.db.query(
+      `SELECT d.id,d.name,d.state,d.created_at AS "createdAt",d.updated_at AS "updatedAt" FROM shot_list_documents d ORDER BY d.updated_at DESC`,
+    );
     return {
-      items: await this.db.query(
-        `SELECT d.id,d.name,d.created_at AS "createdAt",d.updated_at AS "updatedAt"
-      FROM shot_list_documents d ORDER BY d.updated_at DESC`,
+      items: rows.map(
+        ({ state, ...row }: { state: Buffer; [key: string]: unknown }) => {
+          const doc = new Y.Doc();
+          try {
+            Y.applyUpdate(doc, state);
+            return { ...row, ...metadata(snapshot(doc)) };
+          } finally {
+            doc.destroy();
+          }
+        },
       ),
     };
   }
-  async create(user: Collaborator, name: unknown) {
+  async create(user: Collaborator, name: unknown, firstDate?: unknown) {
     this.approved(user);
     if (typeof name !== 'string' || !name.trim() || name.length > 180)
       throw new BadRequestException('Enter a name of up to 180 characters.');
+    if (
+      firstDate !== undefined &&
+      firstDate !== '' &&
+      (typeof firstDate !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) ||
+        !Number.isFinite(Date.parse(firstDate + 'T12:00:00Z')) ||
+        new Date(firstDate + 'T12:00:00Z').toISOString().slice(0, 10) !==
+          firstDate)
+    )
+      throw new BadRequestException('Choose a valid calendar date.');
     const id = randomUUID(),
       doc = new Y.Doc();
     doc.getMap('meta').set('name', name.trim());
-    doc.getMap('meta').set('schemaVersion', 1);
+    doc.getMap('meta').set('schemaVersion', 2);
+    if (firstDate) {
+      const dayId = randomUUID(),
+        day = new Y.Map();
+      doc.getMap('shootDays').set(dayId, day);
+      Object.entries({
+        id: dayId,
+        date: firstDate,
+        title: '',
+        order: 1024,
+      }).forEach(([k, v]) => day.set(k, v));
+    }
     await this.db.transaction(async (manager) => {
       await manager.query(
         'INSERT INTO shot_list_documents(id,name,owner_user_id,state) VALUES($1,$2,$3,$4)',
@@ -292,9 +331,38 @@ export class ShotlistsService implements OnModuleDestroy {
         meta: doc.getMap('meta').toJSON(),
         scenes: doc.getMap('scenes').toJSON(),
         shots: doc.getMap('shots').toJSON(),
+        shootDays: doc.getMap('shootDays').toJSON(),
+        shootAssignments: doc.getMap('shootAssignments').toJSON(),
       };
     } finally {
       await connection.disconnect();
+    }
+  }
+  async pdf(
+    id: string,
+    user: Collaborator,
+    options: PrintOptions | TablePrintSpec,
+  ) {
+    await this.authorize(id, user);
+    await this.saveQueues.get(id);
+    const [row] = await this.db.query(
+      'SELECT state FROM shot_list_documents WHERE id=$1',
+      [id],
+    );
+    const doc = new Y.Doc();
+    try {
+      Y.applyUpdate(doc, row.state);
+      return await compileShotlist(
+        'version' in options
+          ? buildTablePrint(snapshot(doc), options as TablePrintSpec).source
+          : buildShotLatex(snapshot(doc), options as PrintOptions),
+      );
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'PDF generation failed.',
+      );
+    } finally {
+      doc.destroy();
     }
   }
   // Import is a single CRDT transaction on the same authoritative document.
@@ -302,7 +370,7 @@ export class ShotlistsService implements OnModuleDestroy {
   async import(
     id: string,
     user: Collaborator,
-    payload: { batchId?: string; scenes?: unknown[] },
+    payload: { batchId?: string; scenes?: unknown[]; schedule?: unknown },
   ) {
     await this.authorize(id, user);
     if (
@@ -369,6 +437,53 @@ export class ShotlistsService implements OnModuleDestroy {
             throw new BadRequestException('Invalid imported field.');
       }
     }
+    const schedule = (payload.schedule || []) as Array<{
+      date: string;
+      title: string;
+      rows: {
+        number: string;
+        sceneNumber?: string;
+        notes?: string;
+        estimatedMinutes?: string;
+      }[];
+    }>;
+    if (!Array.isArray(schedule) || schedule.length > 100)
+      throw new BadRequestException('Invalid schedule references.');
+    let assignmentCount = 0;
+    for (const day of schedule) {
+      if (
+        !day ||
+        typeof day.date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(day.date) ||
+        !Number.isFinite(Date.parse(day.date + 'T12:00:00Z')) ||
+        new Date(day.date + 'T12:00:00Z').toISOString().slice(0, 10) !==
+          day.date ||
+        typeof day.title !== 'string' ||
+        day.title.length > 180 ||
+        !Array.isArray(day.rows)
+      )
+        throw new BadRequestException('Review schedule dates and labels.');
+      for (const row of day.rows)
+        if (
+          !row ||
+          ++assignmentCount > 5000 ||
+          typeof row.number !== 'string' ||
+          !row.number.trim() ||
+          row.number.length > 20000 ||
+          (row.sceneNumber !== undefined &&
+            (typeof row.sceneNumber !== 'string' ||
+              row.sceneNumber.length > 80)) ||
+          (row.notes !== undefined &&
+            (typeof row.notes !== 'string' || row.notes.length > 20000)) ||
+          (row.estimatedMinutes !== undefined &&
+            (typeof row.estimatedMinutes !== 'string' ||
+              row.estimatedMinutes.length > 100 ||
+              (row.estimatedMinutes !== '' &&
+                (!Number.isFinite(Number(row.estimatedMinutes)) ||
+                  Number(row.estimatedMinutes) < 0))))
+        )
+          throw new BadRequestException('Invalid schedule reference.');
+    }
     const connection = await this.collab!.openDirectConnection(id, { user });
     let result: unknown;
     try {
@@ -381,8 +496,54 @@ export class ShotlistsService implements OnModuleDestroy {
           }
           const allScenes = doc.getMap<Y.Map<unknown>>('scenes'),
             shots = doc.getMap<Y.Map<unknown>>('shots');
-          let sceneOrder = allScenes.size,
-            planning = shots.size;
+          const existing = [...shots.values()]
+            .filter(
+              (shot) =>
+                !shot.get('deleted') &&
+                allScenes.has(String(shot.get('sceneId'))) &&
+                !allScenes.get(String(shot.get('sceneId')))?.get('deleted'),
+            )
+            .map((shot) => ({
+              number: String(shot.get('number')),
+              sceneNumber: String(
+                allScenes.get(String(shot.get('sceneId')))?.get('number'),
+              ),
+              id: String(shot.get('id')),
+            }));
+          const candidates = [
+            ...existing,
+            ...scenes.flatMap((scene) =>
+              scene.shots.map((shot) => ({
+                number: shot.number,
+                sceneNumber: scene.number,
+                id: '',
+              })),
+            ),
+          ];
+          for (const day of schedule)
+            for (const row of day.rows) {
+              const matches = candidates.filter(
+                (c) =>
+                  c.number === row.number &&
+                  (!row.sceneNumber || c.sceneNumber === row.sceneNumber),
+              );
+              if (matches.length !== 1)
+                throw new BadRequestException(
+                  `Schedule shot “${row.number}” has ${matches.length} matches. Review its scene and identifier before importing.`,
+                );
+            }
+          let sceneOrder = Math.max(
+              0,
+              ...[...allScenes.values()].map(
+                (s) => Number(s.get('order')) || 0,
+              ),
+            ),
+            planning = Math.max(
+              0,
+              ...[...shots.values()].map(
+                (s) => Number(s.get('planningOrder')) || 0,
+              ),
+            );
           const narrative = new Set([
             'coverage',
             'notes',
@@ -396,7 +557,7 @@ export class ShotlistsService implements OnModuleDestroy {
             scene.set('id', sceneId);
             scene.set('number', source.number);
             scene.set('title', source.title || '');
-            scene.set('order', ++sceneOrder * 1024);
+            scene.set('order', (sceneOrder += 1024));
             let order = 0;
             for (const row of source.shots) {
               const shotId = randomUUID(),
@@ -409,16 +570,57 @@ export class ShotlistsService implements OnModuleDestroy {
               shot.set('id', shotId);
               shot.set('sceneId', sceneId);
               shot.set('order', ++order * 1024);
-              shot.set('planningOrder', ++planning * 1024);
+              shot.set('planningOrder', (planning += 1024));
               shot.set('createdAt', new Date().toISOString());
               shot.set('createdBy', user.userID);
               shot.set('deleted', false);
+              existing.push({
+                id: shotId,
+                number: String(row.number),
+                sceneNumber: source.number,
+              });
             }
+          }
+          for (const source of schedule) {
+            const dayId = randomUUID(),
+              day = new Y.Map();
+            doc.getMap('shootDays').set(dayId, day);
+            Object.entries({
+              id: dayId,
+              date: source.date,
+              title: source.title,
+              order: doc.getMap('shootDays').size * 1024,
+            }).forEach(([k, v]) => day.set(k, v));
+            let order = 0;
+            const used = new Set<string>();
+            for (const row of source.rows) {
+              const shot = existing.find(
+                (c) =>
+                  c.number === row.number &&
+                  (!row.sceneNumber || c.sceneNumber === row.sceneNumber),
+              )!;
+              const assignmentId = randomUUID(),
+                assignment = new Y.Map();
+              doc.getMap('shootAssignments').set(assignmentId, assignment);
+              Object.entries({
+                id: assignmentId,
+                dayId,
+                shotId: shot.id,
+                order: (order += 1024),
+                notes: row.notes || '',
+                estimatedMinutes: row.estimatedMinutes || '',
+                status: 'planned',
+                pickup: used.has(shot.id),
+              }).forEach(([k, v]) => assignment.set(k, v));
+              used.add(shot.id);
+            }
+            doc.getMap('meta').set('schemaVersion', 2);
           }
           result = {
             scenes: scenes.length,
             shots: count,
             rejected: 0,
+            assignments: assignmentCount,
             batchId: payload.batchId,
           };
           batches.set(payload.batchId!, result);

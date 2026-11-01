@@ -16,20 +16,35 @@ export default function Combobox({
 }: {
   label: string
   value: string
-  options: string[]
+  options: (string | { value: string; label: string })[]
   onChange: (s: string) => void
   custom?: boolean
   clearable?: boolean
   labels?: Record<string, string>
   onFocus?: () => void
 }) {
+  const optionValues = options.map((option) =>
+    typeof option === 'string' ? option : option.value,
+  )
+  const displayLabels = {
+    ...labels,
+    ...Object.fromEntries(
+      options
+        .filter((option) => typeof option !== 'string')
+        .map((option) => [option.value, option.label]),
+    ),
+  }
+  const display = (value: string) =>
+    Object.prototype.hasOwnProperty.call(displayLabels, value)
+      ? displayLabels[value]
+      : value
   const pop = usePopover(232),
     input = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState(''),
     [active, setActive] = useState(0)
-  const filtered = [...new Set([...(value ? [value] : []), ...options])].filter(
-    (s) => (labels[s] || s).toLowerCase().includes(query.toLowerCase()),
-  )
+  const filtered = [
+    ...new Set([...(value ? [value] : []), ...optionValues]),
+  ].filter((s) => display(s).toLowerCase().includes(query.toLowerCase()))
   const values =
     custom &&
     query.trim() &&
@@ -76,7 +91,7 @@ export default function Combobox({
           }
         }}
       >
-        <span>{labels[value] || value || '—'}</span>
+        <span>{display(value) || '—'}</span>
         <Icon name="chevron" />
       </button>
       {pop.open &&
@@ -174,9 +189,9 @@ export default function Combobox({
                   onClick={() => select(v)}
                 >
                   <span>
-                    {!options.includes(v) && v !== value
+                    {!optionValues.includes(v) && v !== value
                       ? `Use “${v}”`
-                      : labels[v] || v}
+                      : display(v)}
                   </span>
                   {v === value && <Icon name="check" />}
                 </button>

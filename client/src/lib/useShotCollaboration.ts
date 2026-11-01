@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { getAuthToken } from './api'
 import { shotApiBase, shotRequest, type ShotSession } from './shotApi'
-import { scenes, shots } from './shotDocument'
+import { createShotUndo } from './shotUndo'
 
 export type Peer = {
   clientId: number
@@ -12,14 +12,7 @@ export type Peer = {
 }
 export function useShotCollaboration(id: string) {
   const doc = useMemo(() => new Y.Doc(), [id])
-  const undo = useMemo(
-    () =>
-      new Y.UndoManager([scenes(doc), shots(doc)], {
-        trackedOrigins: new Set(['local']),
-        captureTimeout: 400,
-      }),
-    [doc],
-  )
+  const undo = useMemo(() => createShotUndo(doc), [doc])
   const [session, setSession] = useState<ShotSession>()
   const [provider, setProvider] = useState<HocuspocusProvider>()
   const [connected, setConnected] = useState(false),

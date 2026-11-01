@@ -35,7 +35,9 @@ export default function ModeSwitch({
             ? 'All Shots'
             : value === 'scene'
               ? 'Scene View'
-              : 'Planning Order'
+              : value === 'shooting'
+                ? 'Shooting Order'
+                : 'Planning Order'
         }
         value={value}
         width={204}
@@ -43,7 +45,12 @@ export default function ModeSwitch({
         items={[
           { value: 'all', label: 'All Shots', icon: 'shots' },
           { value: 'scene', label: 'Scene View', icon: 'file' },
-          { value: 'planning', label: 'Planning Order', icon: 'sort' },
+          {
+            value: 'planning',
+            label: 'Planning Order',
+            icon: 'sort',
+          },
+          { value: 'shooting', label: 'Shooting Order', icon: 'calendar' },
         ]}
       />
     </div>

@@ -52,13 +52,11 @@ async function main() {
       .fill('The threshold')
     await p.getByRole('button', { name: 'Save scene' }).click()
     await p.getByRole('button', { name: 'Add shot', exact: true }).click()
-    await p
-      .getByRole('textbox', { name: 'Shot number · unnumbered shot' })
-      .fill('12.B')
+    await p.getByRole('textbox', { name: 'Shot number · 12-A' }).fill('12.B')
     await ready(p)
     const first = p.locator('.pd-shot-table tbody tr').first(),
       id = await first.getAttribute('data-shot')
-    await first.locator('[data-field="number"] input').evaluate((e) => {
+    await first.locator('[data-grid-col="0"]').evaluate((e) => {
       const data = new DataTransfer()
       data.setData(
         'text/plain',
@@ -78,7 +76,7 @@ async function main() {
       'CU',
     )
     assert.match(
-      await first.locator('.cm-content').innerText(),
+      await first.locator('[data-field="coverage"]').innerText(),
       /Hold at the threshold/,
     )
     await first
@@ -132,7 +130,7 @@ async function main() {
       await p
         .getByRole('textbox', { name: 'Shot number · 12.B', exact: true })
         .count(),
-      2,
+      1,
     )
     await p.getByRole('button', { name: 'Copy link', exact: true }).click()
     await p.getByRole('button', { name: 'Copied', exact: true }).waitFor()
@@ -142,10 +140,10 @@ async function main() {
     )
     await p.getByRole('button', { name: 'Choose columns' }).click()
     await p
-      .getByRole('dialog', { name: 'Table columns' })
-      .getByRole('checkbox', { name: 'Camera notes', exact: true })
+      .getByRole('dialog', { name: 'Columns and layout' })
+      .getByRole('checkbox', { name: 'Show Camera notes', exact: true })
       .check()
-    await p.getByRole('button', { name: 'Close Table columns' }).click()
+    await p.getByRole('button', { name: 'Close Columns and layout' }).click()
     await p.getByRole('columnheader', { name: 'Camera notes' }).waitFor()
     results.push({
       name: 'Duplicate, collaborative undo/redo, identity-preserving reorder, selected-scene deep link and column customization',
@@ -167,11 +165,14 @@ async function main() {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       buffer: XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }),
     })
-    await p.getByText('1 worksheets inspected').waitFor()
+    await p.getByRole('button', { name: 'Continue', exact: true }).click()
+    await p.getByText('1 sheets inspected').waitFor()
+    await p.getByRole('button', { name: 'Continue', exact: true }).click()
+    await p.getByRole('button', { name: 'Continue', exact: true }).click()
     await p
       .getByRole('button', { name: 'Import selected', exact: true })
       .click()
-    await p.getByText('1 shot imported into 1 scene. 0 rejected.').waitFor()
+    await p.getByText('1 shots imported into 1 scenes. 0 rejected.').waitFor()
     await ready(p)
     await p.reload()
     await p.locator('.pd-shot-table tbody tr').first().waitFor()

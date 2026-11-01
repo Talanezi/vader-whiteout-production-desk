@@ -122,6 +122,16 @@ async function main() {
   await p.locator('.pd-avatar').filter({ hasText: 'EM' }).waitFor()
   await p.locator('.pd-shot-cell.has-remote').first().waitFor()
   await shot(p, '11-two-collaborators-cell')
+  await p
+    .locator('.pd-shot-table tbody tr')
+    .first()
+    .locator('[data-field="coverage"] .pd-text-preview')
+    .focus()
+  await b.p
+    .locator('.pd-shot-table tbody tr')
+    .first()
+    .locator('[data-field="coverage"] .pd-text-preview')
+    .focus()
   const editor = b.p
     .locator('.pd-shot-table tbody tr')
     .first()
@@ -172,6 +182,11 @@ async function main() {
     .locator('[data-field="number"] input')
     .fill(originalNumber)
   await saved(p)
+  await b.p
+    .locator('.pd-shot-table tbody tr')
+    .first()
+    .locator('[data-field="coverage"] .pd-text-preview')
+    .focus()
   const before = await p
     .locator('.pd-shot-table tbody tr')
     .first()
@@ -213,12 +228,7 @@ async function main() {
   assert.ok(!link.includes(state.tokens['101']))
   const deleteLabel = 'QA-' + require('node:crypto').randomUUID().slice(0, 8)
   await p.getByRole('button', { name: 'Add shot', exact: true }).click()
-  const added = p.locator('.pd-shot-table tbody tr').filter({
-    has: p.getByRole('textbox', {
-      name: 'Shot number · unnumbered shot',
-      exact: true,
-    }),
-  })
+  const added = p.locator('.pd-shot-table tbody tr[data-shot]').last()
   await added.locator('[data-field="number"] input').fill(deleteLabel)
   await saved(p)
   const row = p.locator('.pd-shot-table tbody tr').filter({
@@ -265,10 +275,12 @@ async function main() {
       process.env.M03_WORKBOOK ||
         '/Users/thameralanezi/Downloads/Shot List - Vader_ Whiteout.xlsx',
     )
-  await p.getByText('10 worksheets inspected').waitFor()
+  await p.getByRole('button', { name: 'Continue', exact: true }).click()
+  await p.getByText('10 sheets inspected').waitFor()
+  await p.getByRole('button', { name: 'Continue', exact: true }).click()
   await shot(p, '17-actual-workbook-review')
   assert.equal((await p.locator('.needs-review').count()) > 0, true)
-  await p.getByRole('button', { name: 'Import selected', exact: true }).click()
+  await p.getByRole('button', { name: 'Continue', exact: true }).click()
   await p
     .getByRole('alert')
     .filter({ hasText: /Review|Confirm/ })

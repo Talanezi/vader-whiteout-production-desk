@@ -51,9 +51,11 @@ async function main() {
     assert.equal(after.dpr, before.dpr * 2)
     assert.ok(after.scroll <= after.width + 1)
     await p
-      .locator('.pd-shot-table tbody tr')
+      .locator('.pd-shot-table tbody tr [data-field="number"] input')
       .first()
-      .getByRole('button', { name: /Inspect shot/ })
+      .focus()
+    await p
+      .getByRole('button', { name: 'Open shot inspector', exact: true })
       .click()
     await p
       .getByRole('dialog', { name: 'Shot inspector' })

@@ -1,101 +1,152 @@
 import * as XLSX from 'xlsx'
+import { workbookInput } from './shotImportLimits'
 import { type ShotField, fields } from './shotDocument'
-
+import { validateValue } from './shotClipboard'
+export type ImportField = ShotField | 'sceneNumber'
 export type ImportRow = {
   row: number
+  sceneNumber: string
   values: Partial<Record<ShotField | 'source', string>>
   issues: string[]
   include: boolean
   reviewed: boolean
+  overrides?: Partial<Record<ShotField, string>>
+  sceneOverride?: string
 }
 export type ImportSheet = {
   name: string
-  kind: 'scene' | 'planning' | 'reference' | 'template' | 'unknown'
+  kind: 'scene' | 'combined' | 'planning' | 'reference' | 'template' | 'unknown'
   include: boolean
   sceneNumber: string
   title: string
   headerRow: number
   columns: { letter: string; label: string }[]
-  mapping: Record<string, ShotField | ''>
+  mapping: Record<string, ImportField | ''>
   rows: ImportRow[]
   scriptUnit: 'seconds' | 'minutes' | 'review'
+  units: Record<string, 'seconds' | 'minutes' | 'review'>
   workbook: XLSX.WorkSheet
+  date: string
+  scheduleReviewed: boolean
+  blocks?: ImportSheet[]
 }
 export type ImportPreview = {
   sheets: ImportSheet[]
   options: Record<string, string[]>
   warnings: string[]
 }
+export const isShotSheet = (s: ImportSheet) =>
+  s.kind === 'scene' || s.kind === 'combined'
 const normalized = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-function matchField(header: string): ShotField | '' {
-  const s = normalized(header)
-  const aliases: Record<string, ShotField> = {
-    shot: 'number',
-    shotnumber: 'number',
-    shotno: 'number',
-    camera: 'camera',
-    frame: 'framing',
-    framing: 'framing',
-    subject: 'subject',
-    angle: 'angle',
-    cameraangle: 'angle',
-    lens: 'lens',
-    equipment: 'equipment',
-    support: 'equipment',
-    movement: 'movement',
-    coverage: 'coverage',
-    action: 'coverage',
-    description: 'coverage',
-    notes: 'notes',
-    cameranotes: 'notes',
-    focusnotes: 'focusNotes',
-    lightingnotes: 'lightingNotes',
-    predicoftakes: 'plannedTakes',
-    plannedtakes: 'plannedTakes',
-    takecirclebest: 'actualTakes',
-    actualtakes: 'actualTakes',
-  }
+export function matchField(header: string): ImportField | '' {
+  const s = normalized(header),
+    aliases: Record<string, ImportField> = {
+      scene: 'sceneNumber',
+      scenenumber: 'sceneNumber',
+      sceneno: 'sceneNumber',
+      shot: 'number',
+      shotnumber: 'number',
+      shotno: 'number',
+      shotid: 'number',
+      cam: 'camera',
+      camera: 'camera',
+      frame: 'framing',
+      framing: 'framing',
+      shotsize: 'framing',
+      subject: 'subject',
+      angle: 'angle',
+      cameraangle: 'angle',
+      lens: 'lens',
+      equipment: 'equipment',
+      support: 'equipment',
+      rig: 'equipment',
+      movement: 'movement',
+      cameramovement: 'movement',
+      coverage: 'coverage',
+      action: 'coverage',
+      description: 'coverage',
+      notes: 'notes',
+      cameranotes: 'notes',
+      focusnotes: 'focusNotes',
+      lightingnotes: 'lightingNotes',
+      predicoftakes: 'plannedTakes',
+      predictedtakes: 'plannedTakes',
+      plannedtakes: 'plannedTakes',
+      takecirclebest: 'actualTakes',
+      actualtakes: 'actualTakes',
+      takenumber: 'actualTakes',
+      besttake: 'actualTakes',
+    }
   if (aliases[s]) return aliases[s]
-  if (s.startsWith('scripttime') || s.startsWith('scriptduration'))
-    return 'scriptSeconds'
-  if (s.startsWith('setuptime')) return 'setupMinutes'
-  if (s.startsWith('shoottime') || s.startsWith('estimatedtime'))
+  if (/^(scripttime|scriptduration|duration)/.test(s)) return 'scriptSeconds'
+  if (/^setuptime/.test(s)) return 'setupMinutes'
+  if (/^(shoottime|estimatedtime|estimatedshooting)/.test(s))
     return 'estimatedMinutes'
   return ''
 }
 function text(cell?: XLSX.CellObject) {
-  if (!cell || cell.v === undefined || cell.v === null) return ''
-  return cell.w ?? String(cell.v)
+  return !cell || cell.v === undefined || cell.v === null
+    ? ''
+    : (cell.w ?? String(cell.v))
 }
-export function inspectWorkbook(data: ArrayBuffer | Uint8Array): ImportPreview {
+export function setHeader(sheet: ImportSheet, row: number) {
+  const range = XLSX.utils.decode_range(sheet.workbook['!ref'] || 'A1')
+  sheet.headerRow = row
+  sheet.columns = []
+  sheet.mapping = {}
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const letter = XLSX.utils.encode_col(c),
+      label = text(sheet.workbook[`${letter}${row + 1}`])
+    if (label) {
+      sheet.columns.push({ letter, label })
+      sheet.mapping[letter] = matchField(label)
+    }
+  }
+}
+export function inspectWorkbook(
+  data: ArrayBuffer | Uint8Array,
+  filename = '',
+): ImportPreview {
   if (data.byteLength > 8 * 1024 * 1024)
-    throw new Error('The workbook must be 8 MB or smaller.')
-  const book = XLSX.read(data, {
-    type: 'array',
+    throw Error('The file must be 8 MB or smaller.')
+  if (!data.byteLength) throw Error('The file is empty.')
+  const input = workbookInput(data)
+  const book = XLSX.read(input.data, {
+    type: input.type,
+    raw: true,
     cellNF: true,
     cellText: true,
-    cellFormula: false,
-    sheetRows: 10000,
+    cellFormula: true,
+    sheetRows: 10001,
   })
-  if (book.SheetNames.length > 100)
-    throw new Error('The workbook has too many worksheets (maximum 100).')
+  if (book.SheetNames.length > 100) throw Error('Maximum 100 worksheets.')
   const sheets: ImportSheet[] = [],
     options: Record<string, string[]> = {}
+  let total = 0
   for (const name of book.SheetNames) {
     const ws = book.Sheets[name],
-      range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
-    let headerRow = -1
+      range = XLSX.utils.decode_range(ws['!fullref'] || ws['!ref'] || 'A1')
+    if (range.e.r > 9999 || range.e.c > 99)
+      throw Error(
+        `${name}: maximum 10,000 rows and 100 columns. No rows were imported.`,
+      )
+    let headerRow = -1,
+      best = 0
     for (let r = range.s.r; r <= Math.min(range.e.r, 30); r++) {
-      for (let c = range.s.c; c <= Math.min(range.e.c, 100); c++) {
-        const v = normalized(text(ws[XLSX.utils.encode_cell({ r, c })]))
-        if (v === 'shot' || v === 'shotnumber' || v === 'shotno') {
-          headerRow = r
-          break
-        }
+      const cells = Array.from({ length: range.e.c + 1 }, (_, c) =>
+          text(ws[XLSX.utils.encode_cell({ r, c })]),
+        ),
+        score = cells.filter((c) => matchField(c)).length
+      if (cells.some((c) => matchField(c) === 'number')) {
+        headerRow = r
+        break
       }
-      if (headerRow >= 0) break
+      if (score > best && score >= 2) {
+        best = score
+        headerRow = r
+      }
     }
-    const kind: ImportSheet['kind'] = /template/i.test(name)
+    const kind: ImportSheet['kind'] = /template/i.test(name + ' ' + filename)
       ? 'template'
       : /dropdown|options|reference/i.test(name)
         ? 'reference'
@@ -104,102 +155,238 @@ export function inspectWorkbook(data: ArrayBuffer | Uint8Array): ImportPreview {
           : headerRow >= 0
             ? 'scene'
             : 'unknown'
-    if (kind === 'reference') {
-      for (let c = range.s.c; c <= Math.min(range.e.c, 100); c++) {
-        const key = text(ws[XLSX.utils.encode_cell({ r: range.s.r, c })])
-        if (!key) continue
-        options[key] = Array.from(
-          { length: Math.min(range.e.r, 500) },
-          (_, i) => text(ws[XLSX.utils.encode_cell({ r: i + 1, c })]),
-        ).filter(Boolean)
-      }
-    }
-    const columns: ImportSheet['columns'] = [],
-      mapping: ImportSheet['mapping'] = {}
-    if (headerRow >= 0)
-      for (let c = range.s.c; c <= Math.min(range.e.c, 100); c++) {
-        const letter = XLSX.utils.encode_col(c),
-          label = text(ws[`${letter}${headerRow + 1}`])
-        if (label) {
-          columns.push({ letter, label })
-          mapping[letter] = matchField(label)
-        }
-      }
-    const scene = name.match(/scene\s*(.+)$/i)?.[1]?.trim() || ''
-    const title =
-      Array.from({ length: Math.max(headerRow, 0) }, (_, r) =>
-        Array.from({ length: Math.min(range.e.c + 1, 24) }, (_, c) =>
-          text(ws[XLSX.utils.encode_cell({ r, c })]),
-        ),
-      )
-        .flat()
-        .find((v) => /^location:/i.test(v))
-        ?.replace(/^location:\s*/i, '') || ''
-    const scriptHeader =
-      columns.find((c) => mapping[c.letter] === 'scriptSeconds')?.label || ''
     const sheet: ImportSheet = {
       name,
       kind,
       include: kind === 'scene',
-      sceneNumber: scene,
-      title,
+      sceneNumber: name.match(/scene\s*(.+)$/i)?.[1]?.trim() || '',
+      title: '',
       headerRow,
-      columns,
-      mapping,
+      columns: [],
+      mapping: {},
       rows: [],
-      scriptUnit: /seconds/i.test(scriptHeader)
-        ? 'seconds'
-        : /minutes/i.test(scriptHeader)
-          ? 'minutes'
-          : 'review',
+      scriptUnit: 'review',
+      units: {},
       workbook: ws,
+      date: '',
+      scheduleReviewed: false,
     }
-    if (kind === 'scene') sheet.rows = mapRows(sheet)
+    if (headerRow >= 0) {
+      setHeader(sheet, headerRow)
+      if (
+        kind === 'scene' &&
+        Object.values(sheet.mapping).includes('sceneNumber')
+      )
+        sheet.kind = 'combined'
+      for (const field of [
+        'scriptSeconds',
+        'setupMinutes',
+        'estimatedMinutes',
+      ]) {
+        const header =
+          sheet.columns.find((c) => sheet.mapping[c.letter] === field)?.label ||
+          ''
+        sheet.units[field] = /sec/i.test(header)
+          ? 'seconds'
+          : /min/i.test(header)
+            ? 'minutes'
+            : 'review'
+      }
+      sheet.scriptUnit = sheet.units.scriptSeconds
+      sheet.rows = mapRows(sheet)
+    }
+    const title = Array.from({ length: Math.max(headerRow, 0) }, (_, r) =>
+      Array.from({ length: range.e.c + 1 }, (_, c) =>
+        text(ws[XLSX.utils.encode_cell({ r, c })]),
+      ),
+    )
+      .flat()
+      .find((v) => /^location:/i.test(v))
+    sheet.title = title?.replace(/^location:\s*/i, '') || ''
+    if (kind === 'reference') {
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const key = text(ws[XLSX.utils.encode_cell({ r: range.s.r, c })])
+        if (key)
+          options[key] = Array.from(
+            { length: Math.min(range.e.r, 500) },
+            (_, i) => text(ws[XLSX.utils.encode_cell({ r: i + 1, c })]),
+          ).filter(Boolean)
+      }
+    }
+    if (kind === 'planning') {
+      const blockHeaders: {
+        r: number
+        c: number
+        label: string
+        scene: string
+      }[] = []
+      for (let r = range.s.r; r <= Math.min(range.e.r, 10); r++)
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const label = text(ws[XLSX.utils.encode_cell({ r, c })]),
+            match = label.match(/^Scene\s+(.+?)\s+(?:Shot|Shoot)\s+Order$/i)
+          if (match)
+            blockHeaders.push({
+              r,
+              c,
+              label,
+              scene: (match[1].match(/^\d+/)?.[0] || match[1]).padStart(2, '0'),
+            })
+        }
+      if (blockHeaders.length) {
+        sheet.blocks = blockHeaders.map((header, i) => {
+          const endColumn = blockHeaders[i + 1]?.c ?? range.e.c + 1,
+            block: ImportSheet = {
+              ...sheet,
+              name: header.label,
+              sceneNumber: header.scene,
+              columns: [],
+              mapping: {},
+              headerRow: header.r,
+              units: { estimatedMinutes: 'minutes' },
+              scriptUnit: 'seconds',
+              blocks: undefined,
+            }
+          for (let c = header.c; c < endColumn; c++) {
+            const letter = XLSX.utils.encode_col(c),
+              label = text(ws[`${letter}${header.r + 1}`])
+            if (!label) continue
+            block.columns.push({ letter, label })
+            block.mapping[letter] =
+              c === header.c
+                ? 'number'
+                : /specs|descrip/i.test(label)
+                  ? 'notes'
+                  : /time to shoot/i.test(label)
+                    ? 'estimatedMinutes'
+                    : ''
+          }
+          block.rows = mapRows(block)
+          return block
+        })
+        sheet.rows = []
+      }
+    }
+    total += sheet.rows.length
+    if (total > 5000)
+      throw Error('Maximum 5,000 candidate rows across all worksheets.')
     sheets.push(sheet)
   }
-  if (!sheets.some((s) => s.kind === 'scene'))
-    throw new Error(
-      'No shot-list headers found. Include a “SHOT #” column in each scene sheet.',
-    )
   return {
     sheets,
     options,
-    warnings: [
-      'Shooting-order worksheets are retained as references; day-specific timing and order are not imported into creative planning order.',
-    ],
+    warnings: !sheets.some(isShotSheet)
+      ? [
+          'No confident master shot sheet detected. In Map, choose a sheet role, header row and Shot number column.',
+        ]
+      : [],
+  }
+}
+function duration(
+  value: string,
+  cell: XLSX.CellObject | undefined,
+  field: string,
+  unit: string,
+) {
+  if (!value.trim()) return { value: '' }
+  if (cell?.t === 'n' && /[hms].*[:].*[hms]/i.test(String(cell.z)))
+    return {
+      value: String(
+        Number(
+          (Number(cell.v) * (field === 'scriptSeconds' ? 86400 : 1440)).toFixed(
+            6,
+          ),
+        ),
+      ),
+    }
+  const explicit = value
+    .trim()
+    .match(/^([\d.]+)\s*(sec(?:onds?)?|s|min(?:utes?)?|m)$/i)
+  if (explicit) {
+    const n = Number(explicit[1]),
+      seconds = /^s/i.test(explicit[2])
+    return {
+      value: String(
+        Number(
+          (
+            n *
+            (field === 'scriptSeconds'
+              ? seconds
+                ? 1
+                : 60
+              : seconds
+                ? 1 / 60
+                : 1)
+          ).toFixed(6),
+        ),
+      ),
+    }
+  }
+  if (unit === 'review')
+    return { value, issue: 'Confirm timing units for this column.' }
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < 0)
+    return {
+      value,
+      issue: `Invalid duration “${value}”. Correct or exclude this row.`,
+    }
+  return {
+    value: String(
+      Number(
+        (
+          number *
+          (field === 'scriptSeconds'
+            ? unit === 'minutes'
+              ? 60
+              : 1
+            : unit === 'seconds'
+              ? 1 / 60
+              : 1)
+        ).toFixed(6),
+      ),
+    ),
   }
 }
 export function mapRows(sheet: ImportSheet): ImportRow[] {
   const ws = sheet.workbook,
-    end = Math.min(XLSX.utils.decode_range(ws['!ref'] || 'A1').e.r, 9999)
-  const result: ImportRow[] = [],
-    labels = new Set<string>()
-  const duplicateMapping = Object.values(sheet.mapping)
-    .filter(Boolean)
-    .some((v, i, a) => a.indexOf(v) !== i)
+    end = XLSX.utils.decode_range(ws['!ref'] || 'A1').e.r,
+    result: ImportRow[] = [],
+    labels = new Set<string>(),
+    mapped = Object.values(sheet.mapping).filter(Boolean),
+    duplicate = mapped.some((v, i, a) => a.indexOf(v) !== i)
+  if (sheet.headerRow < 0) return result
   for (let r = sheet.headerRow + 1; r <= end; r++) {
     const values: ImportRow['values'] = {},
       issues: string[] = []
+    let sceneNumber = sheet.sceneNumber
     for (const [col, field] of Object.entries(sheet.mapping)) {
       if (!field) continue
       const cell: XLSX.CellObject | undefined = ws[`${col}${r + 1}`]
       let value = text(cell)
-      // Durations remain strings and can include explicit production notation.
-      // Only convert minutes to seconds when the user confirms the source unit.
+      if (field === 'sceneNumber') {
+        sceneNumber = value
+        continue
+      }
       if (
-        field === 'scriptSeconds' &&
-        sheet.scriptUnit === 'minutes' &&
-        value &&
-        Number.isFinite(Number(cell?.v))
-      )
-        value = String(Number((Number(cell!.v) * 60).toFixed(6)))
+        ['scriptSeconds', 'setupMinutes', 'estimatedMinutes'].includes(field)
+      ) {
+        const converted = duration(
+          value,
+          cell,
+          field,
+          field === 'scriptSeconds'
+            ? sheet.scriptUnit
+            : sheet.units[field] || 'review',
+        )
+        value = converted.value
+        if (converted.issue) issues.push(`${fields[field]}: ${converted.issue}`)
+      }
       values[field] = value
       if (field === 'number' && cell?.t === 'n') {
-        const fmt = String(cell.z || 'General')
-        const reliable = /0\.0{1,4}/.test(fmt) && value.includes('.')
+        const fmt = String(cell.z || 'General'),
+          reliable = /0\.0{1,4}/.test(fmt) && value.includes('.')
         if (!reliable && Number(cell.v) % 1 !== 0)
           issues.push(
-            `Numeric identifier “${value}”: trailing-zero meaning may already be lost. Review the label.`,
+            `Numeric identifier “${value}”: trailing-zero meaning may already be lost. Review the label; the importer cannot reconstruct it.`,
           )
         if (
           !reliable &&
@@ -208,39 +395,61 @@ export function mapRows(sheet: ImportSheet): ImportRow[] {
           issues.push('Floating-point identifier needs manual review.')
       }
     }
-    // Ignore styled/formula-only trailing rows, totals, and template filler.
     if (
       !['number', 'coverage', 'subject', 'notes'].some((k) =>
         values[k as ShotField]?.trim(),
       )
     )
       continue
+    if (
+      normalized(values.number || '') === 'shot' ||
+      normalized(values.number || '') === 'shotnumber'
+    )
+      continue
     if (!values.number?.trim())
       issues.push(
         'Missing shot number. Enter a text identifier or exclude this row.',
       )
-    else if (labels.has(values.number))
+    else if (labels.has(sceneNumber + '\0' + values.number))
       issues.push(
-        'Duplicate label within this scene. UUIDs remain distinct; review before importing.',
+        'Duplicate label in this scene. Distinct UUIDs will be created; review this row.',
       )
-    if (values.number) labels.add(values.number)
-    if (sheet.scriptUnit === 'review' && values.scriptSeconds)
-      issues.push(
-        'Script-time unit is unspecified. Choose seconds or minutes for this sheet.',
-      )
-    if (duplicateMapping)
-      issues.push(
-        'Two columns map to the same field. Resolve the mapping first.',
-      )
+    labels.add(sceneNumber + '\0' + values.number)
+    if (duplicate)
+      issues.push('Two columns map to one field. Resolve the mapping first.')
+    for (const field of ['plannedTakes'] as ShotField[])
+      try {
+        validateValue(field, values[field] || '')
+      } catch (e) {
+        issues.push(`${fields[field]}: ${(e as Error).message}`)
+      }
     values.source = JSON.stringify({
       sheet: sheet.name,
       row: r + 1,
       original: Object.fromEntries(
         sheet.columns.map((c) => [c.label, text(ws[`${c.letter}${r + 1}`])]),
       ),
+      cells: Object.fromEntries(
+        sheet.columns.map((c) => {
+          const cell = ws[`${c.letter}${r + 1}`] as XLSX.CellObject | undefined
+          return [
+            c.letter,
+            cell
+              ? Object.fromEntries(
+                  ['t', 'v', 'w', 'z', 'f']
+                    .filter(
+                      (k) => cell[k as keyof XLSX.CellObject] !== undefined,
+                    )
+                    .map((k) => [k, cell[k as keyof XLSX.CellObject]]),
+                )
+              : null,
+          ]
+        }),
+      ),
     })
     result.push({
       row: r + 1,
+      sceneNumber,
       values,
       issues,
       include: true,
@@ -250,39 +459,76 @@ export function mapRows(sheet: ImportSheet): ImportRow[] {
   return result
 }
 export function importPayload(preview: ImportPreview, batchId: string) {
-  const selected = preview.sheets.filter((s) => s.include && s.kind === 'scene')
-  if (!selected.length) throw new Error('Select at least one scene.')
-  return {
-    batchId,
-    scenes: selected.map((sheet) => {
-      if (!sheet.sceneNumber.trim())
-        throw new Error(`Enter a scene number for ${sheet.name}.`)
-      const rows = sheet.rows.filter((r) => r.include)
-      if (!rows.length) throw new Error(`${sheet.name} has no selected shots.`)
-      if (
-        sheet.scriptUnit === 'review' &&
-        rows.some((r) => r.values.scriptSeconds)
-      )
-        throw new Error(`Confirm script-time units for ${sheet.name}.`)
-      if (rows.some((r) => !r.values.number?.trim() || !r.reviewed))
-        throw new Error(`Review the flagged identifiers in ${sheet.name}.`)
-      if (
-        Object.values(sheet.mapping)
-          .filter(Boolean)
-          .some((v, i, a) => a.indexOf(v) !== i)
-      )
-        throw new Error(`Resolve duplicate column mappings in ${sheet.name}.`)
-      return {
-        number: sheet.sceneNumber,
-        title: sheet.title,
-        shots: rows.map((r) =>
+  const selected = preview.sheets.filter((s) => s.include && isShotSheet(s))
+  if (!selected.length && !scheduleSheets(preview).some((s) => s.include))
+    throw Error('Select a master shot sheet or reviewed schedule block.')
+  const grouped = new Map<
+    string,
+    { number: string; title: string; shots: Record<string, string>[] }
+  >()
+  for (const sheet of selected) {
+    const rows = sheet.rows.filter((r) => r.include)
+    if (!rows.length) throw Error(`${sheet.name} has no selected rows.`)
+    if (
+      Object.values(sheet.mapping)
+        .filter(Boolean)
+        .some((v, i, a) => a.indexOf(v) !== i)
+    )
+      throw Error(`Resolve duplicate mappings in ${sheet.name}.`)
+    for (const row of rows) {
+      if (!row.values.number?.trim() || !row.reviewed)
+        throw Error(`Review row ${row.row} in ${sheet.name}.`)
+      for (const field of [
+        'scriptSeconds',
+        'setupMinutes',
+        'estimatedMinutes',
+        'plannedTakes',
+      ] as ShotField[])
+        validateValue(field, row.values[field] || '')
+      const number =
+        sheet.kind === 'combined' ? row.sceneNumber : sheet.sceneNumber
+      if (!number.trim())
+        throw Error(`Enter a scene for row ${row.row} in ${sheet.name}.`)
+      const key = sheet.name + '\0' + number
+      if (!grouped.has(key))
+        grouped.set(key, { number, title: sheet.title, shots: [] })
+      grouped
+        .get(key)!
+        .shots.push(
           Object.fromEntries(
-            Object.entries(r.values).filter(
-              ([key]) => key === 'source' || key in fields,
+            Object.entries(row.values).filter(
+              ([k]) => k === 'source' || k in fields,
             ),
-          ),
-        ),
-      }
-    }),
+          ) as Record<string, string>,
+        )
+    }
   }
+  const schedule = scheduleSheets(preview)
+    .filter((s) => s.include)
+    .map((sheet) => {
+      if (!sheet.date || !sheet.scheduleReviewed)
+        throw Error(
+          `Choose a real date and review schedule references in ${sheet.name}.`,
+        )
+      const rows = sheet.rows.filter((r) => r.include)
+      if (rows.some((r) => !r.reviewed || !r.values.number?.trim()))
+        throw Error(`Review schedule rows in ${sheet.name}.`)
+      return {
+        date: sheet.date,
+        title: sheet.name,
+        rows: rows.map((r) => ({
+          number: r.values.number!,
+          sceneNumber: r.sceneNumber,
+          notes: r.values.notes || '',
+          estimatedMinutes: r.values.estimatedMinutes || '',
+        })),
+      }
+    })
+  return { batchId, scenes: [...grouped.values()], schedule }
+}
+
+export function scheduleSheets(preview: ImportPreview) {
+  return preview.sheets
+    .filter((s) => s.kind === 'planning')
+    .flatMap((s) => s.blocks || [s])
 }

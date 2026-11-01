@@ -263,9 +263,6 @@ function DashboardPage() {
                       return (
                         <tr key={item.id} aria-busy={!!pending[item.id]}>
                           <td className="pd-document-title">
-                            <div className="pd-document-mark">
-                              <Icon name="file" />
-                            </div>
                             <div>
                               <Link to={`/callsheets/${item.id}/edit`}>
                                 {title}
