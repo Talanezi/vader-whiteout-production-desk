@@ -42,6 +42,7 @@ import {
   type RecordMap,
   type ShotField,
 } from '../lib/shotDocument'
+import ShotStoryboards from '../components/storyboards/ShotStoryboards'
 import { useShotCollaboration } from '../lib/useShotCollaboration'
 import { getAuthToken } from '../lib/api'
 
@@ -57,6 +58,13 @@ export default function ShotListPage() {
   const [selected, setSelected] = useState(''),
     [inspector, setInspector] = useState(false),
     [mobileScenes, setMobileScenes] = useState(false)
+  useEffect(() => {
+    const shot = query.get('shot')
+    if (shot) {
+      setSelected(shot)
+      setInspector(true)
+    }
+  }, [query])
   const [width, setWidth] = useState(304),
     [columnOpen, setColumnOpen] = useState(false)
   const [railCollapsed, setRailCollapsed] = useState(false),
@@ -454,6 +462,7 @@ export default function ShotListPage() {
         />
       </div>
       <div className="pd-inspector-body">
+        <ShotStoryboards listId={id} shotId={selected} />
         {hasShotNumberConflict(c.doc, current) && (
           <p className="pd-print-warning" role="status">
             Duplicate shot number. Edit Shot number below to distinguish this

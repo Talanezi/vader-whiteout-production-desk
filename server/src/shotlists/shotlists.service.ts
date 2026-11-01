@@ -57,7 +57,7 @@ export class ShotlistsService implements OnModuleDestroy {
     private readonly auth: AuthService,
   ) {}
 
-  private approved(user: Collaborator) {
+  assertProductionMember(user: Collaborator) {
     const membership = user.productionMembership as Record<
       string,
       unknown
@@ -81,7 +81,7 @@ export class ShotlistsService implements OnModuleDestroy {
       );
   }
   async authorize(id: string, user: Collaborator) {
-    this.approved(user);
+    this.assertProductionMember(user);
     if (!uuid.test(id))
       throw new ForbiddenException('Shot list is unavailable.');
     const [row] = await this.db.query(
@@ -104,7 +104,7 @@ export class ShotlistsService implements OnModuleDestroy {
       throw new ForbiddenException('Shot list is archived.');
   }
   async list(user: Collaborator) {
-    this.approved(user);
+    this.assertProductionMember(user);
     const rows = await this.db.query(
       `SELECT d.id,d.name,d.state,d.created_at AS "createdAt",d.updated_at AS "updatedAt" FROM shot_list_documents d ORDER BY d.updated_at DESC`,
     );
@@ -125,7 +125,7 @@ export class ShotlistsService implements OnModuleDestroy {
     };
   }
   async create(user: Collaborator, name: unknown, firstDate?: unknown) {
-    this.approved(user);
+    this.assertProductionMember(user);
     if (typeof name !== 'string' || !name.trim() || name.length > 180)
       throw new BadRequestException('Enter a name of up to 180 characters.');
     if (
@@ -326,6 +326,8 @@ export class ShotlistsService implements OnModuleDestroy {
     );
     http.on('upgrade', (request, socket, head) => {
       const url = new URL(request.url || '/', 'http://localhost');
+      // Storyboards has an independently authenticated collaboration endpoint.
+      if (url.pathname === '/api/storyboards/collaboration') return;
       if (
         url.pathname !== '/api/shotlists/collaboration' ||
         url.search ||
@@ -361,7 +363,7 @@ export class ShotlistsService implements OnModuleDestroy {
     user: Collaborator,
     payload: { action?: string; name?: string },
   ) {
-    this.approved(user);
+    this.assertProductionMember(user);
     if (
       !uuid.test(id) ||
       !['rename', 'archive', 'restore'].includes(payload?.action || '')

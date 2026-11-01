@@ -1,5 +1,6 @@
 import type { SVGProps } from 'react'
 export type IconName =
+  | 'play'
   | 'shots'
   | 'undo'
   | 'redo'
@@ -34,6 +35,7 @@ export type IconName =
   | 'retry'
   | 'calendar'
 const paths: Record<IconName, string> = {
+  play: 'M8 4 21 12 8 20Z',
   shots: 'M3 5h18v14H3z M3 9h18 M8 5v14 M16 5v14 M3 15h18',
   undo: 'm9 4-5 5 5 5 M4 9h10a6 6 0 0 1 0 12',
   redo: 'm15 4 5 5-5 5 M20 9h-10a6 6 0 0 0 0 12',

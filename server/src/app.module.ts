@@ -1,3 +1,4 @@
+import { StoryboardsModule } from './storyboards/storyboards.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -32,6 +33,7 @@ import { ShotlistsModule } from './shotlists/shotlists.module';
     RosterModule,
     AuthModule,
     ShotlistsModule,
+    StoryboardsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

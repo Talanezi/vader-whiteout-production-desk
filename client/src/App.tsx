@@ -6,10 +6,19 @@ import CallSheetNewPage from './pages/CallSheetNewPage'
 import CallSheetEditorPage from './pages/CallSheetEditorPage'
 import RosterPage from './pages/RosterPage'
 import ShotListsPage from './pages/ShotListsPage'
+import DotsLoader from './components/whiteout/DotsLoader'
+const StoryboardsPage = lazy(() => import('./pages/StoryboardsPage'))
+const StoryboardPage = lazy(() => import('./pages/StoryboardPage'))
 const ShotListPage = lazy(() => import('./pages/ShotListPage'))
 
 // The existing hash URLs are unchanged. The data router enables a native
 // navigation blocker for unsaved roster edits and unfinished imports.
+const storyboardFallback = (
+  <div className="pd-loading" role="status">
+    <DotsLoader />
+    <span className="pd-sr-only">Loading storyboards</span>
+  </div>
+)
 const router = createHashRouter([
   {
     element: <AppShell />,
@@ -28,6 +37,30 @@ const router = createHashRouter([
             }
           >
             <ShotListPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/storyboards',
+        element: (
+          <Suspense fallback={storyboardFallback}>
+            <StoryboardsPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/storyboards/new',
+        element: (
+          <Suspense fallback={storyboardFallback}>
+            <StoryboardsPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/storyboards/:id',
+        element: (
+          <Suspense fallback={storyboardFallback}>
+            <StoryboardPage />
           </Suspense>
         ),
       },

@@ -23,7 +23,10 @@
     "react-router-dom": "^6.30.3",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "y-codemirror.next": "0.3.6",
-    "yjs": "13.6.27"
+    "yjs": "13.6.27",
+    "react-konva": "19.0.10",
+    "konva": "10.9.1",
+    "perfect-freehand": "1.2.3"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

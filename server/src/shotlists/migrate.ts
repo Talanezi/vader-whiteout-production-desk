@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { Storyboards1793512800000 } from '../storyboards/storyboards.migration';
 import { DataSource } from 'typeorm';
 import { ShotLists1793426400000 } from './shotlists.migration';
 
@@ -11,7 +12,7 @@ async function run() {
       ? { rejectUnauthorized: false }
       : false,
     synchronize: false,
-    migrations: [ShotLists1793426400000],
+    migrations: [ShotLists1793426400000, Storyboards1793512800000],
     migrationsTableName: 'production_desk_migrations',
   });
   await db.initialize();

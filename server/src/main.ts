@@ -8,6 +8,7 @@ if (!(globalThis as { crypto?: Crypto }).crypto) {
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { StoryboardsService } from './storyboards/storyboards.service';
 import { ShotlistsService } from './shotlists/shotlists.service';
 
 async function bootstrap() {
@@ -15,6 +16,8 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.useBodyParser('json', { limit: '2mb' });
   await app.get(ShotlistsService).attach(app.getHttpServer());
+
+  await app.get(StoryboardsService).attach(app.getHttpServer());
 
   app.enableCors({
     origin: true,

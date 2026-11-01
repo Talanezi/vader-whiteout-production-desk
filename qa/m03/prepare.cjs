@@ -96,7 +96,7 @@ alias.unshift({
 })
 fs.writeFileSync(
   path.join(runtime, 'vite.config.mts'),
-  `import config from ${JSON.stringify(path.join(root, 'client/vite.config.ts'))};\nexport default {...config,root:${JSON.stringify(path.join(root, 'client'))},cacheDir:${JSON.stringify(path.join(runtime, 'vite-cache'))},resolve:{alias:${JSON.stringify(alias)}},server:{host:'127.0.0.1',port:5175,strictPort:true}}\n`,
+  `const pluginPath=${JSON.stringify(path.join(runtime, 'client/node_modules/@vitejs/plugin-react/dist/index.js'))};\nconst {default:react}=await import(pluginPath);\nexport default {base:'/productiondesk/',plugins:[react()],optimizeDeps:{exclude:['pdfjs-dist']},root:${JSON.stringify(path.join(root, 'client'))},cacheDir:${JSON.stringify(path.join(runtime, 'vite-cache'))},resolve:{alias:${JSON.stringify(alias)}},server:{host:'127.0.0.1',port:5175,strictPort:true}}\n`,
 )
 run(process.execPath, [
   path.join(runtime, 'client/node_modules/typescript/bin/tsc'),

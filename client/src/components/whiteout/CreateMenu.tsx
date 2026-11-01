@@ -155,6 +155,7 @@ export default function CreateMenu() {
               {[
                 ['file', 'New Call Sheet', '/callsheets/new'],
                 ['shots', 'New Shot List', '/shotlists/new'],
+                ['grid', 'New Storyboard', '/storyboards/new'],
               ].map(([icon, label, path]) => (
                 <button
                   type="button"
