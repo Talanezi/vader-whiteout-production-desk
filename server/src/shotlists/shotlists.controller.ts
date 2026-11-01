@@ -38,6 +38,13 @@ export class ShotlistsController {
   ) {
     return this.lists.export(id, req.user);
   }
+  @Post(':id/manage') manage(
+    @Req() req: { user: Collaborator },
+    @Param('id') id: string,
+    @Body() payload: { action?: string; name?: string },
+  ) {
+    return this.lists.manage(id, req.user, payload);
+  }
   @Post(':id/pdf') async pdf(
     @Req() req: { user: Collaborator },
     @Param('id') id: string,

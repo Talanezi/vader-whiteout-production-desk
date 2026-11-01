@@ -11,7 +11,18 @@ import Combobox from '../whiteout/Combobox'
 import { ErrorNotice } from '../whiteout/Feedback'
 GlobalWorkerOptions.workerSrc = workerUrl
 /** Renders the exact immutable PDF bytes also used by the download link. */
-export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
+export default function PdfPages({
+  bytes,
+  onReady,
+}: {
+  bytes: Uint8Array
+  onReady?: (bytes: Uint8Array) => void
+}) {
+  const ready = useRef(onReady)
+  ready.current = onReady
+  const [renderedBytes, setRenderedBytes] = useState<Uint8Array>()
+  const [bands, setBands] = useState<{ value: string; label: string }[]>([])
+  const [renderedKey, setRenderedKey] = useState('')
   const [pdf, setPdf] = useState<PDFDocumentProxy>(),
     [page, setPage] = useState(1),
     [zoom, setZoom] = useState('fit'),
@@ -25,11 +36,13 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
     let active = true
     setError('')
     setPdf(undefined)
-    setPage(1)
     const task = getDocument({ data: bytes.slice(), useSystemFonts: false })
     task.promise
       .then((document) => {
-        if (active) setPdf(document)
+        if (active) {
+          setPdf(document)
+          setPage((n) => (n > document.numPages ? 1 : n))
+        }
       })
       .catch((e) => {
         if (active) setError(e.message || 'PDF preview is unavailable.')
@@ -39,6 +52,34 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
       void task.destroy()
     }
   }, [bytes])
+  useEffect(() => {
+    let active = true
+    setBands([])
+    if (pdf)
+      void (async () => {
+        const found: { value: string; label: string }[] = []
+        for (let i = 1; i <= pdf.numPages && active; i++) {
+          const sheet = await pdf.getPage(i),
+            content = await sheet.getTextContent(),
+            text = content.items
+              .map((x) => ('str' in x ? x.str : ''))
+              .join(' '),
+            match = text.match(/Column band\s+(\d+)\s+of\s+(\d+)/i)
+          if (
+            match &&
+            !found.some((b) => b.label === `Band ${match[1]} of ${match[2]}`)
+          )
+            found.push({
+              value: String(i),
+              label: `Band ${match[1]} of ${match[2]}`,
+            })
+        }
+        if (active) setBands(found)
+      })().catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [pdf])
   useEffect(() => {
     if (!viewport.current) return
     const observer = new ResizeObserver((entries) =>
@@ -58,7 +99,15 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
         if (!active) return
         const natural = sheet.getViewport({ scale: 1 }),
           fit = (viewport.current!.clientWidth - 24) / natural.width,
-          scale = zoom === 'fit' ? fit : ((Number(zoom) / 100) * 96) / 72,
+          scale =
+            zoom === 'page'
+              ? Math.min(
+                  fit,
+                  (viewport.current!.clientHeight - 24) / natural.height,
+                )
+              : zoom === 'fit'
+                ? fit
+                : ((Number(zoom) / 100) * 96) / 72,
           view = sheet.getViewport({ scale }),
           element = canvas.current!,
           ratio = Math.min(devicePixelRatio || 1, 2)
@@ -75,7 +124,12 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
           transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
         })
         await task.promise
-        if (active) setRendering(false)
+        if (active) {
+          setRendering(false)
+          setRenderedBytes(bytes)
+          setRenderedKey(`${page}:${zoom}:${available}`)
+          ready.current?.(bytes)
+        }
       } catch (e) {
         if (active && (e as Error).name !== 'RenderingCancelledException') {
           setError((e as Error).message)
@@ -109,16 +163,30 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
         >
           →
         </Button>
+        {bands.length > 1 && (
+          <Combobox
+            label="Column band"
+            value={
+              [...bands].reverse().find((b) => Number(b.value) <= page)
+                ?.value || bands[0].value
+            }
+            options={bands}
+            custom={false}
+            clearable={false}
+            onChange={(v) => setPage(Number(v))}
+          />
+        )}
         <Combobox
           label="Preview zoom"
           value={zoom}
           labels={{
             fit: 'Fit width',
+            page: 'Fit page',
             '100': '100%',
             '150': '150%',
             '200': '200%',
           }}
-          options={['fit', '100', '150', '200']}
+          options={['page', 'fit', '100', '150', '200']}
           custom={false}
           clearable={false}
           onChange={setZoom}
@@ -132,7 +200,14 @@ export default function PdfPages({ bytes }: { bytes: Uint8Array }) {
       <div className="pd-pdf-canvas-scroll" ref={viewport}>
         <canvas
           data-rendered={
-            pdf && !rendering && dimensions && !error ? 'true' : undefined
+            pdf &&
+            renderedBytes === bytes &&
+            renderedKey === `${page}:${zoom}:${available}` &&
+            !rendering &&
+            dimensions &&
+            !error
+              ? 'true'
+              : undefined
           }
           ref={canvas}
           aria-label={`PDF page ${page}`}

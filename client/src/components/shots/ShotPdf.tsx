@@ -5,6 +5,7 @@ import {
   Suspense,
   useEffect,
   useState,
+  useRef,
 } from 'react'
 import * as Y from 'yjs'
 import { Overlay } from '../whiteout/Overlay'
@@ -15,6 +16,7 @@ import { ErrorNotice } from '../whiteout/Feedback'
 import { ordered, scenes, shots, str } from '../../lib/shotDocument'
 import { days, validAssignments } from '../../lib/shotSchedule'
 import { shotApiBase } from '../../lib/shotApi'
+import { presets, widths } from '../../lib/shotColumns'
 import { getAuthToken } from '../../lib/api'
 import {
   printFit,
@@ -89,12 +91,17 @@ export default function ShotPdf({
             ? 'area'
             : 'current',
     ),
-    [layout, setLayout] = useState<PrintSpec['layout']>('table'),
+    [layout, setLayout] = useState<PrintSpec['layout']>(() =>
+      printFit(view?.columns || defaults, 'letter', 'landscape', 'normal')
+        .readable
+        ? 'table'
+        : 'expanded',
+    ),
     [paper, setPaper] = useState<PrintSpec['paper']>('letter'),
     [orientation, setOrientation] =
       useState<PrintSpec['orientation']>('landscape'),
     [margins, setMargins] = useState<PrintSpec['margins']>('normal'),
-    [columns, setColumns] = useState<PrintColumn[]>(
+    [columns, setColumnState] = useState<PrintColumn[]>(
       view?.area && !selected.length
         ? view.area.columns
         : view?.columns || defaults,
@@ -132,7 +139,19 @@ export default function ShotPdf({
       bytes: Uint8Array
       signature: string
     }>(),
-    [newer, setNewer] = useState(false)
+    [revision, setRevision] = useState(0),
+    [printPreset, setPrintPreset] = useState('Current grid'),
+    [retry, setRetry] = useState(0)
+  const [previewReady, setPreviewReady] = useState('')
+  const layoutChosen = useRef(false),
+    requestNumber = useRef(0),
+    cache = useRef(new Map<string, Uint8Array>())
+  function setColumns(
+    value: PrintColumn[] | ((old: PrintColumn[]) => PrintColumn[]),
+  ) {
+    setPrintPreset('Custom')
+    setColumnState(value)
+  }
   const allScenes = ordered(scenes(doc)),
     shootDays = ordered(days(doc)).filter(
       (day) => validAssignments(doc, str(day, 'id')).length,
@@ -186,9 +205,12 @@ export default function ShotPdf({
       groupScenes,
       report: { mode: reportMode, profile, notes, summaries },
     },
-    signature = JSON.stringify(spec),
+    signature = JSON.stringify(spec) + ':' + revision,
     changed = !!generated && generated.signature !== signature,
-    blocked = layout === 'table' && scaling === 'fit-width' && !fit.readable
+    blocked =
+      (layout === 'table' || layout === 'exact') &&
+      scaling === 'fit-width' &&
+      !fit.readable
   useEffect(
     () => () => {
       if (generated) URL.revokeObjectURL(generated.url)
@@ -197,53 +219,97 @@ export default function ShotPdf({
   )
   useEffect(() => {
     const update = () => {
-      if (generated) setNewer(true)
+      setRevision((v) => v + 1)
     }
     doc.on('update', update)
     return () => doc.off('update', update)
-  }, [doc, generated])
+  }, [doc])
   function chooseScope(value: string) {
     const next = value as PrintSpec['scope']
     setScope(next)
     setError('')
     if (next === 'area' && view?.area) setColumns(view.area.columns)
-    else if (next === 'day') {
-      setColumns(shootingColumns)
-      setGroups(false)
-      setScaling('readable')
-    } else {
-      setColumns(view?.columns || defaults)
-      setGroups(view?.groupScenes ?? true)
-    }
     if (next === 'scenes' && !sceneIds.length)
       setScenes(allScenes[0] ? [str(allScenes[0], 'id')] : [])
   }
-  async function generate() {
-    setError('')
-    setBusy(true)
-    try {
-      const response = await fetch(`${shotApiBase}/shotlists/${id}/pdf`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${getAuthToken() || ''}`,
-          'Content-Type': 'application/json',
-        },
-        body: signature,
-      })
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        throw Error(result.message || 'PDF generation failed.')
-      }
-      if (!response.headers.get('content-type')?.includes('application/pdf'))
-        throw Error('The service did not return a PDF.')
-      const blob = await response.blob(),
-        bytes = new Uint8Array(await blob.arrayBuffer())
-      setGenerated({ url: URL.createObjectURL(blob), bytes, signature })
-      setNewer(false)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
+  useEffect(() => {
+    const number = ++requestNumber.current
+    const controller = new AbortController()
+    if (!saved || blocked || (!rows.length && entire.length)) {
       setBusy(false)
+      return
+    }
+    setBusy(true)
+    const timer = window.setTimeout(async () => {
+      try {
+        let bytes = cache.current.get(signature)
+        if (!bytes) {
+          const response = await fetch(`${shotApiBase}/shotlists/${id}/pdf`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${getAuthToken() || ''}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(spec),
+          })
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({}))
+            throw Error(result.message || 'PDF preview failed.')
+          }
+          if (
+            !response.headers.get('content-type')?.includes('application/pdf')
+          )
+            throw Error('The service did not return a PDF.')
+          bytes = new Uint8Array(await response.arrayBuffer())
+        }
+        if (controller.signal.aborted || number !== requestNumber.current)
+          return
+        cache.current.set(signature, bytes)
+        if (cache.current.size > 6)
+          cache.current.delete(cache.current.keys().next().value!)
+        setGenerated({
+          url: URL.createObjectURL(
+            new Blob([bytes.slice()], { type: 'application/pdf' }),
+          ),
+          bytes,
+          signature,
+        })
+        setError('')
+      } catch (e) {
+        if (!controller.signal.aborted && number === requestNumber.current)
+          setError((e as Error).message)
+      } finally {
+        if (number === requestNumber.current) setBusy(false)
+      }
+    }, 500)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [signature, saved, blocked, retry])
+  function choosePreset(value: string) {
+    setPrintPreset(value)
+    const next =
+      value === 'Current grid'
+        ? view?.columns || defaults
+        : value === 'Custom'
+          ? columns
+          : ([
+              { field: 'number' as const, width: 106 },
+              ...(presets[value] || []).map((field) => ({
+                field,
+                width: widths[field],
+              })),
+            ] as PrintColumn[])
+    setColumnState(next)
+    if (
+      !layoutChosen.current &&
+      !printFit(next, paper, orientation, margins).readable &&
+      layout === 'table'
+    ) {
+      setLayout('expanded')
+      setText('wrap')
     }
   }
   function move(index: number, delta: number) {
@@ -258,41 +324,30 @@ export default function ShotPdf({
   return (
     <Overlay
       title="Download shot list"
-      className={`pd-pdf-dialog ${generated ? 'has-preview' : ''}`}
-      busy={busy}
+      className="pd-pdf-dialog has-preview"
+      busy={false}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose} disabled={busy}>
-            Close
-          </Button>
-          {generated && !changed && (
+          <Button onClick={onClose}>Close</Button>
+          <span className="pd-muted" role="status">
+            {busy ? 'Updating…' : ''}
+          </span>
+          {generated &&
+          previewReady === signature &&
+          !changed &&
+          saved &&
+          !busy ? (
             <a
-              className="pd-button"
+              className="pd-button pd-button-primary"
               href={generated.url}
               download="whiteout-shot-list.pdf"
             >
               Download PDF
             </a>
+          ) : (
+            <Button disabled>Download PDF</Button>
           )}
-          <Button
-            variant="primary"
-            icon="download"
-            state={busy ? 'pending' : 'idle'}
-            pendingLabel="Typesetting…"
-            disabled={
-              !saved ||
-              (!rows.length &&
-                !(
-                  entire.length === 0 &&
-                  (scope === 'entire' || scope === 'current')
-                )) ||
-              blocked
-            }
-            onClick={generate}
-          >
-            {generated ? 'Refresh preview' : 'Generate PDF'}
-          </Button>
         </>
       }
     >
@@ -392,12 +447,19 @@ export default function ShotPdf({
                 label="Print layout"
                 value={layout}
                 options={[
-                  { value: 'table', label: 'Table Print' },
+                  { value: 'table', label: 'Compact Table' },
+                  { value: 'expanded', label: 'Expanded Technical' },
+                  { value: 'exact', label: 'Exact Grid' },
                   { value: 'report', label: 'Detailed Production Report' },
                 ]}
                 custom={false}
                 clearable={false}
-                onChange={(v) => setLayout(v as PrintSpec['layout'])}
+                onChange={(v) => {
+                  layoutChosen.current = true
+                  setLayout(v as PrintSpec['layout'])
+                  if (v === 'table') setScaling('fit-width')
+                  if (v === 'exact') setScaling('readable')
+                }}
               />
             </div>
             <div className="pd-print-setting">
@@ -408,6 +470,8 @@ export default function ShotPdf({
                 options={[
                   { value: 'letter', label: 'US Letter' },
                   { value: 'a4', label: 'A4' },
+                  { value: 'a3', label: 'A3' },
+                  { value: 'tabloid', label: 'Tabloid' },
                 ]}
                 custom={false}
                 clearable={false}
@@ -440,29 +504,35 @@ export default function ShotPdf({
               />
             </div>
           </div>
-          {layout === 'table' ? (
+          {layout !== 'report' ? (
             <>
-              <div className="pd-print-setting">
-                <label>Scaling</label>
-                <Combobox
-                  label="Print scaling"
-                  value={scaling}
-                  options={[
-                    { value: 'fit-width', label: 'Fit one page wide' },
-                    {
-                      value: 'actual',
-                      label: 'Actual size · tile wide columns',
-                    },
-                    {
-                      value: 'readable',
-                      label: 'Readable pages · tile columns',
-                    },
-                  ]}
-                  custom={false}
-                  clearable={false}
-                  onChange={(v) => setScaling(v as PrintSpec['scaling'])}
-                />
-              </div>
+              {layout !== 'expanded' && (
+                <div className="pd-print-setting">
+                  <label>Scaling</label>
+                  <Combobox
+                    label="Print scaling"
+                    value={scaling}
+                    options={
+                      layout === 'exact'
+                        ? [
+                            { value: 'fit-width', label: 'Fit one page wide' },
+                            {
+                              value: 'actual',
+                              label: 'Actual size · tile wide columns',
+                            },
+                            {
+                              value: 'readable',
+                              label: 'Readable pages · tile columns',
+                            },
+                          ]
+                        : [{ value: 'fit-width', label: 'Fit one page wide' }]
+                    }
+                    custom={false}
+                    clearable={false}
+                    onChange={(v) => setScaling(v as PrintSpec['scaling'])}
+                  />
+                </div>
+              )}
               <div className="pd-print-setting">
                 <label>Text</label>
                 <Combobox
@@ -483,22 +553,44 @@ export default function ShotPdf({
               {blocked && (
                 <div className="pd-print-warning" role="alert">
                   These fields would shrink below 8 pt.{' '}
-                  <Button onClick={() => setScaling('readable')}>
-                    Use readable pages
+                  <Button
+                    onClick={() =>
+                      layout === 'exact'
+                        ? setScaling('readable')
+                        : setLayout('expanded')
+                    }
+                  >
+                    {layout === 'exact'
+                      ? 'Use readable bands'
+                      : 'Use Expanded Technical'}
                   </Button>
                   <span>
                     Or choose fewer fields, landscape or narrower margins.
                   </span>
                 </div>
               )}
-              {scaling !== 'fit-width' && (
+              {layout === 'exact' && scaling !== 'fit-width' && (
                 <p className="pd-print-hint">
                   Wide fields continue in column bands with shot IDs repeated.
                   Rows continue vertically; they are never fitted to one page.
                 </p>
               )}
+              <div className="pd-print-setting">
+                <label>Columns</label>
+                <Combobox
+                  label="Print column preset"
+                  value={printPreset}
+                  options={['Current grid', ...Object.keys(presets), 'Custom']}
+                  custom={false}
+                  clearable={false}
+                  onChange={choosePreset}
+                />
+              </div>
               <details className="pd-print-columns">
-                <summary>Columns · {printable.length} in print order</summary>
+                <summary>Customize · {printable.length} fields</summary>
+                <Button onClick={() => setColumns(availableColumns)}>
+                  Select all fields
+                </Button>
                 <p className="pd-print-hint">
                   Shot identity is retained. Hidden notes print only when
                   selected here.
@@ -615,27 +707,34 @@ export default function ShotPdf({
               Waiting for saved changes before generating.
             </p>
           )}
-          {changed && (
-            <p className="pd-print-warning" role="status">
-              Print selection or settings changed. Refresh the preview before
-              downloading.
-            </p>
+          {error && (
+            <ErrorNotice>
+              {error}{' '}
+              <Button onClick={() => setRetry((v) => v + 1)}>Retry</Button>
+            </ErrorNotice>
           )}
-          {newer && generated && !changed && (
-            <p className="pd-print-hint" role="status">
-              Newer document edits exist. Download keeps this preview snapshot;
-              refresh to include them.
-            </p>
-          )}
-          {error && <ErrorNotice>{error}</ErrorNotice>}
         </div>
-        {generated && (
-          <PdfPreviewBoundary key={generated.url} fallbackUrl={generated.url}>
-            <Suspense fallback={<p className="pd-muted">Loading PDF pages…</p>}>
-              <PdfPages bytes={generated.bytes} />
-            </Suspense>
-          </PdfPreviewBoundary>
-        )}
+        <div className="pd-print-preview" aria-busy={busy || changed}>
+          {generated ? (
+            <PdfPreviewBoundary fallbackUrl={generated.url}>
+              <Suspense
+                fallback={<p className="pd-muted">Loading PDF pages…</p>}
+              >
+                <PdfPages
+                  bytes={generated.bytes}
+                  onReady={(bytes) => {
+                    if (bytes === generated.bytes)
+                      setPreviewReady(generated.signature)
+                  }}
+                />
+              </Suspense>
+            </PdfPreviewBoundary>
+          ) : (
+            <p className="pd-muted" role="status">
+              {error ? 'Preview unavailable' : 'Preparing preview…'}
+            </p>
+          )}
+        </div>
       </div>
     </Overlay>
   )

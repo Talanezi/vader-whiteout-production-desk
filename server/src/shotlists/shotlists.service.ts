@@ -44,6 +44,8 @@ const uuid =
 @Injectable()
 export class ShotlistsService implements OnModuleDestroy {
   private collab?: Hocuspocus;
+  // Single-writer process: archive state is loaded once and changed only by management operations.
+  private archiveStates = new Map<string, boolean>();
   private sockets?: WebSocketServer;
   private saveQueues = new Map<string, Promise<void>>();
   private failedSaves = new Set<string>();
@@ -84,10 +86,23 @@ export class ShotlistsService implements OnModuleDestroy {
     if (!uuid.test(id))
       throw new ForbiddenException('Shot list is unavailable.');
     const [row] = await this.db.query(
-      'SELECT id FROM shot_list_documents WHERE id=$1',
+      this.archiveStates.has(id)
+        ? 'SELECT id FROM shot_list_documents WHERE id=$1'
+        : 'SELECT id,state FROM shot_list_documents WHERE id=$1',
       [id],
     );
     if (!row) throw new ForbiddenException('Shot list is unavailable.');
+    if (!this.archiveStates.has(id)) {
+      const state = new Y.Doc();
+      try {
+        Y.applyUpdate(state, row.state);
+        this.archiveStates.set(id, !!state.getMap('meta').get('archivedAt'));
+      } finally {
+        state.destroy();
+      }
+    }
+    if (this.archiveStates.get(id))
+      throw new ForbiddenException('Shot list is archived.');
   }
   async list(user: Collaborator) {
     this.approved(user);
@@ -95,17 +110,19 @@ export class ShotlistsService implements OnModuleDestroy {
       `SELECT d.id,d.name,d.state,d.created_at AS "createdAt",d.updated_at AS "updatedAt" FROM shot_list_documents d ORDER BY d.updated_at DESC`,
     );
     return {
-      items: rows.map(
-        ({ state, ...row }: { state: Buffer; [key: string]: unknown }) => {
+      items: rows
+        .map(({ state, ...row }: { state: Buffer; [key: string]: unknown }) => {
           const doc = new Y.Doc();
           try {
             Y.applyUpdate(doc, state);
-            return { ...row, ...metadata(snapshot(doc)) };
+            return doc.getMap('meta').get('archivedAt')
+              ? null
+              : { ...row, ...metadata(snapshot(doc)) };
           } finally {
             doc.destroy();
           }
-        },
-      ),
+        })
+        .filter(Boolean),
     };
   }
   async create(user: Collaborator, name: unknown, firstDate?: unknown) {
@@ -334,6 +351,55 @@ export class ShotlistsService implements OnModuleDestroy {
         shootDays: doc.getMap('shootDays').toJSON(),
         shootAssignments: doc.getMap('shootAssignments').toJSON(),
       };
+    } finally {
+      await connection.disconnect();
+    }
+  }
+  async manage(
+    id: string,
+    user: Collaborator,
+    payload: { action?: string; name?: string },
+  ) {
+    this.approved(user);
+    if (
+      !uuid.test(id) ||
+      !['rename', 'archive', 'restore'].includes(payload?.action || '')
+    )
+      throw new BadRequestException('Invalid document action.');
+    if (payload.action !== 'restore') await this.authorize(id, user);
+    else {
+      const [row] = await this.db.query(
+        'SELECT id FROM shot_list_documents WHERE id=$1',
+        [id],
+      );
+      if (!row) throw new ForbiddenException('Shot list unavailable.');
+    }
+    if (
+      payload.action === 'rename' &&
+      (typeof payload.name !== 'string' ||
+        !payload.name.trim() ||
+        payload.name.length > 180)
+    )
+      throw new BadRequestException('Enter a name of up to 180 characters.');
+    const connection = await this.collab!.openDirectConnection(id, { user });
+    try {
+      await connection.transact((doc) => {
+        if (payload.action === 'rename')
+          doc.getMap('meta').set('name', payload.name!.trim());
+        else
+          doc
+            .getMap('meta')
+            .set(
+              'archivedAt',
+              payload.action === 'archive' ? new Date().toISOString() : null,
+            );
+      });
+      await this.persist(connection.document!, id);
+      if (payload.action !== 'rename')
+        this.archiveStates.set(id, payload.action === 'archive');
+      if (payload.action === 'archive')
+        connection.document!.getConnections().forEach((c) => c.close());
+      return { ok: true };
     } finally {
       await connection.disconnect();
     }

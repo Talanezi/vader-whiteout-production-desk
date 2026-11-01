@@ -1,10 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import type { CallSheetDraft, CallSheetStatus } from '../data/mockCallSheet'
-import {
-  callSheetStatuses,
-  distributionStatusLabels,
-} from '../data/mockCallSheet'
+import type { CallSheetDraft } from '../data/mockCallSheet'
+import { distributionStatusLabels } from '../data/mockCallSheet'
 import {
   deleteCallSheet,
   downloadPdfFile,
@@ -24,19 +21,8 @@ import {
   SessionState,
   useToast,
 } from '../components/whiteout/Feedback'
-import {
-  PageHeader,
-  SearchField,
-  Status,
-} from '../components/whiteout/Workspace'
+import { PageHeader, SearchField } from '../components/whiteout/Workspace'
 
-const labels: Record<CallSheetStatus, string> = {
-  draft: 'Draft',
-  ready_for_review: 'In review',
-  approved: 'Approved',
-  published: 'Published',
-  revised: 'Revised',
-}
 const displayDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? new Date(value + 'T12:00:00Z').toLocaleDateString('en-US', {
@@ -58,7 +44,6 @@ function DashboardPage() {
   const [attempt, setAttempt] = useState(0),
     [pending, setPending] = useState<Record<string, string>>({})
   const [search, setSearch] = useState(''),
-    [filter, setFilter] = useState<'all' | CallSheetStatus>('all'),
     [sort, setSort] = useState<Sort>('production_date')
   const [deleting, setDeleting] = useState<CallSheetDraft | null>(null),
     [deleteError, setDeleteError] = useState<string | null>(null)
@@ -91,12 +76,10 @@ function DashboardPage() {
   }, [token, attempt])
   const unauthorized = !token || loadError === 'UNAUTHORIZED'
   const filtered = items
-    .filter(
-      (item) =>
-        (filter === 'all' || (item.status || 'draft') === filter) &&
-        (item.title || 'Untitled Call Sheet')
-          .toLowerCase()
-          .includes(search.trim().toLowerCase()),
+    .filter((item) =>
+      (item.title || 'Untitled Call Sheet')
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
     )
     .sort((a, b) => {
       if (sort === 'title')
@@ -112,7 +95,6 @@ function DashboardPage() {
     })
   const clear = () => {
     setSearch('')
-    setFilter('all')
   }
   async function action(
     item: CallSheetDraft,
@@ -179,19 +161,6 @@ function DashboardPage() {
             />
             <div className="pd-toolbar-options">
               <Menu
-                label={filter === 'all' ? 'All statuses' : labels[filter]}
-                icon="file"
-                value={filter}
-                items={[
-                  { value: 'all', label: 'All statuses' },
-                  ...callSheetStatuses.map((s) => ({
-                    value: s,
-                    label: labels[s],
-                  })),
-                ]}
-                onChange={(v) => setFilter(v as typeof filter)}
-              />
-              <Menu
                 label={sort === 'title' ? 'Title A–Z' : 'Production date'}
                 icon="sort"
                 value={sort}
@@ -236,7 +205,6 @@ function DashboardPage() {
                     <tr>
                       <th scope="col">Document</th>
                       <th scope="col">Production date</th>
-                      <th scope="col">Status</th>
                       <th scope="col">Distribution</th>
                       <th scope="col">
                         <span className="pd-sr-only">Actions</span>
@@ -279,11 +247,7 @@ function DashboardPage() {
                               {displayDate(item.productionDate) || 'Not set'}
                             </span>
                           </td>
-                          <td data-label="Status">
-                            <Status value={item.status || 'draft'}>
-                              {labels[item.status || 'draft']}
-                            </Status>
-                          </td>
+
                           <td
                             className="pd-distribution"
                             data-label="Distribution"
@@ -380,7 +344,7 @@ function DashboardPage() {
                     ? `${items.length} call sheets`
                     : `${filtered.length} of ${items.length} call sheets`}
                 </span>
-                {(search || filter !== 'all') && (
+                {search && (
                   <Button variant="quiet" onClick={clear}>
                     Clear filters
                   </Button>

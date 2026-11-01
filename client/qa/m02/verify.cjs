@@ -100,32 +100,8 @@ async function testDashboard() {
   const { c, p, state } = await setup()
   await tableReady(p)
   await shot(p, '01-dashboard')
-  await p.getByRole('button', { name: 'All statuses', exact: true }).click()
-  assert.equal(
-    await p.evaluate(() => document.activeElement.getAttribute('role')),
-    'menuitemradio',
-  )
-  await shot(p, '02-status-menu')
-  await p.getByRole('menuitemradio', { name: 'Draft', exact: true }).click()
-  assert.equal(await p.locator('.pd-documents tbody tr').count(), 2)
-  await p.getByRole('button', { name: 'Draft', exact: true }).press('ArrowDown')
-  await p.keyboard.press('Home')
-  await p.keyboard.press('End')
-  assert.match(
-    await p.evaluate(() => document.activeElement.textContent),
-    /Revised/,
-  )
-  await p.keyboard.press('Escape')
-  assert.equal(
-    await p
-      .getByRole('button', { name: 'Draft', exact: true })
-      .evaluate((n) => n === document.activeElement),
-    true,
-  )
-  await p.getByRole('button', { name: 'Draft', exact: true }).click()
-  await p
-    .getByRole('menuitemradio', { name: 'All statuses', exact: true })
-    .click()
+  assert.equal(await p.getByRole('button',{name:'All statuses',exact:true}).count(),0)
+  assert.equal(await p.getByRole('columnheader',{name:'Status',exact:true}).count(),0)
   await p
     .getByRole('searchbox', { name: 'Search call sheets' })
     .fill('observatory')
@@ -533,9 +509,9 @@ async function testLongAndMotion() {
     viewport: { width: 390, height: 844 },
   })
   await tableReady(touch.p)
-  await touch.p.getByRole('button', { name: 'All statuses' }).tap()
-  await touch.p.getByRole('menuitemradio', { name: 'Draft', exact: true }).tap()
-  assert.equal(await touch.p.locator('tbody tr').count(), 2)
+  await touch.p.getByRole('button', { name: 'Production date' }).tap()
+  await touch.p.getByRole('menuitemradio', { name: 'Title A–Z', exact: true }).tap()
+  assert.equal(await touch.p.locator('tbody tr').count(), 6)
   await touch.p.getByRole('button', { name: 'Open navigation' }).tap()
   await touch.p
     .getByRole('dialog')

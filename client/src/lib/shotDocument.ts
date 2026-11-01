@@ -164,7 +164,7 @@ export function nextShotNumber(doc: Y.Doc, sceneId: string) {
     used = new Set(
       [...shots(doc).values()]
         .filter((s) => str(s, 'sceneId') === sceneId)
-        .map((s) => str(s, 'number')),
+        .map((s) => displayShot(doc, s)),
     )
   for (let i = 0; i < 100000; i++) {
     let n = i + 1,
@@ -245,4 +245,19 @@ export function reorder(
     () => change(doc, list[index], key, (low + high) / 2),
     'local',
   )
+}
+
+export function displayShot(doc: Y.Doc, shot: RecordMap) {
+  const n = str(shot, 'number'),
+    scene = str(scenes(doc).get(str(shot, 'sceneId')), 'number')
+  if (!scene || !/^[A-Za-z]+$/.test(n)) return n
+  const full = `${scene}-${n}`,
+    collision = [...shots(doc).values()].some(
+      (other) =>
+        other !== shot &&
+        !other.get('deleted') &&
+        str(other, 'sceneId') === str(shot, 'sceneId') &&
+        str(other, 'number') === full,
+    )
+  return collision ? `${full} [${n}]` : full
 }

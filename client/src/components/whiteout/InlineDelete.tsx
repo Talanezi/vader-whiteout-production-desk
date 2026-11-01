@@ -3,12 +3,14 @@ import Icon from './Icon'
 export default function InlineDelete({
   label,
   onConfirm,
+  initialConfirm = false,
 }: {
+  initialConfirm?: boolean
   label: string
   onConfirm: () => Promise<void>
 }) {
   const [state, setState] = useState<'idle' | 'confirm' | 'pending' | 'error'>(
-      'idle',
+      initialConfirm ? 'confirm' : 'idle',
     ),
     [error, setError] = useState('')
   const trigger = useRef<HTMLButtonElement>(null),

@@ -3,6 +3,7 @@ import { Link, useBlocker, useParams, useSearchParams } from 'react-router-dom'
 import * as Y from 'yjs'
 import { Button, IconButton } from '../components/whiteout/Button'
 import Icon from '../components/whiteout/Icon'
+import NameTooltip from '../components/whiteout/NameTooltip'
 import Menu from '../components/whiteout/Menu'
 import ModeSwitch from '../components/whiteout/ModeSwitch'
 import Combobox from '../components/whiteout/Combobox'
@@ -23,6 +24,7 @@ import ShotGrid from '../components/shots/ShotGrid'
 import ShootDays from '../components/shots/ShootDays'
 import ShotPdf from '../components/shots/ShotPdf'
 import {
+  displayShot,
   addScene,
   addShot,
   change,
@@ -290,7 +292,15 @@ export default function ShotListPage() {
         data-shot-id={str(s, 'id')}
         data-remote={peer?.user?.name}
       >
-        {narrativeFields.includes(field) && c.provider ? (
+        {field === 'number' ? (
+          <ShotNumberInput
+            label={label}
+            value={str(s, field)}
+            display={displayShot(c.doc, s)}
+            onFocus={() => selectCell(s, field)}
+            onChange={(v) => edit(s, field, v)}
+          />
+        ) : narrativeFields.includes(field) && c.provider ? (
           <CollaborativeText
             text={s.get(field) as Y.Text}
             provider={c.provider}
@@ -347,6 +357,11 @@ export default function ShotListPage() {
     <aside className="pd-scene-rail">
       <div className="pd-scene-heading">
         <span>Scenes</span>
+        <IconButton
+          name="collapse"
+          label="Collapse scenes"
+          onClick={() => setRailCollapsed(true)}
+        />
         <IconButton
           name="plus"
           label="Add scene"
@@ -554,19 +569,17 @@ export default function ShotListPage() {
                   all.findIndex((other) => other.user?.id === p.user?.id) === i,
               )
               .map((p) => (
-                <span
+                <NameTooltip
                   key={p.clientId}
-                  className="pd-avatar"
-                  title={`${p.user!.name}${p.user!.id === c.session?.user.id ? ' · you' : ''}`}
-                  aria-label={p.user!.name}
-                  style={{ '--peer-color': p.user!.color } as CSSProperties}
+                  name={p.user!.name}
+                  color={p.user!.color}
                 >
                   {p
                     .user!.name.split(/\s+/)
                     .map((w) => w[0])
                     .slice(0, 2)
                     .join('')}
-                </span>
+                </NameTooltip>
               ))}
           </div>
           <button
@@ -645,15 +658,7 @@ export default function ShotListPage() {
                   onClick={() => c.undo.redo()}
                 />
               </div>
-              <Button onClick={() => setDayOpen(true)}>Shoot days</Button>
-              {mode !== 'shooting' && (
-                <Button
-                  aria-pressed={railCollapsed}
-                  onClick={() => setRailCollapsed((v) => !v)}
-                >
-                  {railCollapsed ? 'Show scenes' : 'Hide scenes'}
-                </Button>
-              )}
+
               <Button
                 aria-pressed={focused}
                 onClick={() => {
@@ -681,9 +686,22 @@ export default function ShotListPage() {
                 label="Choose columns"
                 onClick={() => setColumnOpen(true)}
               />
-              <Button icon="import" onClick={() => setImporting(true)}>
-                Import
-              </Button>
+              <Menu
+                label="Workspace actions"
+                compact
+                items={[
+                  {
+                    value: 'import',
+                    label: 'Import',
+                    onSelect: () => setImporting(true),
+                  },
+                  {
+                    value: 'days',
+                    label: 'Shooting days',
+                    onSelect: () => setMode('shooting'),
+                  },
+                ]}
+              />
               <Button
                 icon="plus"
                 onClick={() => {
@@ -711,6 +729,13 @@ export default function ShotListPage() {
             {!railCollapsed && mode !== 'shooting' && sceneRail}
             <section className="pd-shot-center" aria-label="Shot table">
               <div className="pd-shot-context">
+                {railCollapsed && mode !== 'shooting' && (
+                  <IconButton
+                    name="expand"
+                    label="Show scenes"
+                    onClick={() => setRailCollapsed(false)}
+                  />
+                )}
                 <span>
                   {mode === 'scene'
                     ? `Scene ${str(scenes(c.doc).get(selectedScene), 'number')}`
@@ -883,7 +908,7 @@ export default function ShotListPage() {
                 <span>
                   {allScenes.length} scenes · {allShots.length} shots
                 </span>
-                <span>Arrows · Enter to edit · Shift to select</span>
+
                 <span>
                   {visible
                     .reduce(
@@ -1084,4 +1109,32 @@ function MobileInspector({
       {children}
     </Overlay>
   ) : null
+}
+
+function ShotNumberInput({
+  label,
+  value,
+  display,
+  onFocus,
+  onChange,
+}: {
+  label: string
+  value: string
+  display: string
+  onFocus: () => void
+  onChange: (value: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  return (
+    <input
+      aria-label={label}
+      value={editing ? value : display}
+      onFocus={() => {
+        setEditing(true)
+        onFocus()
+      }}
+      onBlur={() => setEditing(false)}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
 }

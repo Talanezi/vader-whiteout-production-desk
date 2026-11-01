@@ -34,12 +34,12 @@ export type PrintReference = { shotId: string; assignmentId?: string };
 export type TablePrintSpec = {
   version: 2;
   scope: 'entire' | 'current' | 'selected' | 'area' | 'scenes' | 'day';
-  layout: 'table' | 'report';
+  layout: 'table' | 'expanded' | 'exact' | 'report';
   rows: PrintReference[];
   columns: { field: PrintField; width: number }[];
   sceneIds?: string[];
   dayId?: string;
-  paper: 'letter' | 'a4';
+  paper: 'letter' | 'a4' | 'a3' | 'tabloid';
   orientation: 'landscape' | 'portrait';
   margins: 'normal' | 'narrow';
   scaling: 'fit-width' | 'actual' | 'readable';
@@ -85,8 +85,8 @@ export function validatePrintSpec(raw: TablePrintSpec) {
     !['entire', 'current', 'selected', 'area', 'scenes', 'day'].includes(
       raw.scope,
     ) ||
-    !['table', 'report'].includes(raw.layout) ||
-    !['letter', 'a4'].includes(raw.paper) ||
+    !['table', 'expanded', 'exact', 'report'].includes(raw.layout) ||
+    !['letter', 'a4', 'a3', 'tabloid'].includes(raw.paper) ||
     !['portrait', 'landscape'].includes(raw.orientation) ||
     !['normal', 'narrow'].includes(raw.margins) ||
     !['fit-width', 'actual', 'readable'].includes(raw.scaling) ||
@@ -116,7 +116,7 @@ export function validatePrintSpec(raw: TablePrintSpec) {
   if (
     !Array.isArray(raw.columns) ||
     !raw.columns.length ||
-    raw.columns.length > 24
+    raw.columns.length > 26
   )
     invalid('Choose printable columns.');
   const seen = new Set<string>();
@@ -241,6 +241,20 @@ export function printValue(row: PrintRow, field: PrintField) {
           .join(', ')
       : 'Not scheduled';
   }
+  if (field === 'number') {
+    const n = String(row.shot.number || ''),
+      scene = String(row.scene.number || '');
+    if (!scene || !/^[A-Za-z]+$/.test(n)) return n;
+    const full = `${scene}-${n}`,
+      collision = Object.values(row.data.shots).some(
+        (other) =>
+          other.id !== row.shot.id &&
+          !other.deleted &&
+          other.sceneId === row.shot.sceneId &&
+          other.number === full,
+      );
+    return collision ? `${full} [${n}]` : full;
+  }
   if (field === 'scene') return String(row.scene.number ?? '');
   if (field === 'sequence') return String(row.index + 1);
   if (field === 'assignmentNotes') return String(row.assignment?.notes ?? '');
@@ -253,7 +267,14 @@ export function computePrintLayout(
   spec: TablePrintSpec,
   columns: TablePrintSpec['columns'],
 ) {
-  const dimensions = spec.paper === 'a4' ? [595.28, 841.89] : [612, 792],
+  const dimensions =
+      spec.paper === 'a3'
+        ? [841.89, 1190.55]
+        : spec.paper === 'tabloid'
+          ? [792, 1224]
+          : spec.paper === 'a4'
+            ? [595.28, 841.89]
+            : [612, 792],
     page =
       spec.orientation === 'landscape'
         ? [dimensions[1], dimensions[0]]
@@ -350,7 +371,7 @@ function cellTex(value: string) {
     .map((token) =>
       /\s/.test(token)
         ? tex(token)
-        : token.length > 6
+        : token.length > 3
           ? (token.match(/.{1,3}/gu) || [])
               .map(tex)
               .join('\\penalty1000\\hskip0pt{}')
@@ -380,7 +401,11 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
         shots: Object.fromEntries(
           rows.map((row, index) => [
             row.reference.shotId,
-            { ...row.shot, order: index * 1024 },
+            {
+              ...row.shot,
+              number: printValue(row, 'number'),
+              order: index * 1024,
+            },
           ]),
         ),
         shootAssignments:
@@ -398,10 +423,15 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
         mode:
           spec.scope === 'day' ? 'shooting' : spec.report?.mode || 'creative',
         orderIds: rows.map((row) => row.reference.shotId),
-        paper: spec.paper,
+        paper: spec.paper === 'a4' ? 'a4' : 'letter',
         sceneIds: spec.scope === 'scenes' ? spec.sceneIds : undefined,
       })
         .replace('landscape]{article}', spec.orientation + ']{article}')
+        .replace('letterpaper', spec.paper === 'a3' ? 'a3paper' : 'letterpaper')
+        .replace(
+          'margin=',
+          `${spec.paper === 'tabloid' ? 'paperwidth=11in,paperheight=17in,' : ''}margin=`,
+        )
         .replace(
           'margin=12mm',
           `margin=${spec.margins === 'narrow' ? 8 : 12}mm`,
@@ -410,7 +440,27 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
       bands: 1,
     };
   }
-  const layout = computePrintLayout(spec, columns),
+  const primary = columns.filter((c) =>
+      ['number', 'coverage', 'camera', 'lens', 'estimatedMinutes'].includes(
+        c.field,
+      ),
+    ),
+    extra =
+      spec.layout === 'expanded'
+        ? columns.filter((c) => !primary.includes(c))
+        : [],
+    layout = computePrintLayout(
+      {
+        ...spec,
+        scaling: spec.layout === 'expanded' ? 'fit-width' : spec.scaling,
+      },
+      spec.layout === 'expanded'
+        ? primary.map((c) => ({
+            ...c,
+            width: Math.min(c.width, c.field === 'coverage' ? 330 : 120),
+          }))
+        : columns,
+    ),
     scopeName = {
       entire: 'Entire Shot List',
       current: 'Current View',
@@ -421,11 +471,18 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
     }[spec.scope],
     title = String(data.meta.name || 'Shot list').slice(0, 180),
     day = spec.dayId ? data.shootDays[spec.dayId] : undefined;
+  if (spec.layout === 'expanded') {
+    const band = layout.bands[0],
+      used = band.reduce((n, c) => n + c.width, 0),
+      full =
+        layout.page[0] - 2 * layout.margin - band.length * 2 * layout.padding;
+    band.forEach((c) => (c.width = (c.width / used) * full));
+  }
   let body = '';
   for (let b = 0; b < layout.bands.length; b++) {
     const band = layout.bands[b];
     if (b) body += '\\clearpage\n';
-    body += `\\noindent{\\bfseries ${tex(title)}}\\hfill{\\small ${tex(scopeName)} · ${rows.length} rows}\\par\n`;
+    body += `\\noindent{\\bfseries ${cellTex(title)}}\\hfill{\\small ${tex(scopeName)} · ${rows.length} ${rows.length === 1 ? 'row' : 'rows'}}\\par\n`;
     if (day) body += `{\\small ${tex(day.date)} · ${tex(day.title)}}\\par\n`;
     if (layout.bands.length > 1)
       body += `{\\footnotesize\\color{muted}Column band ${b + 1} of ${layout.bands.length} · down, then across · shot identity repeats}\\par\n`;
@@ -433,7 +490,7 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
       body +=
         '\\noindent{\\footnotesize\\color{muted}Compact preview: selected text cells are shortened to one line; shot IDs remain complete. This is not a full-text export.}\\par\n';
     const columnSpec = band.map((c) => `P{${c.width.toFixed(2)}pt}`).join(''),
-      head = band.map((c) => tex(printFields[c.field])).join(' & '),
+      head = band.map((c) => cellTex(printFields[c.field])).join(' & '),
       spanWidth =
         band.reduce((n, c) => n + c.width + 2 * layout.padding, 0) -
         2 * layout.padding;
@@ -451,25 +508,45 @@ export function buildTablePrint(data: ShotSnapshot, raw: TablePrintSpec) {
             : pieces(value, band[i].width, layout.font),
         ),
         height = Math.max(...chunks.map((c) => c.length));
+      const together =
+        spec.layout === 'expanded' &&
+        values.every((v) => v.length < 400) &&
+        columns.reduce((n, c) => n + printValue(row, c.field).length, 0) < 1500;
       for (let part = 0; part < height; part++) {
         body +=
           band
             .map((column, index) => {
               let value = chunks[index][part] || '';
               if (column.field === 'number' && part > 0 && !value)
-                value = String(row.shot.number ?? '').slice(0, 32) + ' (cont.)';
+                value = printValue(row, 'number').slice(0, 32) + ' (cont.)';
               if (spec.text === 'single-line' && column.field !== 'number')
                 return `\\truncate{${column.width.toFixed(2)}pt}{${tex(value)}}`;
               return cellTex(value);
             })
             .join(' & ') + ' \\\\ \n';
       }
+      if (together && extra.length) body += '\\noalign{\\penalty10000}\n';
+      if (extra.length) {
+        for (let i = 0; i < extra.length; i += 4) {
+          const content = extra
+            .slice(i, i + 4)
+            .map(
+              (c) =>
+                `${printFields[c.field]}: ${printValue(row, c.field) || '—'}`,
+            )
+            .join('    ·    ');
+          for (const part of pieces(content, spanWidth, layout.font))
+            body += `\\multicolumn{${band.length}}{P{${spanWidth.toFixed(2)}pt}}{${cellTex(together ? part : printValue(row, 'number') + ' · ' + part)}} \\\\ \n`;
+          if (together && i + 4 < extra.length)
+            body += '\\noalign{\\penalty10000}\n';
+        }
+      }
       body += '\\hline\n';
     }
     body += '\\end{longtable}\n';
   }
-  const source = String.raw`\documentclass[10pt,${spec.paper === 'a4' ? 'a4paper' : 'letterpaper'},${spec.orientation}]{article}
-\usepackage[margin=${((layout.margin / 72) * 25.4).toFixed(2)}mm,includeheadfoot,headheight=12pt,headsep=7pt,footskip=16pt]{geometry}
+  const source = String.raw`\documentclass[10pt,${spec.paper === 'a3' ? 'a3paper' : spec.paper === 'tabloid' ? 'letterpaper' : spec.paper === 'a4' ? 'a4paper' : 'letterpaper'},${spec.orientation}]{article}
+\usepackage[${spec.paper === 'tabloid' ? 'paperwidth=11in,paperheight=17in,' : ''}margin=${((layout.margin / 72) * 25.4).toFixed(2)}mm,includeheadfoot,headheight=12pt,headsep=7pt,footskip=16pt]{geometry}
 \usepackage{fontspec}\setmainfont{DejaVuSans.ttf}[BoldFont=DejaVuSans-Bold.ttf,ItalicFont=DejaVuSans-Oblique.ttf]
 \usepackage{longtable,array,booktabs,xcolor,fancyhdr,lastpage,truncate}
 \definecolor{muted}{HTML}{52616A}\definecolor{ink}{HTML}{14202A}

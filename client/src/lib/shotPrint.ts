@@ -26,12 +26,12 @@ export type PrintView = {
 export type PrintSpec = {
   version: 2
   scope: 'entire' | 'current' | 'selected' | 'area' | 'scenes' | 'day'
-  layout: 'table' | 'report'
+  layout: 'table' | 'expanded' | 'exact' | 'report'
   rows: PrintReference[]
   columns: PrintColumn[]
   sceneIds?: string[]
   dayId?: string
-  paper: 'letter' | 'a4'
+  paper: 'letter' | 'a4' | 'a3' | 'tabloid'
   orientation: 'landscape' | 'portrait'
   margins: 'normal' | 'narrow'
   scaling: 'fit-width' | 'actual' | 'readable'
@@ -82,18 +82,26 @@ export const printLabels: Record<PrintField, string> = {
 }
 export function printFit(
   columns: PrintColumn[],
-  paper: 'letter' | 'a4',
+  paper: 'letter' | 'a4' | 'a3' | 'tabloid',
   orientation: 'landscape' | 'portrait',
   margins: 'normal' | 'narrow',
 ) {
   const page =
-      paper === 'letter'
+      paper === 'a3'
         ? orientation === 'landscape'
-          ? [792, 612]
-          : [612, 792]
-        : orientation === 'landscape'
-          ? [841.89, 595.28]
-          : [595.28, 841.89],
+          ? [1190.55, 841.89]
+          : [841.89, 1190.55]
+        : paper === 'tabloid'
+          ? orientation === 'landscape'
+            ? [1224, 792]
+            : [792, 1224]
+          : paper === 'letter'
+            ? orientation === 'landscape'
+              ? [792, 612]
+              : [612, 792]
+            : orientation === 'landscape'
+              ? [841.89, 595.28]
+              : [595.28, 841.89],
     available = page[0] - (2 * (margins === 'narrow' ? 8 : 12) * 72) / 25.4,
     scale = Math.min(
       1,

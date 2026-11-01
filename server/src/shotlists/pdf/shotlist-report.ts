@@ -92,6 +92,25 @@ export function tex(value: unknown) {
     .join('');
 }
 export function buildShotLatex(data: ShotSnapshot, options: PrintOptions = {}) {
+  data = {
+    ...data,
+    shots: Object.fromEntries(
+      Object.entries(data.shots).map(([id, shot]) => {
+        const n = String(shot.number || ''),
+          scene = String(data.scenes[String(shot.sceneId)]?.number || '');
+        return [
+          id,
+          {
+            ...shot,
+            number:
+              scene && /^[A-Za-z]+$/.test(n)
+                ? `${scene}-${n}${Object.values(data.shots).some((other) => other.id !== shot.id && !other.deleted && other.sceneId === shot.sceneId && other.number === `${scene}-${n}`) ? ` [${n}]` : ''}`
+                : n,
+          },
+        ];
+      }),
+    ),
+  };
   const o = {
     mode: 'creative',
     paper: 'letter',

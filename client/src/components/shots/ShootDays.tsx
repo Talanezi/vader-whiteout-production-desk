@@ -14,6 +14,7 @@ import {
   validDate,
 } from '../../lib/shotSchedule'
 import {
+  displayShot,
   ordered,
   shotOperation,
   shots,
@@ -25,6 +26,8 @@ import {
 import { Button } from '../whiteout/Button'
 import DatePicker from '../whiteout/DatePicker'
 import Combobox from '../whiteout/Combobox'
+import { Overlay } from '../whiteout/Overlay'
+import Menu from '../whiteout/Menu'
 import InlineDelete from '../whiteout/InlineDelete'
 import QuantityInput from '../whiteout/QuantityInput'
 function AssignmentRow({
@@ -61,7 +64,7 @@ function AssignmentRow({
         <button
           ref={sortable.handleRef}
           className="pd-row-grip"
-          aria-label={`Reorder assignment ${str(shot, 'number')}`}
+          aria-label={`Reorder assignment ${displayShot(doc, shot)}`}
         >
           ⠿
         </button>
@@ -72,12 +75,12 @@ function AssignmentRow({
           <button
             className="pd-day-shot-link"
             onClick={() => onSelect(str(shot, 'id'))}
-            aria-label={`Inspect scheduled shot ${str(shot, 'number')}`}
+            aria-label={`Inspect scheduled shot ${displayShot(doc, shot)}`}
           >
-            {str(shot, 'number')}
+            {displayShot(doc, shot)}
           </button>
         ) : (
-          <strong>{str(shot, 'number')}</strong>
+          <strong>{displayShot(doc, shot)}</strong>
         )}
         {record.get('pickup') === true && <small>Pickup</small>}
       </td>
@@ -86,22 +89,24 @@ function AssignmentRow({
       <td>{str(shot, 'camera')}</td>
       <td>
         <QuantityInput
-          label={`Estimate for ${str(shot, 'number')}`}
-          value={str(record, 'estimatedMinutes')}
+          label={`Estimate for ${displayShot(doc, shot)}`}
+          value={
+            str(record, 'estimatedMinutes') || str(shot, 'estimatedMinutes')
+          }
           onFocus={() => {}}
           onChange={(value) => change(doc, record, 'estimatedMinutes', value)}
         />
       </td>
       <td>
         <input
-          aria-label={`Schedule notes for ${str(shot, 'number')}`}
+          aria-label={`Schedule notes for ${displayShot(doc, shot)}`}
           value={str(record, 'notes')}
           onChange={(e) => change(doc, record, 'notes', e.target.value)}
         />
       </td>
       <td>
         <Combobox
-          label={`Status for ${str(shot, 'number')}`}
+          label={`Status for ${displayShot(doc, shot)}`}
           value={str(record, 'status')}
           options={['planned', 'ready', 'completed', 'held']}
           custom={false}
@@ -111,7 +116,7 @@ function AssignmentRow({
       </td>
       <td>
         <Combobox
-          label={`Move ${str(shot, 'number')} to day`}
+          label={`Move ${displayShot(doc, shot)} to day`}
           value={str(record, 'dayId')}
           options={dayOptions}
           custom={false}
@@ -137,7 +142,7 @@ function AssignmentRow({
         />
         <div className="pd-assignment-actions">
           <button
-            aria-label={`Move assignment ${str(shot, 'number')} earlier`}
+            aria-label={`Move assignment ${displayShot(doc, shot)} earlier`}
             disabled={!index}
             onClick={() =>
               moveRecords(
@@ -151,7 +156,7 @@ function AssignmentRow({
             ↑
           </button>
           <button
-            aria-label={`Move assignment ${str(shot, 'number')} later`}
+            aria-label={`Move assignment ${displayShot(doc, shot)} later`}
             disabled={index === list.length - 1}
             onClick={() =>
               moveRecords(
@@ -165,7 +170,7 @@ function AssignmentRow({
             ↓
           </button>
           <InlineDelete
-            label={`assignment ${str(shot, 'number')}`}
+            label={`assignment ${displayShot(doc, shot)}`}
             onConfirm={async () => {
               change(doc, record, 'deleted', true)
             }}
@@ -188,6 +193,12 @@ export default function ShootDays({
   selected: string[]
   onError: (message: string) => void
 }) {
+  const [deletingDay, setDeletingDay] = useState(false)
+  const [editing, setEditing] = useState<'new' | 'edit' | null>(null),
+    [picker, setPicker] = useState(false),
+    [search, setSearch] = useState(''),
+    [sceneFilter, setSceneFilter] = useState(''),
+    [note, setNote] = useState('')
   const all = ordered(days(doc)),
     [dayId, setDay] = useState(str(all[0], 'id')),
     [date, setDate] = useState(''),
@@ -203,11 +214,16 @@ export default function ShootDays({
     allShots = ordered(shots(doc)),
     scheduled = new Set(validAssignments(doc).map((a) => str(a, 'shotId'))),
     available = allShots.filter(
-      (s) => !unscheduled || !scheduled.has(str(s, 'id')),
+      (s) =>
+        (!unscheduled || !scheduled.has(str(s, 'id'))) &&
+        (!sceneFilter || str(s, 'sceneId') === sceneFilter) &&
+        `${displayShot(doc, s)} ${str(s, 'coverage')}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
     ),
     options = all.map((d) => ({
       value: str(d, 'id'),
-      label: `${str(d, 'date')}${str(d, 'title') ? ' · ' + str(d, 'title') : ''}`,
+      label: `${new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(str(d, 'date') + 'T12:00:00Z'))}${str(d, 'title') ? ' · ' + str(d, 'title') : ''}`,
     }))
   const total = list.reduce(
     (n, a) =>
@@ -239,6 +255,7 @@ export default function ShootDays({
       if (!ids.length) throw Error('Select shots to assign.')
       assignShots(doc, id, ids, pickup)
       setChecked(new Set())
+      setPicker(false)
     } catch (e) {
       onError((e as Error).message)
     }
@@ -248,7 +265,7 @@ export default function ShootDays({
       <div className="pd-day-tools">
         {all.length > 0 && (
           <Combobox
-            label="Shoot day"
+            label="Change day"
             options={options}
             value={id}
             onChange={setDay}
@@ -256,101 +273,179 @@ export default function ShootDays({
             custom={false}
           />
         )}
-        <DatePicker
-          label="New shoot date"
-          value={date}
-          onValidityChange={setNewDateValid}
-          onChange={setDate}
-        />
-        <input
-          aria-label="New day label"
-          placeholder="Day label (optional)"
-          maxLength={180}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <Button
-          disabled={!validDate(date) || !newDateValid}
-          onClick={() => {
-            try {
-              setDay(addDay(doc, date, title))
-              setDate('')
-              setTitle('')
-            } catch (e) {
-              onError((e as Error).message)
-            }
-          }}
-        >
-          Add day
-        </Button>
+        {current && (
+          <Menu
+            label="Day actions"
+            compact
+            items={[
+              {
+                value: 'new',
+                label: 'Add day',
+                onSelect: () => setEditing('new'),
+              },
+              {
+                value: 'edit',
+                label: 'Edit day',
+                disabled: !current,
+                onSelect: () => setEditing('edit'),
+              },
+              {
+                value: 'delete',
+                label: 'Delete day',
+                danger: true,
+                disabled: !current,
+                onSelect: () => setDeletingDay(true),
+              },
+            ]}
+          />
+        )}
+        {deletingDay && current && (
+          <InlineDelete
+            initialConfirm
+            label="shoot day and its assignments (master shots are retained)"
+            onConfirm={async () => {
+              shotOperation(
+                doc,
+                () => {
+                  current.set('deleted', true)
+                  validAssignments(doc, id).forEach((a) =>
+                    a.set('deleted', true),
+                  )
+                },
+                'local',
+              )
+              setDeletingDay(false)
+            }}
+          />
+        )}
+        {current ? (
+          <Button
+            disabled={!current}
+            onClick={() => {
+              setChecked(new Set(selected))
+              setPicker(true)
+            }}
+          >
+            Assign Shots
+          </Button>
+        ) : (
+          <Button onClick={() => setEditing('new')}>Add day</Button>
+        )}
       </div>
+      {editing === 'new' && (
+        <Overlay title="Add shooting day" onClose={() => setEditing(null)}>
+          <DatePicker
+            label="New shoot date"
+            value={date}
+            onValidityChange={setNewDateValid}
+            onChange={setDate}
+          />
+          <input
+            aria-label="New day label"
+            placeholder="Day label (optional)"
+            maxLength={180}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <Button
+            disabled={!validDate(date) || !newDateValid}
+            onClick={() => {
+              try {
+                const added = addDay(doc, date, title)
+                change(doc, days(doc).get(added)!, 'note', note)
+                setDay(added)
+                setEditing(null)
+                setDate('')
+                setNote('')
+                setTitle('')
+              } catch (e) {
+                onError((e as Error).message)
+              }
+            }}
+          >
+            Add day
+          </Button>
+          <label className="pd-field">
+            Production note (optional)
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </Overlay>
+      )}
       {current && (
         <>
-          <div className="pd-day-tools pd-day-details">
-            <DatePicker
-              label="Planned date"
-              required
-              value={str(current, 'date')}
-              onChange={(v) => {
-                if (validDate(v))
-                  shotOperation(doc, () => change(doc, current, 'date', v))
-              }}
-            />
-            <input
-              aria-label="Day label"
-              value={str(current, 'title')}
-              maxLength={180}
-              onChange={(e) => change(doc, current, 'title', e.target.value)}
-            />
-            <input
-              aria-label="Day location / production note"
-              placeholder="Location / production note"
-              value={str(current, 'note')}
-              onChange={(e) => change(doc, current, 'note', e.target.value)}
-            />
-            <InlineDelete
-              label="shoot day and its assignments (master shots are retained)"
-              onConfirm={async () =>
-                shotOperation(
-                  doc,
-                  () => {
-                    current.set('deleted', true)
-                    validAssignments(doc, id).forEach((a) =>
-                      a.set('deleted', true),
-                    )
-                  },
-                  'local',
-                )
-              }
-            />
-          </div>
-          <div className="pd-day-assign">
-            <label>
+          {editing === 'edit' && (
+            <Overlay title="Edit shooting day" onClose={() => setEditing(null)}>
+              <DatePicker
+                label="Planned date"
+                required
+                value={str(current, 'date')}
+                onChange={(v) => {
+                  if (validDate(v))
+                    shotOperation(doc, () => change(doc, current, 'date', v))
+                }}
+              />
               <input
-                type="checkbox"
-                checked={pickup}
-                onChange={(e) => setPickup(e.target.checked)}
-              />{' '}
-              Pickup / repeat assignment
-            </label>
-            <Button
-              disabled={!selected.length}
-              onClick={() => assign(selected)}
+                aria-label="Day label"
+                placeholder="Day label (optional)"
+                value={str(current, 'title')}
+                maxLength={180}
+                onChange={(e) => change(doc, current, 'title', e.target.value)}
+              />
+              <input
+                aria-label="Day location / production note"
+                placeholder="Location / production note"
+                value={str(current, 'note')}
+                onChange={(e) => change(doc, current, 'note', e.target.value)}
+              />
+            </Overlay>
+          )}
+          {picker && (
+            <Overlay
+              title="Assign shots"
+              onClose={() => setPicker(false)}
+              footer={
+                <Button
+                  disabled={!checked.size}
+                  onClick={() => assign([...checked])}
+                >
+                  Assign {checked.size} shots
+                </Button>
+              }
             >
-              Assign {selected.length || 'selected'} shot
-              {selected.length === 1 ? '' : 's'}
-            </Button>
-            <details>
-              <summary>
-                Choose shots · {allShots.length - scheduled.size} unscheduled
-              </summary>
+              <input
+                aria-label="Search assignment shots"
+                placeholder="Search shots…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Combobox
+                label="Filter assignment scene"
+                value={sceneFilter}
+                options={[
+                  { value: '', label: 'All scenes' },
+                  ...ordered(scenes(doc)).map((s) => ({
+                    value: str(s, 'id'),
+                    label: `Scene ${str(s, 'number')}`,
+                  })),
+                ]}
+                custom={false}
+                onChange={setSceneFilter}
+              />
               <label>
                 <input
                   type="checkbox"
                   checked={unscheduled}
                   onChange={(e) => setUnscheduled(e.target.checked)}
-                />{' '}
+                />
                 Unscheduled only
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={pickup}
+                  onChange={(e) => setPickup(e.target.checked)}
+                />
+                Pickup / repeat assignment
               </label>
               <div className="pd-day-shot-picker">
                 {available.map((s) => (
@@ -366,19 +461,13 @@ export default function ShootDays({
                         setChecked(next)
                       }}
                     />
-                    <strong>{str(s, 'number')}</strong>
+                    <strong>{displayShot(doc, s)}</strong>
                     <span>{str(s, 'coverage')}</span>
                   </label>
                 ))}
               </div>
-              <Button
-                disabled={!checked.size}
-                onClick={() => assign([...checked])}
-              >
-                Assign {checked.size} shots
-              </Button>
-            </details>
-          </div>
+            </Overlay>
+          )}
           <DragDropProvider
             sensors={shotSensors}
             onDragEnd={(e) => {
@@ -442,12 +531,7 @@ export default function ShootDays({
           )}
         </>
       )}
-      {!current && (
-        <p className="pd-muted">
-          Add a shooting date to plan a day. Creative and planning order remain
-          independent.
-        </p>
-      )}
+      {!current && <p className="pd-muted">No shooting days yet.</p>}
     </div>
   )
 }

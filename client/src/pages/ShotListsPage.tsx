@@ -11,6 +11,8 @@ import {
 import { Button } from '../components/whiteout/Button'
 import { Overlay } from '../components/whiteout/Overlay'
 import DatePicker from '../components/whiteout/DatePicker'
+import Menu from '../components/whiteout/Menu'
+import InlineDelete from '../components/whiteout/InlineDelete'
 import Icon from '../components/whiteout/Icon'
 import { getAuthToken } from '../lib/api'
 import { shotRequest, type ShotListMetadata } from '../lib/shotApi'
@@ -20,6 +22,8 @@ export default function ShotListsPage() {
     navigate = useNavigate(),
     notify = useToast(),
     token = getAuthToken()
+  const [renaming, setRenaming] = useState<ShotListMetadata | null>(null),
+    [deleteId, setDeleteId] = useState('')
   const creating = location.pathname.endsWith('/new')
   const [items, setItems] = useState<ShotListMetadata[]>([]),
     [loading, setLoading] = useState(true),
@@ -80,22 +84,63 @@ export default function ShotListsPage() {
       ) : items.length ? (
         <div className="pd-shot-list-index">
           {items.map((item) => (
-            <Link to={`/shotlists/${item.id}`} key={item.id}>
-              <strong>
-                {item.name}
-                <small>
-                  {item.sceneCount ?? 0} scenes · {item.shotCount ?? 0} shots
-                </small>
-              </strong>
-              <span>
-                {item.dates?.length
-                  ? item.dates.length === 1
-                    ? item.dates[0]
-                    : `${item.dates[0]} – ${item.dates[item.dates.length - 1]}`
-                  : 'Not scheduled'}
-              </span>
-              <Icon name="arrow" />
-            </Link>
+            <div className="pd-shot-index-row" key={item.id}>
+              <Link to={`/shotlists/${item.id}`}>
+                <strong>
+                  {item.name}
+                  <small>
+                    {item.sceneCount ?? 0} scenes · {item.shotCount ?? 0} shots
+                  </small>
+                </strong>
+                <span>
+                  {item.dates?.length
+                    ? item.dates.length === 1
+                      ? item.dates[0]
+                      : `${item.dates[0]} – ${item.dates[item.dates.length - 1]}`
+                    : 'Not scheduled'}
+                </span>
+                <Icon name="arrow" />
+              </Link>
+              <Menu
+                label={`Actions for ${item.name}`}
+                compact
+                items={[
+                  {
+                    value: 'open',
+                    label: 'Open',
+                    onSelect: () => navigate(`/shotlists/${item.id}`),
+                  },
+                  {
+                    value: 'rename',
+                    label: 'Rename',
+                    onSelect: () => {
+                      setName(item.name)
+                      setRenaming(item)
+                    },
+                  },
+                  {
+                    value: 'delete',
+                    label: 'Delete',
+                    danger: true,
+                    onSelect: () => setDeleteId(item.id),
+                  },
+                ]}
+              />
+              {deleteId === item.id && (
+                <InlineDelete
+                  initialConfirm
+                  label={`shot list ${item.name}`}
+                  onConfirm={async () => {
+                    await shotRequest(`/${item.id}/manage`, {
+                      action: 'archive',
+                    })
+                    setItems((old) => old.filter((i) => i.id !== item.id))
+                    setDeleteId('')
+                    notify('Shot list archived.')
+                  }}
+                />
+              )}
+            </div>
           ))}
         </div>
       ) : (
@@ -115,6 +160,47 @@ export default function ShotListsPage() {
             ) : undefined
           }
         />
+      )}
+      {renaming && (
+        <Overlay
+          title="Rename shot list"
+          onClose={() => setRenaming(null)}
+          footer={
+            <>
+              <Button onClick={() => setRenaming(null)}>Cancel</Button>
+              <Button
+                disabled={!name.trim()}
+                onClick={async () => {
+                  try {
+                    await shotRequest(`/${renaming.id}/manage`, {
+                      action: 'rename',
+                      name,
+                    })
+                    setItems((old) =>
+                      old.map((i) =>
+                        i.id === renaming.id ? { ...i, name } : i,
+                      ),
+                    )
+                    setRenaming(null)
+                  } catch (e) {
+                    setError((e as Error).message)
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </>
+          }
+        >
+          <label className="pd-field">
+            Name
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={180}
+            />
+          </label>
+        </Overlay>
       )}
       {creating && (
         <Overlay

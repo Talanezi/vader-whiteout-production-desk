@@ -1,0 +1,44 @@
+# M03 final product-quality correction
+
+## Product behavior
+
+Download opens directly into a stable two-panel workspace. The right side renders the actual immutable PDF using PDF.js; initial generation and subsequent settings/document updates run automatically after 500 ms. Previous pages remain visible and dimmed during updates. Abort signals and request signatures discard obsolete responses. A six-result revision/settings cache avoids repeat compilation. Page navigation and zoom are client-only. Download is enabled only after the matching bytes have rendered, and uses exactly that Blob. Retry appears only after a real generation error.
+
+All six scopes share one validated print specification and authoritative backend snapshot: Entire Shot List, Current View, Selected Shots, Selected Area, Selected Scenes and Selected Shoot Day. Existing grid selections are recognized on opening; invalid selections are disabled. Scene/day choices live inside print. Current view respects its resolved UUID order, filters and columns. Print presets and custom visibility/order are independent of the main grid. Shot identification is retained.
+
+Compact Table is the narrow/default worksheet. Expanded Technical is recommended automatically for wide technical presets and combines selected primary columns with compact selected technical continuations. No hidden notes are injected. Explicit layout choices remain selected. Exact Grid retains exact column order, readable horizontal bands, repeated identities and band navigation. Letter, A4, A3 and Tabloid support portrait/landscape and normal/narrow margins. Minimum type is 8 pt; excessive fit-width shrinkage is blocked. The optional Detailed Production Report remains available. Explicit single-line text mode labels its truncation; wrapped text is the complete-content default.
+
+Focus is the sole workspace-wide layout button. Scene collapse is in the rail header with a contextual reopen icon. Import/management are secondary menu actions. Shooting Order now starts with the selected readable date, compact day actions, Assign Shots and the sequence. Add/Edit Day and assignment search/scene/multi-select/unscheduled/pickup controls appear only in their focused dialogs. UUIDs, pickups, date-only values, drag grips, collaborative order and master shots retain the existing additive model.
+
+The Shot Lists index has Open/Rename/Delete. Delete is a recoverable archive, persists before closing current sockets and denies archived document access. Recovery procedure is in `qa/m03-final/README.md`. No hard-delete, migration, new invitation system or membership-policy change. Call Sheets loses only its index Status column/filter; editing, publication, distribution and PDF paths remain. Full-name tooltips use existing authenticated presence for owner and peers, support hover/focus/Escape, and clamp horizontally to the viewport. Footer keyboard instructions are removed; keyboard editing remains.
+
+Legacy bare-letter shot labels receive the scene prefix for presentation only. A historical `A` colliding with stored `09-A` is displayed as `09-A [A]`, preserving clear distinction without renumbering or rewriting either UUID/value. The number editor edits the raw source value; merely focusing it never writes a presentation annotation. New-number allocation reserves existing legacy labels. PDF and Shooting Order use the same presentation convention.
+
+Approved Create/Metal, Copy Link, sidebar, inline confirmation style and existing editor/import/collaboration architecture are preserved.
+
+## Renderer decision and licensing
+
+Retain **XeLaTeX + PDF.js**, with the corrected table/expanded geometry. Call Sheets continues using its unchanged pdflatex path. GridCraft's previously inspected print-range, geometry and pagination separation informed this architecture; no Rust/WASM runtime or GridCraft source was copied.
+
+A disposable Node pdfmake **0.2.20** prototype exercised the same local 10/25-shot technical snapshot, repeated headers, wrapped values, typeface and page breaks. Sample results: XeLaTeX 1,039/1,052 ms and 2/4 pages; prototype pdfmake 61/41 ms and 4/10 pages. These are single local measurements of different layout implementations, not an intrinsic engine benchmark: pdfmake could be further optimized. It demonstrates a speed benefit, but does not justify a second primary engine and migration when the existing corrected worksheet provides predictable, readable output and exact preview fidelity. The prototype's stacked two-column notes are less dense than the final expanded worksheet. No pdfmake dependency, font copy or runtime was added to the application. Existing PDF.js, fonts, TeX and prior M03 third-party notices remain included in `client/public/licenses/`; no new distributed third-party code is introduced by this correction.
+
+## Verification evidence
+
+Artifacts are local/ignored at `client/qa/m032/artifacts/final/`. They include private historical workbook content and are deliberately excluded from Git.
+
+- Chromium and compatible WebKit actual-browser matrix: automatic first preview; no Generate; repeated stable transitions across all six scopes; scene/row/area/day contents and ordering; independent Full Technical and Expanded; Exact Grid pages/bands; paper/orientation/margins; rapid changes and deliberately delayed obsolete responses; collaborative changes automatically refresh the saved snapshot; controlled generation failure retains preview/settings; Retry; download/preview SHA-256 equality; no uncaught browser errors.
+- Focus and rail reopen; own and second-collaborator full-name hover/focus/edge handling; add/edit/switch day; multi-assign, pickup, reorder, remove, reload; index rename/archive/restore. A real existing socket is disconnected on archive; HTTP/new sessions deny archived documents.
+- Eight actual physical paper/orientation combinations checked with PDF page geometry, including corrected 11×17/17×11 Tabloid.
+- Realistic 10-shot Full Technical: 2 pages; 25-shot technical day: 4 pages. Original 129 shots: compact wrapped table 7 pages, expanded with all 21 selected technical fields/long notes 22 vertical pages (one page wide), optional detailed report 15. Long selected content is preserved rather than silently clipped. Narrow selected area is one page.
+- Actual PDF pages rendered and visually inspected, including first/last technical sheets, selected area and original-workbook table. Physical word bounds checked across 31 generated PDFs/100 pages. Exact Grid uses horizontal bands intentionally, without shrinking below 8 pt.
+- Chrome/WebKit 390×844 print controls/preview/footer remain usable without outer overflow. Retained M02 21-group QA and M03.1 Create/Metal visual checks passed with index-status expectations updated intentionally.
+- All eight eligible verified roles plus denied/revoked identities retain HTTP/WebSocket coverage. Three-client scheduling/offline edits/backend restart passed. Existing Call Sheet PDF regression passed. Domain/ID tests: 14 passed.
+- Secondary stress fixtures: 500/2,000 shots, ~2,171 DOM nodes. Sample initial loads 747/1,197 ms; full-technical view 95/164 ms; saved edits 348/332 ms; resize 162/156 ms. Local measurements only.
+
+The prior M03.2 Generate/Refresh print UI assertions are superseded by the new acceptance tests; they are not claimed to pass unchanged. Physical Safari/iOS hardware was not tested; macOS-compatible WebKit was.
+
+## Release
+
+Source and website release hashes, Railway/GitHub Pages results, normal authenticated live browser evidence and before/after production-state preservation are recorded after publication. No production test document, import, deletion or migration is needed. The pre-release read-only baseline is one Shot List containing five active shots/two scenes, seven Call Sheets and 26 roster people; historical source IDs/UUIDs and document state hash are preserved. This is the owner's current baseline, not the earlier milestone's stale empty-document/eight-call-sheet count.
+
+No M04 implementation is included. Storyboards follows acceptance of this completed M03 correction.

@@ -88,30 +88,11 @@ async function main() {
     const { p, c } = await createFixturePage(browser, { root: state.root })
     await p.locator('.pd-table tbody tr').first().waitFor()
     await p.screenshot({ path: path.join(out, '01-dashboard.png') })
-    await p.getByRole('button', { name: 'All statuses', exact: true }).click()
-    let menu = await p.getByRole('menu').boundingBox()
-    assert.ok(
-      menu.width >= 120 &&
-        menu.width <=
-          (
-            await p
-              .getByRole('button', { name: 'All statuses', exact: true })
-              .boundingBox()
-          ).width +
-            34,
-    )
-    assert.ok(
-      (await p
-        .locator('.pd-menu-item')
-        .first()
-        .evaluate((e) => e.getBoundingClientRect().height)) <= 40,
-    )
-    await p.screenshot({ path: path.join(out, '02-compact-status.png') })
-    await p.keyboard.press('Escape')
+    assert.equal(await p.getByRole('button',{name:'All statuses',exact:true}).count(),0)
     await p
       .getByRole('button', { name: 'Production date', exact: true })
       .click()
-    menu = await p.getByRole('menu').boundingBox()
+    const menu = await p.getByRole('menu').boundingBox()
     assert.ok(
       menu.width >= 120 &&
         menu.width <=

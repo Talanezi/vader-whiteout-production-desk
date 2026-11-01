@@ -26,7 +26,7 @@ async function main() {
     await p.getByRole('heading', { name: 'Call sheets', exact: true }).waitFor()
     const errors = []
     p.on('pageerror', (e) => errors.push(e.message))
-    for (const name of ['All statuses', 'Production date']) {
+    for (const name of ['Production date']) {
       const trigger = p.getByRole('button', { name, exact: true })
       const a = await trigger.boundingBox()
       await trigger.click()

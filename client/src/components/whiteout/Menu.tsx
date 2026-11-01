@@ -197,6 +197,7 @@ export default function Menu({
       aria-hidden={phase !== 'open' || undefined}
       aria-label={label}
       onKeyDown={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') return
         const controls = available(),
           index = controls.indexOf(document.activeElement as HTMLButtonElement)
         if (e.key === 'Escape') {
@@ -252,7 +253,9 @@ export default function Menu({
           aria-checked={value === undefined ? undefined : value === item.value}
           disabled={item.disabled || phase !== 'open'}
           className={`pd-menu-item ${item.danger ? 'pd-menu-danger' : ''} ${index > 0 && item.danger ? 'pd-menu-separated' : ''}`}
-          onClick={() => {
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            event.stopPropagation()
             close()
             onChange?.(item.value)
             item.onSelect?.()
@@ -294,7 +297,7 @@ export default function Menu({
           }
         }}
       >
-        {icon && <Icon name={icon} />}{' '}
+        {(icon || compact) && <Icon name={icon || 'more'} />}{' '}
         {!compact && (
           <>
             <span>{label}</span>
