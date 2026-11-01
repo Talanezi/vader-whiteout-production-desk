@@ -247,6 +247,22 @@ export function reorder(
   )
 }
 
+export function hasShotNumberConflict(doc: Y.Doc, shot: RecordMap) {
+  const identity = (record: RecordMap) => {
+    const number = str(record, 'number'),
+      scene = str(scenes(doc).get(str(record, 'sceneId')), 'number')
+    return scene && /^[A-Za-z]+$/.test(number) ? `${scene}-${number}` : number
+  }
+  const number = identity(shot)
+  return (
+    !!number &&
+    [...shots(doc).values()].some(
+      (other) =>
+        other !== shot && !other.get('deleted') && identity(other) === number,
+    )
+  )
+}
+
 export function displayShot(doc: Y.Doc, shot: RecordMap) {
   const n = str(shot, 'number'),
     scene = str(scenes(doc).get(str(shot, 'sceneId')), 'number')

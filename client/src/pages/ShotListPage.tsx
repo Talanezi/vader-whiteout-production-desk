@@ -25,6 +25,7 @@ import ShootDays from '../components/shots/ShootDays'
 import ShotPdf from '../components/shots/ShotPdf'
 import {
   displayShot,
+  hasShotNumberConflict,
   addScene,
   addShot,
   change,
@@ -428,6 +429,12 @@ export default function ShotListPage() {
         />
       </div>
       <div className="pd-inspector-body">
+        {hasShotNumberConflict(c.doc, current) && (
+          <p className="pd-print-warning" role="status">
+            Duplicate shot number. Edit Shot number below to distinguish this
+            shot.
+          </p>
+        )}
         <div className="pd-inspector-scene">
           <span>Scene</span>
           <Combobox

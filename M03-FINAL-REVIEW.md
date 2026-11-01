@@ -31,7 +31,7 @@ Entire Shot List, Current View/Current Scene, Selected Shots, rectangular Select
 - Shared EasyUI-derived DrawCheckbox uses native semantics, drawn SVG, mixed/disabled/focus/Space states and reduced motion across Shot Lists only. The exact MIT attribution is distributed. SVG bounds are explicitly 16 px in dense controls.
 - Columns and Layout is compact with a dedicated grip, keyboard ordering and focus/hover alternatives. Reset column widths preserves visibility/order; Restore default layout restores the role-based layout. Its header/footer remain fixed while fields scroll. Repetitive resets/filler are removed.
 - Grid presets are a compact five-item nonsearchable selected-state menu. Verified Scheduler role initializes DP→Cinematography, 1st/2nd AD→AD / Planning, others→Essentials. Existing per-user overrides win and survive account changes without entering Yjs state.
-- Actual collaborator full-name tooltips support own/peer hover/focus and viewport edges. Shared complete identifier presentation preserves raw labels/UUIDs and exposes collisions without silent renaming. Permanent keyboard/filler instructions are removed.
+- Actual collaborator full-name tooltips support own/peer hover/focus and viewport edges. Shared complete identifier presentation preserves raw labels/UUIDs. The inspector flags duplicate canonical numbers and points to the existing editable Shot number field; explicit correction changes only the chosen shot. Merely inspecting never renames source data. Permanent keyboard/filler instructions are removed.
 - Approved Create/Metal, Copy Link, sidebar, inline shot deletion and unrelated applications are preserved.
 
 ## Executed verification
@@ -44,7 +44,7 @@ Reproducible sources: `qa/m03-completion/README.md` and sequential `verify.cjs`.
 - Scheduling create/edit/switch/multiassign/pickups/reorder/remove/reload/day deletion preserving masters; own/peer tooltip; CSV review/mapping/checkboxes and once-only import. Original129 import compares every mapped source field and idempotent retry.
 - Document repeated Delete/Cancel, Escape, simulated failure, successful archive/restore; old WebSocket closed and new denied on archive.
 - Three real authenticated clients: offline/concurrent master/scheduling changes converge, backend restart persistence, personal widths do not enter collaborative state. All eight eligible verified roles and unverified/ineligible/revoked HTTP/WebSocket enforcement pass.
-- 17 domain/import/identifier tests; unchanged actual authenticated Call Sheet PDF regression.
+- 18 domain/import/identifier tests; unchanged actual authenticated Call Sheet PDF regression.
 - Chrome/WebKit mobile 390×844; real Chrome 125/150/200% zoom; 500/2,000-shot stress. Latest 2,000-shot sample: load 1,196 ms, preset 180 ms, saved edit 347 ms, resize 203 ms, 2,243 DOM nodes (local measurements).
 
 Physical Safari/iOS hardware was not tested. Compatible macOS WebKit was. Local disposable records cover destructive and multi-user write scenarios; production smoke is read-only. Product acceptance belongs to the owner, not the test suite.

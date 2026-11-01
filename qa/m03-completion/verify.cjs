@@ -18,6 +18,7 @@ run(path.join(runtime, 'qa/node_modules/.bin/tsx'), [
   '--test',
   'qa/m032/domain.test.ts',
   'qa/m03-final/identifier.test.ts',
+  'qa/m03-completion/identifier.test.ts',
   'qa/m03/import.test.ts',
 ])
 run(path.join(runtime, 'qa/node_modules/.bin/tsx'), [
@@ -32,6 +33,7 @@ for (const name of [
   'unicode',
   'browser',
   'workspace',
+  'duplicate',
   'roles',
   'columns',
   'days',

@@ -1,4 +1,6 @@
-# Final M03 product acceptance
+# Historical M03 correction QA
+
+Superseded by `qa/m03-completion/README.md` and the definitive `M03-FINAL-REVIEW.md`. The old Focus, expanded report, engine comparison and inline document-deletion assertions below describe the previous release, not current acceptance. Use the new suite for current verification.
 
 This is the final M03 correction, not another milestone. Reuses the disposable stack and runtime documented in `qa/m032/README.md`. No test in this directory may run against production; helpers enforce loopback API/browser origins. Browser scripts use existing isolated Playwright packages, including the macOS-compatible WebKit runtime. Artifacts remain ignored under `client/qa/m032/artifacts/final/` because the original workbook contains private production material.
 
@@ -25,7 +27,7 @@ open client/qa/m032/artifacts/final/workbook-129-table.pdf
 
 ## Recovering an archived document
 
-Delete uses the approved inline confirmation and archives the document in its existing Yjs metadata. Its PostgreSQL row and full document state are retained. The active index omits it; session/export/PDF/import and new WebSocket sessions deny it, and current sockets are closed after persistence.
+Current document Delete uses the shared Call Sheets Confirm modal and archives the document in its existing Yjs metadata. Its PostgreSQL row and full document state are retained. The active index omits it; session/export/PDF/import and new WebSocket sessions deny it, and current sockets are closed after persistence.
 
 An authenticated, centrally verified eligible production collaborator can restore a known document UUID with the existing management API:
 
