@@ -80,7 +80,9 @@ export default function StoryboardPage() {
     const measure = () => {
       const top = element.getBoundingClientRect().top + window.scrollY
       const content = element.closest('.pd-content')
-      const bottom = content ? Math.max(24,parseFloat(getComputedStyle(content).paddingBottom)||0) : 24
+      const bottom = content
+        ? Math.max(24, parseFloat(getComputedStyle(content).paddingBottom) || 0)
+        : 24
       const value = `${Math.max(160, window.innerHeight - top - bottom)}px`
       if (element.style.height !== value) element.style.height = value
     }

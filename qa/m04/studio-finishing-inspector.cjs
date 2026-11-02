@@ -84,6 +84,16 @@ const fs = require('node:fs'),
     await page
       .getByRole('textbox', { name: 'Reply', exact: true })
       .fill('Move left.')
+    await page
+      .getByRole('textbox', { name: 'Reply', exact: true })
+      .evaluate(async (n) => {
+        await Promise.all(
+          n
+            .closest('form')
+            .getAnimations()
+            .map((a) => a.finished.catch(() => {})),
+        )
+      })
     await page.screenshot({ path: '/tmp/m04/finishing-comment-reply.png' })
     await page
       .getByRole('button', { name: 'Cancel reply', exact: true })

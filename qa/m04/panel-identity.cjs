@@ -1,7 +1,81 @@
-const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('/tmp/m032/runtime/client/node_modules/typescript'),Y=require('/tmp/m032/runtime/client/node_modules/yjs')
-const load=file=>{const m={exports:{}};new Function('exports','module','require',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText)(m.exports,m,n=>n==='yjs'?Y:require(n));return m.exports}
-const {displayShot}=load('client/src/lib/shotDocument.ts'),{panelIdentity,linkedShotLabel}=load('client/src/lib/storyboards/panelIdentity.ts'),doc=new Y.Doc(),scene=new Y.Map();scene.set('number','09');doc.getMap('scenes').set('scene',scene)
-for(const [id,number,deleted]of[['a','A',false],['b','09-A',false],['c','9.1',false],['d','Z',false],['e','M',true]]){const s=new Y.Map();for(const[k,v]of Object.entries({id,number,sceneId:'scene',deleted}))s.set(k,v);doc.getMap('shots').set(id,s)}
-const snapshot={meta:{},shots:doc.getMap('shots').toJSON(),scenes:doc.getMap('scenes').toJSON()}
-for(const [id,shot]of doc.getMap('shots'))if(!shot.get('deleted'))assert.equal(linkedShotLabel(snapshot,id),displayShot(doc,shot),'Derived label must match accepted M03 displayShot')
-const panel={id:'permanent',label:'9.2 original',notes:'',order:1,links:[{listId:'plan',shotId:'a'},{listId:'plan',shotId:'c'}]};assert.equal(panelIdentity(panel,3,{plan:snapshot}),'09-A [A] +1');assert.equal(panelIdentity({...panel,title:'Director sketch'},3,{plan:snapshot}),'Director sketch');assert.equal(panelIdentity({...panel,links:[]},3,{}),'9.2 original');assert.equal(panelIdentity({...panel,label:'Panel 1',links:[]},3,{}),'Panel 4');assert.equal(panel.id,'permanent');assert.equal(panel.label,'9.2 original');console.log('Canonical M03 prefix/collision labels, primary+count, custom-title precedence and independent original labels/UUIDs passed.')
+const fs = require('node:fs'),
+  assert = require('node:assert/strict'),
+  ts = require('/tmp/m032/runtime/client/node_modules/typescript'),
+  Y = require('/tmp/m032/runtime/client/node_modules/yjs')
+const load = (file) => {
+  const m = { exports: {} }
+  new Function(
+    'exports',
+    'module',
+    'require',
+    ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+      },
+    }).outputText,
+  )(m.exports, m, (n) => (n === 'yjs' ? Y : require(n)))
+  return m.exports
+}
+const { displayShot } = load('client/src/lib/shotDocument.ts'),
+  { panelIdentity, linkedShotLabel } = load(
+    'client/src/lib/storyboards/panelIdentity.ts',
+  ),
+  doc = new Y.Doc(),
+  scene = new Y.Map()
+scene.set('number', '09')
+doc.getMap('scenes').set('scene', scene)
+for (const [id, number, deleted] of [
+  ['a', 'A', false],
+  ['b', '09-A', false],
+  ['c', '9.1', false],
+  ['d', 'Z', false],
+  ['e', 'M', true],
+]) {
+  const s = new Y.Map()
+  for (const [k, v] of Object.entries({
+    id,
+    number,
+    sceneId: 'scene',
+    deleted,
+  }))
+    s.set(k, v)
+  doc.getMap('shots').set(id, s)
+}
+const snapshot = {
+  meta: {},
+  shots: doc.getMap('shots').toJSON(),
+  scenes: doc.getMap('scenes').toJSON(),
+}
+for (const [id, shot] of doc.getMap('shots'))
+  if (!shot.get('deleted'))
+    assert.equal(
+      linkedShotLabel(snapshot, id),
+      displayShot(doc, shot),
+      'Derived label must match accepted M03 displayShot',
+    )
+const panel = {
+  id: 'permanent',
+  label: '9.2 original',
+  notes: '',
+  order: 1,
+  links: [
+    { listId: 'plan', shotId: 'a' },
+    { listId: 'plan', shotId: 'c' },
+  ],
+}
+assert.equal(panelIdentity(panel, 3, { plan: snapshot }), '09-A [A] +1')
+assert.equal(
+  panelIdentity({ ...panel, title: 'Director sketch' }, 3, { plan: snapshot }),
+  'Director sketch',
+)
+assert.equal(panelIdentity({ ...panel, links: [] }, 3, {}), '9.2 original')
+assert.equal(
+  panelIdentity({ ...panel, label: 'Panel 1', links: [] }, 3, {}),
+  'Panel 4',
+)
+assert.equal(panel.id, 'permanent')
+assert.equal(panel.label, '9.2 original')
+console.log(
+  'Canonical M03 prefix/collision labels, primary+count, custom-title precedence and independent original labels/UUIDs passed.',
+)

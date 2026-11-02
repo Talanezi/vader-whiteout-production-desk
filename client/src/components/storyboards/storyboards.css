@@ -1291,4 +1291,7 @@
   }
 }
 /* Keep visually hidden labels inside the pane's clipping/positioning context. */
-.sb-shot-pane-scroll,.sb-shot-select { position: relative; }
+.sb-shot-pane-scroll,
+.sb-shot-select {
+  position: relative;
+}

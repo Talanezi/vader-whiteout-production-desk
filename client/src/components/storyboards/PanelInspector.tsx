@@ -128,6 +128,7 @@ export default function PanelInspector({
                   e.preventDefault()
                   const next = (i + (e.key === 'ArrowRight' ? 1 : 2)) % 3
                   setTab(['details', 'comments', 'history'][next])
+                  if (next !== 2) onPreview('')
                   e.currentTarget.parentElement
                     ?.querySelectorAll('button')
                     [next]?.focus()

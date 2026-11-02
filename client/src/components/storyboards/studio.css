@@ -1818,9 +1818,7 @@
   flex: 0 0 48px;
   text-align: right;
 }
-.sb-viewer-frame
-  > header
-  > .pd-menu-anchor:has(> [aria-label='Drawing frame']) {
+.sb-panel-tools > .pd-menu-anchor:has(> [aria-label='Drawing frame']) {
   width: 154px;
   flex: 0 0 154px;
 }

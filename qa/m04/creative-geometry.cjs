@@ -1,15 +1,108 @@
-const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('/tmp/m032/runtime/client/node_modules/typescript')
-const compiled=ts.transpileModule(fs.readFileSync('client/src/lib/storyboards/creativeGeometry.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText
-const m={exports:{}};new Function('exports','module',compiled)(m.exports,m)
-const {strokeIntersects,trimStroke,recognizeShape}=m.exports
-for(let x=10;x<=100;x+=10)assert.ok(strokeIntersects([[x,0],[x,100]],[[0,50],[110,50]],1),'fast swipe must intersect every thin stroke')
-const parts=trimStroke([[0,0,.2],[100,0,.8]],[[50,-100],[50,100]],10)
-assert.equal(parts.length,2);assert.ok(Math.abs(parts[0][1][0]-40)<1e-7);assert.ok(Math.abs(parts[1][0][0]-60)<1e-7);assert.ok(Math.abs(parts[0][1][2]-.44)<1e-7)
-assert.deepEqual(trimStroke([[0,0],[10,0]],[[0,-20],[0,20]],20),[])
-const line=Array.from({length:30},(_,i)=>[i*5,i*2+Math.sin(i)*.8]);assert.equal(recognizeShape(line)?.type,'line')
-const circle=Array.from({length:81},(_,i)=>[100+60*Math.cos(i*Math.PI/40),100+60*Math.sin(i*Math.PI/40)]);assert.equal(recognizeShape(circle)?.name,'Circle')
-const path=vertices=>vertices.slice(1).flatMap((p,i)=>Array.from({length:20},(_,j)=>vertices[i].map((v,k)=>v+(p[k]-v)*j/19)))
-assert.equal(recognizeShape(path([[0,0],[100,0],[100,60],[0,60],[0,0]]))?.type,'rectangle')
-assert.equal(recognizeShape(path([[0,0],[100,0],[50,80],[0,0]]))?.name,'Triangle')
-const scribble=Array.from({length:80},(_,i)=>[i*2,70*Math.sin(i*1.7)]);assert.equal(recognizeShape(scribble),undefined)
-console.log('Swept thin-stroke intersection, exact capsule trimming/pressure interpolation, complete removal, line/circle/rectangle/triangle recognition and scribble rejection passed.')
+const fs = require('node:fs'),
+  assert = require('node:assert/strict'),
+  ts = require('/tmp/m032/runtime/client/node_modules/typescript')
+const compiled = ts.transpileModule(
+  fs.readFileSync('client/src/lib/storyboards/creativeGeometry.ts', 'utf8'),
+  {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+    },
+  },
+).outputText
+const m = { exports: {} }
+new Function('exports', 'module', compiled)(m.exports, m)
+const { strokeIntersects, trimStroke, recognizeShape } = m.exports
+for (let x = 10; x <= 100; x += 10)
+  assert.ok(
+    strokeIntersects(
+      [
+        [x, 0],
+        [x, 100],
+      ],
+      [
+        [0, 50],
+        [110, 50],
+      ],
+      1,
+    ),
+    'fast swipe must intersect every thin stroke',
+  )
+const parts = trimStroke(
+  [
+    [0, 0, 0.2],
+    [100, 0, 0.8],
+  ],
+  [
+    [50, -100],
+    [50, 100],
+  ],
+  10,
+)
+assert.equal(parts.length, 2)
+assert.ok(Math.abs(parts[0][1][0] - 40) < 1e-7)
+assert.ok(Math.abs(parts[1][0][0] - 60) < 1e-7)
+assert.ok(Math.abs(parts[0][1][2] - 0.44) < 1e-7)
+assert.deepEqual(
+  trimStroke(
+    [
+      [0, 0],
+      [10, 0],
+    ],
+    [
+      [0, -20],
+      [0, 20],
+    ],
+    20,
+  ),
+  [],
+)
+const line = Array.from({ length: 30 }, (_, i) => [
+  i * 5,
+  i * 2 + Math.sin(i) * 0.8,
+])
+assert.equal(recognizeShape(line)?.type, 'line')
+const circle = Array.from({ length: 81 }, (_, i) => [
+  100 + 60 * Math.cos((i * Math.PI) / 40),
+  100 + 60 * Math.sin((i * Math.PI) / 40),
+])
+assert.equal(recognizeShape(circle)?.name, 'Circle')
+const path = (vertices) =>
+  vertices
+    .slice(1)
+    .flatMap((p, i) =>
+      Array.from({ length: 20 }, (_, j) =>
+        vertices[i].map((v, k) => v + ((p[k] - v) * j) / 19),
+      ),
+    )
+assert.equal(
+  recognizeShape(
+    path([
+      [0, 0],
+      [100, 0],
+      [100, 60],
+      [0, 60],
+      [0, 0],
+    ]),
+  )?.type,
+  'rectangle',
+)
+assert.equal(
+  recognizeShape(
+    path([
+      [0, 0],
+      [100, 0],
+      [50, 80],
+      [0, 0],
+    ]),
+  )?.name,
+  'Triangle',
+)
+const scribble = Array.from({ length: 80 }, (_, i) => [
+  i * 2,
+  70 * Math.sin(i * 1.7),
+])
+assert.equal(recognizeShape(scribble), undefined)
+console.log(
+  'Swept thin-stroke intersection, exact capsule trimming/pressure interpolation, complete removal, line/circle/rectangle/triangle recognition and scribble rejection passed.',
+)

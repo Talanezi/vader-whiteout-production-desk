@@ -1,20 +1,210 @@
-const fs=require('node:fs'),assert=require('node:assert/strict'),crypto=require('node:crypto')
-const webkit=process.env.M04_BROWSER==='webkit',pw=require(webkit?'/tmp/whiteout-m03-research/webkit-runtime/node_modules/playwright':'/Users/thameralanezi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),state=JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
-;(async()=>{const browser=await(webkit?pw.webkit:pw.chromium).launch({headless:true});let page;try{
-const headers={Authorization:'Bearer '+state.tokens['101'],'Content-Type':'application/json'},id=crypto.randomUUID();assert.ok((await fetch('http://127.0.0.1:4314/api/storyboards',{method:'POST',headers,body:JSON.stringify({id,name:'M04 final input '+id.slice(0,4)})})).ok)
-page=await browser.newPage({viewport:{width:1600,height:1100}});await page.addInitScript(t=>{localStorage.setItem('token',t);Object.defineProperty(window,'EyeDropper',{value:undefined,configurable:true})},state.tokens['101']);await page.goto(`http://127.0.0.1:5176/productiondesk/#/storyboards/${id}`);await page.getByRole('button',{name:'Start drawing',exact:true}).click();await page.locator('[data-drawing-engine="vectorcraft-639c9d6"]').waitFor();assert.equal(await page.evaluate(()=>document.body.style.position),'fixed')
-const canvas=page.getByLabel('Storyboard drawing canvas'),art=await page.locator('.sb-studio-composition > rect').boundingBox(),at=(x,y)=>[art.x+x*art.width,art.y+y*art.height]
-await page.locator('.sb-property-trigger').click();await page.getByRole('button',{name:'Brush preset',exact:true}).click();await page.getByRole('menuitemradio',{name:'Fine · 2 px',exact:true}).click();await page.locator('.sb-property-trigger').click()
-for(let i=0;i<10;i++){await page.mouse.move(...at(.2+i*.055,.28));await page.mouse.down();await page.mouse.move(...at(.2+i*.055,.68),{steps:4});await page.mouse.up()}
-assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),10)
-await page.getByRole('button',{name:'Eraser (E)',exact:true}).click();await page.mouse.move(...at(.12,.48));await page.mouse.down();await page.mouse.move(...at(.82,.48),{steps:2});await page.mouse.up();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),0)
-await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),10)
-await page.locator('.sb-property-trigger').click();await page.getByRole('button',{name:'Eraser mode',exact:true}).click();await page.getByRole('menuitemradio',{name:'Partial',exact:true}).click();await page.screenshot({path:'/tmp/m04/finishing-eraser-settings.png'});await page.locator('.sb-property-trigger').click()
-await page.mouse.move(...at(.12,.48));await page.mouse.down();await page.mouse.move(...at(.82,.48),{steps:2});await page.mouse.up();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),20)
-await page.screenshot({path:'/tmp/m04/finishing-partial-eraser.png'});await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),10);await page.getByRole('button',{name:'Redo',exact:true}).click();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),20)
-await page.getByRole('button',{name:'Brush (B)',exact:true}).click();await page.getByRole('button',{name:'Studio input settings',exact:true}).click();await page.getByRole('button',{name:'Drawing input',exact:true}).click();await page.getByRole('menuitemradio',{name:'Touch Drawing',exact:true}).click();await page.getByRole('button',{name:'Studio input settings',exact:true}).click()
-await canvas.dispatchEvent('pointerdown',{pointerId:99,pointerType:'touch',isPrimary:true,button:0,buttons:1,clientX:at(.1,.8)[0],clientY:at(.1,.8)[1]});for(let i=1;i<=6;i++)await canvas.dispatchEvent('pointermove',{pointerId:99,pointerType:'touch',buttons:1,clientX:at(.1+i*.03,.8)[0],clientY:at(.1,.8)[1]});await canvas.dispatchEvent('pointerup',{pointerId:99,pointerType:'touch',button:0,clientX:at(.28,.8)[0],clientY:at(.28,.8)[1]});assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),21)
-await page.mouse.move(...at(.3,.85));await page.mouse.down();await page.mouse.move(...at(.65,.86),{steps:16});await page.waitForTimeout(900);await page.mouse.up();assert.equal(await page.locator('.sb-studio-composition [data-object]').count(),22)
-await page.locator('.sb-property-trigger').click();await page.getByRole('button',{name:'Sample color',exact:true}).click();await page.getByRole('status').filter({hasText:'Sample artwork'}).waitFor();await page.mouse.move(...at(.9,.1));await page.screenshot({path:'/tmp/m04/finishing-eyedropper.png'});await page.mouse.click(...at(.9,.1));await page.locator('.sb-property-trigger').click();assert.equal(await page.getByLabel('Custom color HEX').inputValue(),'#ffffff');await page.locator('.sb-property-trigger').click()
-await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('dialog',{name:'Panel viewer',exact:true}).waitFor({state:'hidden'});assert.notEqual(await page.evaluate(()=>document.body.style.position),'fixed');await page.getByRole('status').filter({hasText:'Saved'}).waitFor();await page.reload();await page.locator('.sb-panel-card').first().click();await page.locator('.sb-studio-composition [data-object]').nth(21).waitFor();fs.writeFileSync('/tmp/m04/finishing-input-record.json',JSON.stringify({id,url:page.url()}));console.log('Whole swipe across10 thin strokes, one-step Undo,20 partial fragments, Redo, touch drawing, held shape, actual composition sampling, scroll restore and reload passed.')
-}catch(e){if(page){console.error(await page.locator('[role=alert]').allTextContents());await page.screenshot({path:'/tmp/m04/finishing-input-failure.png'})}throw e}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1})
+const fs = require('node:fs'),
+  assert = require('node:assert/strict'),
+  crypto = require('node:crypto')
+const webkit = process.env.M04_BROWSER === 'webkit',
+  pw = require(
+    webkit
+      ? '/tmp/whiteout-m03-research/webkit-runtime/node_modules/playwright'
+      : '/Users/thameralanezi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright',
+  ),
+  state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
+;(async () => {
+  const browser = await (webkit ? pw.webkit : pw.chromium).launch({
+    headless: true,
+  })
+  let page
+  try {
+    const headers = {
+        Authorization: 'Bearer ' + state.tokens['101'],
+        'Content-Type': 'application/json',
+      },
+      id = crypto.randomUUID()
+    assert.ok(
+      (
+        await fetch('http://127.0.0.1:4314/api/storyboards', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            id,
+            name: 'M04 final input ' + id.slice(0, 4),
+          }),
+        })
+      ).ok,
+    )
+    page = await browser.newPage({ viewport: { width: 1600, height: 1100 } })
+    await page.addInitScript((t) => {
+      localStorage.setItem('token', t)
+      Object.defineProperty(window, 'EyeDropper', {
+        value: undefined,
+        configurable: true,
+      })
+    }, state.tokens['101'])
+    await page.goto(`http://127.0.0.1:5176/productiondesk/#/storyboards/${id}`)
+    await page
+      .getByRole('button', { name: 'Start drawing', exact: true })
+      .click()
+    await page.locator('[data-drawing-engine="vectorcraft-639c9d6"]').waitFor()
+    assert.equal(
+      await page.evaluate(() => document.body.style.position),
+      'fixed',
+    )
+    const canvas = page.getByLabel('Storyboard drawing canvas'),
+      art = await page.locator('.sb-studio-composition > rect').boundingBox(),
+      at = (x, y) => [art.x + x * art.width, art.y + y * art.height]
+    await page.locator('.sb-property-trigger').click()
+    await page
+      .getByRole('button', { name: 'Brush preset', exact: true })
+      .click()
+    await page
+      .getByRole('menuitemradio', { name: 'Fine · 2 px', exact: true })
+      .click()
+    await page.locator('.sb-property-trigger').click()
+    for (let i = 0; i < 10; i++) {
+      await page.mouse.move(...at(0.2 + i * 0.055, 0.28))
+      await page.mouse.down()
+      await page.mouse.move(...at(0.2 + i * 0.055, 0.68), { steps: 4 })
+      await page.mouse.up()
+    }
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      10,
+    )
+    await page.getByRole('button', { name: 'Eraser (E)', exact: true }).click()
+    await page.mouse.move(...at(0.12, 0.48))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.82, 0.48), { steps: 2 })
+    await page.mouse.up()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      0,
+    )
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      10,
+    )
+    await page.locator('.sb-property-trigger').click()
+    await page.getByRole('button', { name: 'Eraser mode', exact: true }).click()
+    await page
+      .getByRole('menuitemradio', { name: 'Partial', exact: true })
+      .click()
+    await page.screenshot({ path: '/tmp/m04/finishing-eraser-settings.png' })
+    await page.locator('.sb-property-trigger').click()
+    await page.mouse.move(...at(0.12, 0.48))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.82, 0.48), { steps: 2 })
+    await page.mouse.up()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      20,
+    )
+    await page.screenshot({ path: '/tmp/m04/finishing-partial-eraser.png' })
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      10,
+    )
+    await page.getByRole('button', { name: 'Redo', exact: true }).click()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      20,
+    )
+    await page.getByRole('button', { name: 'Brush (B)', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: 'Drawing input', exact: true })
+      .click()
+    await page
+      .getByRole('menuitemradio', { name: 'Touch Drawing', exact: true })
+      .click()
+    await page
+      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .click()
+    await canvas.dispatchEvent('pointerdown', {
+      pointerId: 99,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX: at(0.1, 0.8)[0],
+      clientY: at(0.1, 0.8)[1],
+    })
+    for (let i = 1; i <= 6; i++)
+      await canvas.dispatchEvent('pointermove', {
+        pointerId: 99,
+        pointerType: 'touch',
+        buttons: 1,
+        clientX: at(0.1 + i * 0.03, 0.8)[0],
+        clientY: at(0.1, 0.8)[1],
+      })
+    await canvas.dispatchEvent('pointerup', {
+      pointerId: 99,
+      pointerType: 'touch',
+      button: 0,
+      clientX: at(0.28, 0.8)[0],
+      clientY: at(0.28, 0.8)[1],
+    })
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      21,
+    )
+    await page.mouse.move(...at(0.3, 0.85))
+    await page.mouse.down()
+    await page.mouse.move(...at(0.65, 0.86), { steps: 16 })
+    await page.waitForTimeout(900)
+    await page.mouse.up()
+    assert.equal(
+      await page.locator('.sb-studio-composition [data-object]').count(),
+      22,
+    )
+    await page.locator('.sb-property-trigger').click()
+    await page
+      .getByRole('button', { name: 'Sample color', exact: true })
+      .click()
+    await page
+      .getByRole('status')
+      .filter({ hasText: 'Sample artwork' })
+      .waitFor()
+    await page.mouse.move(...at(0.9, 0.1))
+    await page.screenshot({ path: '/tmp/m04/finishing-eyedropper.png' })
+    await page.mouse.click(...at(0.9, 0.1))
+    await page.locator('.sb-property-trigger').click()
+    assert.equal(
+      await page.getByLabel('Custom color HEX').inputValue(),
+      '#ffffff',
+    )
+    await page.locator('.sb-property-trigger').click()
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await page
+      .getByRole('dialog', { name: 'Panel viewer', exact: true })
+      .waitFor({ state: 'hidden' })
+    assert.notEqual(
+      await page.evaluate(() => document.body.style.position),
+      'fixed',
+    )
+    await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor()
+    await page.reload()
+    await page.locator('.sb-panel-card').first().click()
+    await page.locator('.sb-studio-composition [data-object]').nth(21).waitFor()
+    fs.writeFileSync(
+      '/tmp/m04/finishing-input-record.json',
+      JSON.stringify({ id, url: page.url() }),
+    )
+    console.log(
+      'Whole swipe across10 thin strokes, one-step Undo,20 partial fragments, Redo, touch drawing, held shape, actual composition sampling, scroll restore and reload passed.',
+    )
+  } catch (e) {
+    if (page) {
+      console.error(await page.locator('[role=alert]').allTextContents())
+      await page.screenshot({ path: '/tmp/m04/finishing-input-failure.png' })
+    }
+    throw e
+  } finally {
+    await browser.close()
+  }
+})().catch((e) => {
+  console.error(e)
+  process.exitCode = 1
+})

@@ -1,6 +1,6 @@
 # M04 — Storyboards Studio release review
 
-Owner acceptance is pending. The authoritative recovery contract is qa/m04/STUDIO-SPECIFICATION.md. Existing accepted M03 functionality and its PDF renderer remain unchanged.
+Owner acceptance is pending. The current authoritative contract is qa/m04/FINAL-COMPLETION-SPECIFICATION.md. Read [M04-FINAL-COMPLETION.md](M04-FINAL-COMPLETION.md) for the final20-issue correction and verification report; the Studio review below is the preceding baseline. Existing accepted M03 functionality and its PDF renderer remain unchanged.
 
 ## Delivered experience
 
