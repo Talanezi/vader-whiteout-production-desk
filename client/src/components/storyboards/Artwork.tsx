@@ -10,12 +10,14 @@ export default function Artwork({
   label,
   thumbnail = true,
   drawing,
+  drawingHeight = 562.5,
 }: {
   documentId: string
   assetId?: string
   label: string
   thumbnail?: boolean
   drawing?: Annotation[]
+  drawingHeight?: number
 }) {
   const host = useRef<HTMLSpanElement>(null),
     [visible, setVisible] = useState(false)
@@ -43,7 +45,17 @@ export default function Artwork({
   )
   return (
     <span ref={host} className="sb-artwork-preview">
-      {drawing ? <svg className="sb-native-art" viewBox="0 0 1000 562.5" role="img" aria-label={label}><rect width="1000" height="562.5" fill="white"/><DrawingObjects objects={drawing}/></svg> : assetId ? (
+      {drawing ? (
+        <svg
+          className="sb-native-art"
+          viewBox={`0 0 1000 ${drawingHeight}`}
+          role="img"
+          aria-label={label}
+        >
+          <rect width="1000" height={drawingHeight} fill="white" />
+          <DrawingObjects objects={drawing} height={drawingHeight} />
+        </svg>
+      ) : assetId ? (
         error ? (
           <span role="alert">Artwork unavailable</span>
         ) : url ? (
@@ -52,7 +64,9 @@ export default function Artwork({
           <DotsLoader />
         )
       ) : (
-        <span className="sb-drawing-empty"><StudioGlyph name="pen"/></span>
+        <span className="sb-drawing-empty">
+          <StudioGlyph name="pen" />
+        </span>
       )}
     </span>
   )

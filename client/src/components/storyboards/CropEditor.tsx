@@ -19,7 +19,7 @@ export default function CropEditor({
   regions: CropRegion[]
   onChange: (r: CropRegion[]) => void
   selectedId?: string
-  onSelect?: (id:string)=>void
+  onSelect?: (id: string) => void
 }) {
   const [viewportWidth, setViewportWidth] = useState(width)
   const [localSelected, setLocalSelected] = useState(''),
@@ -29,7 +29,10 @@ export default function CropEditor({
     [undo, setUndo] = useState<CropRegion[][]>([]),
     [redo, setRedo] = useState<CropRegion[][]>([])
   const selected = selectedId === undefined ? localSelected : selectedId
-  const setSelected = (id:string) => {setLocalSelected(id);onSelect?.(id)}
+  const setSelected = (id: string) => {
+    setLocalSelected(id)
+    onSelect?.(id)
+  }
   const svg = useRef<SVGSVGElement>(null),
     scroll = useRef<HTMLDivElement>(null)
   const drag = useRef<
@@ -152,11 +155,71 @@ export default function CropEditor({
   const active = current.find((r) => r.id === selected)
   return (
     <div className="sb-crop-editor">
-      <div className="sb-toolstrip sb-crop-tools" role="toolbar" aria-label="Crop tools">
-        <StudioIcon name="fit" label="Fit page" onClick={()=>{const box=scroll.current!;setZoom(Math.min(1,box.clientHeight/((box.clientWidth*height)/width)))}}/>
-        <StudioIcon name="rectangle" label="Draw regions" active={mode==='crop'} onClick={()=>setMode('crop')}/><StudioIcon name="hand" label="Pan page" active={mode==='pan'} onClick={()=>setMode('pan')}/>
-        <span className="sb-dock-divider"/><StudioIcon name="minus" label="Zoom out" onClick={()=>setZoom(z=>Math.max(.25,z-.25))}/><output>{Math.round(zoom*100)}%</output><StudioIcon name="plus" label="Zoom in" onClick={()=>setZoom(z=>Math.min(4,z+.25))}/>
-        <span className="sb-dock-divider"/><StudioIcon name="undo" label="Undo crop" disabled={!undo.length} onClick={()=>{const prev=undo[undo.length-1];setRedo(r=>[...r,regions]);setUndo(u=>u.slice(0,-1));onChange(prev)}}/><StudioIcon name="redo" label="Redo crop" disabled={!redo.length} onClick={()=>{const next=redo[redo.length-1];setUndo(u=>[...u,regions]);setRedo(r=>r.slice(0,-1));onChange(next)}}/>
+      <div
+        className="sb-toolstrip sb-crop-tools"
+        role="toolbar"
+        aria-label="Crop tools"
+      >
+        <StudioIcon
+          name="fit"
+          label="Fit page"
+          onClick={() => {
+            const box = scroll.current!
+            setZoom(
+              Math.min(
+                1,
+                box.clientHeight / ((box.clientWidth * height) / width),
+              ),
+            )
+          }}
+        />
+        <StudioIcon
+          name="rectangle"
+          label="Draw regions"
+          active={mode === 'crop'}
+          onClick={() => setMode('crop')}
+        />
+        <StudioIcon
+          name="hand"
+          label="Pan page"
+          active={mode === 'pan'}
+          onClick={() => setMode('pan')}
+        />
+        <span className="sb-dock-divider" />
+        <StudioIcon
+          name="minus"
+          label="Zoom out"
+          onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+        />
+        <output>{Math.round(zoom * 100)}%</output>
+        <StudioIcon
+          name="plus"
+          label="Zoom in"
+          onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+        />
+        <span className="sb-dock-divider" />
+        <StudioIcon
+          name="undo"
+          label="Undo crop"
+          disabled={!undo.length}
+          onClick={() => {
+            const prev = undo[undo.length - 1]
+            setRedo((r) => [...r, regions])
+            setUndo((u) => u.slice(0, -1))
+            onChange(prev)
+          }}
+        />
+        <StudioIcon
+          name="redo"
+          label="Redo crop"
+          disabled={!redo.length}
+          onClick={() => {
+            const next = redo[redo.length - 1]
+            setUndo((u) => [...u, regions])
+            setRedo((r) => r.slice(0, -1))
+            onChange(next)
+          }}
+        />
       </div>
       <div className="sb-crop-scroll" ref={scroll}>
         <svg
@@ -227,55 +290,101 @@ export default function CropEditor({
           ))}
         </svg>
       </div>
-      {onSelect ? <div className="sb-crop-properties">{active?<><input aria-label={`Region ${current.findIndex(r=>r.id===active.id)+1} original label`} placeholder="Original label" value={active.label} onChange={e=>onChange(regions.map(r=>r.id===active.id?{...r,label:e.target.value}:r))}/><StudioIcon name="duplicate" label="Duplicate crop" onClick={()=>{const id=crypto.randomUUID();commit([...regions,{...active,id,x:Math.min(1-active.width,active.x+.015),y:Math.min(1-active.height,active.y+.015)}]);setSelected(id)}}/><InlineDelete label="crop" onConfirm={async()=>{commit(regions.filter(r=>r.id!==active.id));setSelected('')}}/></>:<span>Select a frame to adjust its label.</span>}</div> : (      <div className="sb-crop-review">
-        {current.map((r, i) => (
-          <div className={r.id === selected ? 'is-selected' : ''} key={r.id}>
-            <button
-              onClick={() => setSelected(r.id)}
-              aria-label={`Select region ${i + 1}`}
-            >
-              <svg
-                viewBox={`${r.x * width} ${r.y * height} ${r.width * width} ${r.height * height}`}
+      {onSelect ? (
+        <div className="sb-crop-properties">
+          {active ? (
+            <>
+              <input
+                aria-label={`Region ${current.findIndex((r) => r.id === active.id) + 1} original label`}
+                placeholder="Original label"
+                value={active.label}
+                onChange={(e) =>
+                  onChange(
+                    regions.map((r) =>
+                      r.id === active.id ? { ...r, label: e.target.value } : r,
+                    ),
+                  )
+                }
+              />
+              <StudioIcon
+                name="duplicate"
+                label="Duplicate crop"
+                onClick={() => {
+                  const id = crypto.randomUUID()
+                  commit([
+                    ...regions,
+                    {
+                      ...active,
+                      id,
+                      x: Math.min(1 - active.width, active.x + 0.015),
+                      y: Math.min(1 - active.height, active.y + 0.015),
+                    },
+                  ])
+                  setSelected(id)
+                }}
+              />
+              <InlineDelete
+                label="crop"
+                onConfirm={async () => {
+                  commit(regions.filter((r) => r.id !== active.id))
+                  setSelected('')
+                }}
+              />
+            </>
+          ) : (
+            <span>Select a frame to adjust its label.</span>
+          )}
+        </div>
+      ) : (
+        <div className="sb-crop-review">
+          {current.map((r, i) => (
+            <div className={r.id === selected ? 'is-selected' : ''} key={r.id}>
+              <button
+                onClick={() => setSelected(r.id)}
+                aria-label={`Select region ${i + 1}`}
               >
-                <image href={image} width={width} height={height} />
-              </svg>
-            </button>
-            <input
-              aria-label={`Region ${i + 1} original label`}
-              placeholder={`Panel ${i + 1}`}
-              value={r.label}
-              onChange={(e) =>
-                onChange(
-                  regions.map((v) =>
-                    v.id === r.id ? { ...v, label: e.target.value } : v,
-                  ),
-                )
-              }
-            />
-            <Button
-              disabled={i === 0}
-              onClick={() => {
-                const next = [...regions]
-                ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
-                commit(next)
-              }}
-            >
-              Earlier
-            </Button>
-            <Button
-              disabled={i === regions.length - 1}
-              onClick={() => {
-                const next = [...regions]
-                ;[next[i + 1], next[i]] = [next[i], next[i + 1]]
-                commit(next)
-              }}
-            >
-              Later
-            </Button>
-          </div>
-        ))}
-      </div>)}
-
+                <svg
+                  viewBox={`${r.x * width} ${r.y * height} ${r.width * width} ${r.height * height}`}
+                >
+                  <image href={image} width={width} height={height} />
+                </svg>
+              </button>
+              <input
+                aria-label={`Region ${i + 1} original label`}
+                placeholder={`Panel ${i + 1}`}
+                value={r.label}
+                onChange={(e) =>
+                  onChange(
+                    regions.map((v) =>
+                      v.id === r.id ? { ...v, label: e.target.value } : v,
+                    ),
+                  )
+                }
+              />
+              <Button
+                disabled={i === 0}
+                onClick={() => {
+                  const next = [...regions]
+                  ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+                  commit(next)
+                }}
+              >
+                Earlier
+              </Button>
+              <Button
+                disabled={i === regions.length - 1}
+                onClick={() => {
+                  const next = [...regions]
+                  ;[next[i + 1], next[i]] = [next[i], next[i + 1]]
+                  commit(next)
+                }}
+              >
+                Later
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

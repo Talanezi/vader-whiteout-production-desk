@@ -11,7 +11,7 @@ The narrow ABI accepts bounded UTF-8 JSON through an allocated input region and 
 Build with Rust 1.99.1 and target wasm32-unknown-unknown:
 
     cargo build --locked --release --target wasm32-unknown-unknown
-    cp target/wasm32-unknown-unknown/release/whiteout_studio_engine.wasm ../client/src/lib/storyboards/whiteout_studio_engine.wasm
+    install -m 644 target/wasm32-unknown-unknown/release/whiteout_studio_engine.wasm ../client/src/lib/storyboards/whiteout_studio_engine.wasm
 
 Using an external CARGO_TARGET_DIR is supported. The checked binary allows the established Node-only frontend release to remain unchanged. Run `node qa/m04/studio-engine.cjs` from the repository root to verify actual WASM execution; `cargo test -p whiteout-studio-engine --lib` verifies the Rust bridge.
 

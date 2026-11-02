@@ -1,0 +1,17 @@
+{
+  "upstream": "https://github.com/storytold/vectorcraft",
+  "revision": "639c9d6ce989dd638ba3488cc26e36d907022bcb",
+  "crates": [
+    "vectorcraft-geom",
+    "vectorcraft-color",
+    "vectorcraft-doc",
+    "vectorcraft-brush"
+  ],
+  "rust": "1.99.1",
+  "target": "wasm32-unknown-unknown",
+  "bytes": 764124,
+  "wasmSha256": "2e678ba5133a761a3ee9c0579838fbbbd38cb37b65418f12919a8d51570e6a27",
+  "bridgeSourceSha256": "0f3229683a7ec20844f488d9ee82a65d59f85ce02fd9495755c30f5e90916530",
+  "cargoLockSha256": "780070cc19689978d5184ec8f95b77235f449125cc44016429f176d07b1faa54",
+  "abi": "bounded-json-v1"
+}

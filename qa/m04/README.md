@@ -1,13 +1,13 @@
-# M04 acceptance and release
+# Current M04 Studio acceptance
 
-Read SPECIFICATION.md for the authoritative scope and M04-REVIEW.md at repository root for results. STATE.md preserves the implementation history.
+STUDIO-SPECIFICATION.md is authoritative. SPECIFICATION.md is the preserved earlier baseline. Read root M04-REVIEW.md for the implementation/results and STATE.md for recovery history.
 
-Use Node 22. Existing isolated dependencies live in /tmp/m032/runtime. Start the isolated fixture services with `node qa/m04/local.cjs`; it uses API4314, frontend5176, private S3 fixture4570, and loopback restart control4318. This QA control is never part of the deployed application. Original M03 fixture services remain independent.
+Node22 is required. Existing isolated dependencies: /tmp/m032/runtime. M04 local services: `node qa/m04/local.cjs` (API4314, Vite5176, private S3fixture4570, restart control4318, dedicated whiteout_m04 database). They reuse loopback PostgreSQL55432 and the existing local Scheduler authority4311. If that authority has expired while PostgreSQL persists, `node qa/m04/authority.cjs` resumes the existing private QA state; never run these fixture services in production.
 
-Run individual scripts in this directory against that local stack. `node qa/m04/verify.cjs` is the broader integrated suite; `node qa/m04/zoom.cjs` tests real headed Chrome zoom, and `node qa/m04/pointer-drag.cjs` tests pointer/native-touch grip ordering. Do not run all *.cjs indiscriminately (local.cjs is a service manager).
+`node qa/m04/verify.cjs` runs current integrated Studio acceptance; `node qa/m04/zoom.cjs` is the separate headed native Chrome zoom check. The individual scripts may be run to repeat only affected gates. `studio-engine.cjs` executes the checked WASM directly; Rust bridge tests/build instructions are in studio-engine/README.md. The whole current runner was not repeatedly executed just to duplicate already valid evidence.
 
-Scene 09.pdf and Scene16_Storyboard.pdf are read from the owner's Downloads directory. They are not committed or published. Individual extraction acceptance is individual-panels.cjs and scene16-individual.cjs, not the optional whole-page journey.cjs regression. Detection is conservative; manual regions and review are required where uncertain.
+Scene 09.pdf and Scene16_Storyboard.pdf are read from the owner's Downloads directory, never committed or imported into production. studio-import.cjs and studio-scene16.cjs are the current unified individual-panel workflows. Historical Konva and explicit full-page import proofs remain available for reference, but their old UI selectors are not the primary Studio acceptance.
 
-Screenshots, actual PDFs and logs are under /tmp/m04 and copied to ignored client/qa/m032/artifacts/m04 for owner review. Sources, tokens, production credentials and private artwork are never published as fixtures. Local authenticated test tokens stay in the private runtime state file.
+Private screenshots/PDFs/logs live in /tmp/m04 and the ignored client/qa/m032/artifacts/m04 gallery. Fixture tokens remain in private local runtime state. No production credentials or artwork are distributed.
 
-Fresh production publication uses the existing mechanism: `M03_RUNTIME=/tmp/m032/runtime node qa/release.cjs`. It verifies production base/API, rejects local endpoint leakage, backs up the old bundle and checks all unrelated website files remain unchanged. It does not commit/push/deploy automatically.
+Fresh scoped publication: `M03_RUNTIME=/tmp/m032/runtime node qa/release.cjs`. It builds current source, validates production base/API, rejects fixture/localhost leakage, copies only productiondesk, backs up the previous bundle and hashes all unrelated website files. It does not itself commit or deploy.

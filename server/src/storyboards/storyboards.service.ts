@@ -99,7 +99,30 @@ export class StoryboardsService implements OnModuleDestroy {
                   a.localeCompare(b, undefined, { numeric: true }),
                 ),
                 panelCount: panels.length,
-                previewDrawing: (()=>{const panel=[...panels].sort((a,b)=>a.order-b.order).find(p=>p.activeRevision);if(!panel)return null;const revision=d.getMap<Y.Map<unknown>>('revisions').get(panel.activeRevision);if(revision?.get('kind')!=='native')return null;return Object.values(d.getMap('annotations').toJSON()).filter((a:any)=>a.revisionId===panel.activeRevision)})(),
+                previewHeight: (() => {
+                  const p = [...panels]
+                    .sort((a, b) => a.order - b.order)
+                    .find((p) => p.activeRevision);
+                  return p
+                    ? d
+                        .getMap<Y.Map<unknown>>('revisions')
+                        .get(p.activeRevision)
+                        ?.get('height') || 562.5
+                    : 562.5;
+                })(),
+                previewDrawing: (() => {
+                  const panel = [...panels]
+                    .sort((a, b) => a.order - b.order)
+                    .find((p) => p.activeRevision);
+                  if (!panel) return null;
+                  const revision = d
+                    .getMap<Y.Map<unknown>>('revisions')
+                    .get(panel.activeRevision);
+                  if (revision?.get('kind') !== 'native') return null;
+                  return Object.values(d.getMap('annotations').toJSON()).filter(
+                    (a: any) => a.revisionId === panel.activeRevision,
+                  );
+                })(),
                 originatingList: d.getMap('meta').get('originatingList'),
                 previewAsset:
                   (() => {
@@ -213,7 +236,13 @@ export class StoryboardsService implements OnModuleDestroy {
             panelId: panel.id,
             label: panel.label,
             assetId: revision?.get('assetId') || null,
-            drawing:revision?.get('kind')==='native'?Object.values(doc.getMap('annotations').toJSON()).filter((a:any)=>a.revisionId===panel.activeRevision):null,
+            drawingHeight: revision?.get('height') || 562.5,
+            drawing:
+              revision?.get('kind') === 'native'
+                ? Object.values(doc.getMap('annotations').toJSON()).filter(
+                    (a: any) => a.revisionId === panel.activeRevision,
+                  )
+                : null,
           });
         }
       } finally {

@@ -8,6 +8,8 @@ export function useMedia(
   thumbnail = false,
 ) {
   const key = `${documentId}:${assetId || ''}:${thumbnail}`
+  const [attempt, setAttempt] = useState(0)
+  const retry = () => setAttempt((n) => n + 1)
   const [state, setState] = useState({ key: '', url: '', error: '' })
   useEffect(() => {
     let alive = true,
@@ -35,8 +37,8 @@ export function useMedia(
       abort.abort()
       if (object) URL.revokeObjectURL(object)
     }
-  }, [documentId, assetId, thumbnail, key])
+  }, [documentId, assetId, thumbnail, key, attempt])
   return state.key === key
-    ? { url: state.url, error: state.error }
-    : { url: '', error: '' }
+    ? { url: state.url, error: state.error, retry }
+    : { url: '', error: '', retry }
 }

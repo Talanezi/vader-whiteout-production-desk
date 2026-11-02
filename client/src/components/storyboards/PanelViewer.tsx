@@ -4,6 +4,7 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import CollaborativeText from '../shots/CollaborativeText'
 import { panelNotes } from '../../lib/storyboards/model'
 import { Link } from 'react-router-dom'
+import Menu from '../whiteout/Menu'
 import { Button } from '../whiteout/Button'
 import DrawCheckbox from '../whiteout/DrawCheckbox'
 import DotsLoader from '../whiteout/DotsLoader'
@@ -18,6 +19,7 @@ import {
 import { useMedia } from '../../lib/storyboards/useMedia'
 import { shotRequest } from '../../lib/shotApi'
 import Studio from './Studio'
+import { StoryboardIllustration } from './StoryboardIdentity'
 import { StudioIcon } from './StudioControls'
 import PanelDiscussion from './PanelDiscussion'
 import ShotPicker, { type LinkedSnapshot } from './ShotPicker'
@@ -54,12 +56,33 @@ export default function PanelViewer({
       onClose()
       return
     }
+    if (
+      document.fullscreenElement &&
+      dialog.current?.contains(document.fullscreenElement)
+    )
+      void document.exitFullscreen().catch(() => {})
     setClosing(true)
     closeTimer.current = setTimeout(onClose, 140)
   }
   useEffect(() => () => clearTimeout(closeTimer.current), [])
-  const [idle,setIdle]=useState(false)
-  useEffect(()=>{if(!present)return;let timer:ReturnType<typeof setTimeout>;const active=()=>{setIdle(false);clearTimeout(timer);timer=setTimeout(()=>setIdle(true),2500)};window.addEventListener('pointermove',active);window.addEventListener('keydown',active);active();return()=>{clearTimeout(timer);window.removeEventListener('pointermove',active);window.removeEventListener('keydown',active)}},[present])
+  const [idle, setIdle] = useState(false)
+  useEffect(() => {
+    if (!present) return
+    let timer: ReturnType<typeof setTimeout>
+    const active = () => {
+      setIdle(false)
+      clearTimeout(timer)
+      timer = setTimeout(() => setIdle(true), 2500)
+    }
+    window.addEventListener('pointermove', active)
+    window.addEventListener('keydown', active)
+    active()
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointermove', active)
+      window.removeEventListener('keydown', active)
+    }
+  }, [present])
   const [viewerZoom, setViewerZoom] = useState(1)
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined)
   const [noteText, setNoteText] = useState<Y.Text>()
@@ -75,7 +98,9 @@ export default function PanelViewer({
       previous?.isConnected && previous.focus()
     }
   }, [])
-  const [annotating, setAnnotating] = useState(!present && panel.activeRevision?.startsWith('native-')),
+  const [annotating, setAnnotating] = useState(
+      !present && panel.activeRevision?.startsWith('native-'),
+    ),
     [show, setShow] = useState(true),
     [picker, setPicker] = useState(false),
     [history, setHistory] = useState(false),
@@ -103,7 +128,7 @@ export default function PanelViewer({
     index = all.findIndex((p) => p.id === panel.id)
   useEffect(() => {
     setViewRevision('')
-    setAnnotating(!present && revision?.kind==='native')
+    setAnnotating(!present && revision?.kind === 'native')
   }, [panel.id])
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -170,7 +195,7 @@ export default function PanelViewer({
         e.preventDefault()
         requestClose()
       }}
-      className={`sb-viewer ${present ? 'sb-present' : ''} ${closing ? 'is-closing' : ''} ${idle?'is-idle':''}`}
+      className={`sb-viewer ${present ? 'sb-present' : ''} ${closing ? 'is-closing' : ''} ${idle ? 'is-idle' : ''}`}
       aria-label={present ? 'Present storyboard' : 'Panel viewer'}
     >
       <div className="sb-viewer-frame">
@@ -180,13 +205,23 @@ export default function PanelViewer({
           <span>
             {index + 1} / {all.length}
           </span>
-          <StudioIcon name="previous" label="Previous panel" disabled={index === 0} onClick={() => onSelect(all[index - 1].id)} />
-          <StudioIcon name="next" label="Next panel" disabled={index === all.length - 1} onClick={() => onSelect(all[index + 1].id)} />
+          <StudioIcon
+            name="previous"
+            label="Previous panel"
+            disabled={index === 0}
+            onClick={() => onSelect(all[index - 1].id)}
+          />
+          <StudioIcon
+            name="next"
+            label="Next panel"
+            disabled={index === all.length - 1}
+            onClick={() => onSelect(all[index + 1].id)}
+          />
           {!present && (
             <>
               <Button
                 icon="edit"
-                variant={annotating?'primary':'secondary'}
+                variant={annotating ? 'primary' : 'secondary'}
                 aria-pressed={annotating}
                 disabled={
                   !revision ||
@@ -196,11 +231,63 @@ export default function PanelViewer({
               >
                 Studio
               </Button>
-              <StudioIcon name="layers" label="Artwork history" active={history} onClick={() => setHistory(v=>!v)} />
-              <StudioIcon name="settings" label={inspector?'Hide details':'Details'} active={inspector} onClick={()=>setInspector(v=>!v)} />
+              <StudioIcon
+                name="layers"
+                label="Artwork history"
+                active={history}
+                onClick={() => {
+                  setHistory((v) => !v)
+                  setInspector(true)
+                }}
+              />
+              <StudioIcon
+                name="settings"
+                label={inspector ? 'Hide details' : 'Details'}
+                active={inspector}
+                onClick={() => setInspector((v) => !v)}
+              />
             </>
           )}
-          <StudioIcon name="fullscreen" label="Full screen" disabled={!document.fullscreenEnabled} onClick={() => { const frame = dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame'); void (document.fullscreenElement ? document.exitFullscreen() : frame?.requestFullscreen())?.catch(() => {}) }} />
+          {!present && revision?.kind === 'native' && (
+            <Menu
+              label={
+                (revision.height || 562.5) === 562.5
+                  ? '16:9 frame'
+                  : revision.height === 750
+                    ? '4:3 frame'
+                    : revision.height === 1000
+                      ? 'Square frame'
+                      : 'Scope frame'
+              }
+              icon="columns"
+              ariaLabel="Drawing frame"
+              disabled={objects.length > 0}
+              value={String(revision.height || 562.5)}
+              items={[
+                { value: '562.5', label: 'Widescreen · 16:9' },
+                { value: '750', label: 'Classic · 4:3' },
+                { value: '1000', label: 'Square · 1:1' },
+                { value: '418.41', label: 'Scope · 2.39:1' },
+              ]}
+              onChange={(v) =>
+                put(doc, 'revisions', revision.id, { height: Number(v) })
+              }
+            />
+          )}
+          <StudioIcon
+            name="fullscreen"
+            label="Full screen"
+            disabled={!document.fullscreenEnabled}
+            onClick={() => {
+              const frame =
+                dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame')
+              void (
+                document.fullscreenElement
+                  ? document.exitFullscreen()
+                  : frame?.requestFullscreen()
+              )?.catch(() => {})
+            }}
+          />
           {present && (
             <>
               <Button onClick={() => setShowNotes((v) => !v)}>
@@ -220,15 +307,26 @@ export default function PanelViewer({
         <div className="sb-viewer-body">
           <div className="sb-viewer-art">
             {media.error ? (
-              <p role="alert">{media.error}</p>
-            ) : (media.url || revision?.kind === 'native') ? (
+              <div className="sb-connect">
+                <StoryboardIllustration />
+                <h3 role="alert">Artwork unavailable</h3>
+                <p>Check your connection or access, then retry.</p>
+                <Button icon="retry" onClick={media.retry}>
+                  Retry artwork
+                </Button>
+              </div>
+            ) : media.url || revision?.kind === 'native' ? (
               <Studio
                 key={revision?.id}
                 url={media.url}
                 nativeHeight={revision?.height || 562.5}
                 objects={objects}
                 visible={show || revision?.kind === 'native'}
-                annotating={annotating}
+                annotating={
+                  annotating &&
+                  !present &&
+                  (!viewRevision || viewRevision === panel.activeRevision)
+                }
                 onCommit={(a, continuous = false) => {
                   if (!continuous) undo.stopCapturing()
                   if (revision)
@@ -254,7 +352,38 @@ export default function PanelViewer({
             ) : present ? (
               <span>No artwork</span>
             ) : (
-              <Button onClick={onReplace}>Add image</Button>
+              <div className="sb-connect">
+                <StoryboardIllustration />
+                <h3>A frame for the next idea.</h3>
+                <div className="sb-empty-choices">
+                  <Button
+                    icon="edit"
+                    variant="primary"
+                    onClick={() => {
+                      const id = 'native-' + crypto.randomUUID()
+                      doc.transact(() => {
+                        put(doc, 'revisions', id, {
+                          id,
+                          panelId: panel.id,
+                          kind: 'native',
+                          width: 1000,
+                          height: 562.5,
+                          uploader: user.id,
+                          uploaderName: user.name,
+                          createdAt: new Date().toISOString(),
+                        })
+                        put(doc, 'panels', panel.id, { activeRevision: id })
+                      })
+                      setAnnotating(true)
+                    }}
+                  >
+                    Start drawing
+                  </Button>
+                  <Button icon="import" onClick={onReplace}>
+                    Import image
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
           {((!present && inspector) || (present && showNotes)) && (

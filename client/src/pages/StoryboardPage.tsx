@@ -32,7 +32,6 @@ import {
 } from '../lib/storyboards/model'
 import { boardRequest, type MediaAsset } from '../lib/storyboards/api'
 import { StoryboardIllustration } from '../components/storyboards/StoryboardIdentity'
-import { StudioGlyph } from '../components/storyboards/StudioControls'
 import Artwork from '../components/storyboards/Artwork'
 import ArtworkImport from '../components/storyboards/ArtworkImport'
 import OriginalViewer from '../components/storyboards/OriginalViewer'
@@ -86,10 +85,37 @@ export default function StoryboardPage() {
         all.flatMap((p) => p.links)[0]?.listId ||
         '',
     )
+  const assetRequest = useRef(0)
+  useEffect(() => {
+    assetRequest.current++
+    setSelected(query.get('panel') || '')
+    setImporting(query.has('import'))
+    setMode('grid')
+    setScene('')
+    setSearch('')
+    setMulti(new Set())
+    setAssets([])
+    setOriginal(undefined)
+    setExtract(undefined)
+    setReplace(undefined)
+    setPicker(undefined)
+    setDeleting(undefined)
+    setPdfOpen(false)
+  }, [id])
+  const requestedPanel = query.get('panel')
+  useEffect(() => {
+    if (requestedPanel) setSelected(requestedPanel)
+  }, [id, requestedPanel])
   function refreshAssets() {
+    const request = ++assetRequest.current
     void boardRequest<{ items: MediaAsset[] }>(`/${id}/assets`)
-      .then((r) => setAssets(r.items))
-      .catch((e) => notify(e.message, { state: 'error' }))
+      .then((r) => {
+        if (request === assetRequest.current) setAssets(r.items)
+      })
+      .catch((e) => {
+        if (request === assetRequest.current)
+          notify(e.message, { state: 'error' })
+      })
   }
   useEffect(() => {
     if (c.session) refreshAssets()
@@ -167,19 +193,32 @@ export default function StoryboardPage() {
             ? 1
             : a.order - b.order
     })
-  function addPanel() {
+  function addPanel(
+    afterId = selected || (multi.size === 1 ? [...multi][0] : ''),
+  ) {
     const panelId = crypto.randomUUID()
     const revisionId = 'native-' + crypto.randomUUID()
-    const position = all.findIndex(p => p.id === selected)
+    const position = all.findIndex((p) => p.id === afterId)
     const previous = position >= 0 ? all[position] : all[all.length - 1]
     const next = position >= 0 ? all[position + 1] : undefined
-    put(c.doc, 'revisions', revisionId, {id:revisionId,panelId,kind:'native',width:1000,height:562.5,uploader:c.session?.user.id,uploaderName:c.session?.user.name,createdAt:new Date().toISOString()})
+    put(c.doc, 'revisions', revisionId, {
+      id: revisionId,
+      panelId,
+      kind: 'native',
+      width: 1000,
+      height: 562.5,
+      uploader: c.session?.user.id,
+      uploaderName: c.session?.user.name,
+      createdAt: new Date().toISOString(),
+    })
     put(c.doc, 'panels', panelId, {
       id: panelId,
       label: '',
       notes: '',
       activeRevision: revisionId,
-      order: next ? ((previous?.order || 0) + next.order) / 2 : (previous?.order || 0) + 1024,
+      order: next
+        ? ((previous?.order || 0) + next.order) / 2
+        : (previous?.order || 0) + 1024,
       links:
         mode === 'split' && shot && origin
           ? [{ listId: origin, shotId: shot }]
@@ -188,7 +227,13 @@ export default function StoryboardPage() {
     setSelected(panelId)
   }
   const drawingStarted = useRef('')
-  useEffect(() => {if(query.get('draw') && c.synced && drawingStarted.current!==id){drawingStarted.current=id;if(all.length)setSelected(all[0].id);else addPanel()}},[c.synced,query,all.length])
+  useEffect(() => {
+    if (query.get('draw') && c.synced && drawingStarted.current !== id) {
+      drawingStarted.current = id
+      if (all.length) setSelected(all[0].id)
+      else addPanel()
+    }
+  }, [c.synced, query, all.length])
   function reorder(from: string, to: string) {
     if (from === to) return
     const order = all.map((p) => p.id),
@@ -249,16 +294,16 @@ export default function StoryboardPage() {
     })
   }
   function remove() {
-    const active=new Set(panels(c.doc).map(p=>p.id)),records=(deleting||[]).filter(p=>active.has(p.id)),stamp=new Date().toISOString()
+    const active = new Set(panels(c.doc).map((p) => p.id)),
+      records = (deleting || []).filter((p) => active.has(p.id)),
+      stamp = new Date().toISOString()
     c.doc.transact(() =>
-      records.forEach((p) =>
-        put(c.doc, 'panels', p.id, { deletedAt: stamp }),
-      ),
+      records.forEach((p) => put(c.doc, 'panels', p.id, { deletedAt: stamp })),
     )
     setDeleting(undefined)
     setMulti(new Set())
     setSelected('')
-    if(!records.length)return
+    if (!records.length) return
     notify(
       `${records.length} panel${records.length === 1 ? '' : 's'} deleted.`,
       {
@@ -266,7 +311,15 @@ export default function StoryboardPage() {
           label: 'Restore',
           run: () =>
             c.doc.transact(() =>
-              records.forEach(p=>{if(c.doc.getMap<import('yjs').Map<unknown>>('panels').get(p.id)?.get('deletedAt')===stamp)put(c.doc,'panels',p.id,{deletedAt:null})}),
+              records.forEach((p) => {
+                if (
+                  c.doc
+                    .getMap<import('yjs').Map<unknown>>('panels')
+                    .get(p.id)
+                    ?.get('deletedAt') === stamp
+                )
+                  put(c.doc, 'panels', p.id, { deletedAt: null })
+              }),
             ),
         },
       },
@@ -342,6 +395,12 @@ export default function StoryboardPage() {
                     label={`Actions for ${p.label || `panel ${i + 1}`}`}
                     items={[
                       {
+                        value: 'draw-after',
+                        label: 'Draw panel after',
+                        icon: 'edit',
+                        onSelect: () => addPanel(p.id),
+                      },
+                      {
                         value: 'replace',
                         label: 'Replace artwork',
                         onSelect: () => setReplace(p),
@@ -377,7 +436,19 @@ export default function StoryboardPage() {
                     assetId={
                       revisions.find((r) => r.id === p.activeRevision)?.assetId
                     }
-                    drawing={revisions.find(r=>r.id===p.activeRevision)?.kind === 'native' ? values<Annotation & {revisionId:string}>(c.doc,'annotations').filter(a=>a.revisionId===p.activeRevision) : undefined}
+                    drawingHeight={
+                      revisions.find((r) => r.id === p.activeRevision)
+                        ?.height || 562.5
+                    }
+                    drawing={
+                      revisions.find((r) => r.id === p.activeRevision)?.kind ===
+                      'native'
+                        ? values<Annotation & { revisionId: string }>(
+                            c.doc,
+                            'annotations',
+                          ).filter((a) => a.revisionId === p.activeRevision)
+                        : undefined
+                    }
                     label={p.label || `Panel ${i + 1}`}
                   />
                 </button>
@@ -426,7 +497,35 @@ export default function StoryboardPage() {
             : { duration: 120 }
         }
       >
-        {dragging && <div className="sb-art-drag"><Artwork documentId={id} assetId={revisions.find(r=>r.id===all.find(p=>p.id===dragging)?.activeRevision)?.assetId} label="Dragged storyboard panel" drawing={revisions.find(r=>r.id===all.find(p=>p.id===dragging)?.activeRevision)?.kind==='native' ? values<Annotation & {revisionId:string}>(c.doc,'annotations').filter(a=>a.revisionId===all.find(p=>p.id===dragging)?.activeRevision) : undefined} /></div>}
+        {dragging && (
+          <div className="sb-art-drag">
+            <Artwork
+              documentId={id}
+              assetId={
+                revisions.find(
+                  (r) =>
+                    r.id === all.find((p) => p.id === dragging)?.activeRevision,
+                )?.assetId
+              }
+              label="Dragged storyboard panel"
+              drawing={
+                revisions.find(
+                  (r) =>
+                    r.id === all.find((p) => p.id === dragging)?.activeRevision,
+                )?.kind === 'native'
+                  ? values<Annotation & { revisionId: string }>(
+                      c.doc,
+                      'annotations',
+                    ).filter(
+                      (a) =>
+                        a.revisionId ===
+                        all.find((p) => p.id === dragging)?.activeRevision,
+                    )
+                  : undefined
+              }
+            />
+          </div>
+        )}
       </DragOverlay>
     </DragDropProvider>
   )
@@ -448,10 +547,35 @@ export default function StoryboardPage() {
         ← Storyboards
       </Link>
       <PageHeader title={name}>
-        <span role="status" className={`pd-sync-state ${c.connected&&c.saved?'is-saved':''}`} data-sync={c.error?'error':!c.connected?'disconnected':c.saved?'saved':'syncing'}><i />{c.error?'Save interrupted':!c.connected?'Reconnecting':c.saved?'Saved':'Syncing'}</span>
+        <span
+          role="status"
+          className={`pd-sync-state ${c.connected && c.saved ? 'is-saved' : ''}`}
+          data-sync={
+            c.error
+              ? 'error'
+              : !c.connected
+                ? 'disconnected'
+                : c.saved
+                  ? 'saved'
+                  : 'syncing'
+          }
+        >
+          <i />
+          {c.error
+            ? 'Save interrupted'
+            : !c.connected
+              ? 'Reconnecting'
+              : c.saved
+                ? 'Saved'
+                : 'Syncing'}
+        </span>
         <div className="pd-collaborators">
           {c.peers
-            .filter((p) => p.user)
+            .filter(
+              (p, i, all) =>
+                p.user &&
+                all.findIndex((other) => other.user?.id === p.user?.id) === i,
+            )
             .map((p) => (
               <NameTooltip
                 key={p.clientId}
@@ -550,26 +674,35 @@ export default function StoryboardPage() {
                 { value: 'shot', label: 'Shot List order', icon: 'shots' },
               ]}
             />
-            <Button icon="plus" variant="primary" onClick={addPanel}>
+            <Button icon="plus" variant="primary" onClick={() => addPanel()}>
               Add panel
             </Button>
             <Button icon="import" onClick={() => setImporting(true)}>
               Import artwork
             </Button>
-            {assets.some((a) => a.mime === 'application/pdf') && (
+            {assets.some(
+              (a) => !revisions.some((r) => r.assetId === a.id && r.source),
+            ) && (
               <Menu
                 icon="file"
                 label="Sources"
                 items={[
                   ...assets
-                    .filter((a) => a.mime === 'application/pdf')
+                    .filter(
+                      (a) =>
+                        !revisions.some((r) => r.assetId === a.id && r.source),
+                    )
                     .flatMap((a) => [
-                      {
-                        value: `organize:${a.id}`,
-                        label: `Organize panels · ${a.filename}`,
-                        icon: 'grid' as const,
-                        onSelect: () => setExtract(a),
-                      },
+                      ...(a.mime === 'application/pdf'
+                        ? [
+                            {
+                              value: `organize:${a.id}`,
+                              label: `Organize panels · ${a.filename}`,
+                              icon: 'grid' as const,
+                              onSelect: () => setExtract(a),
+                            },
+                          ]
+                        : []),
                       {
                         value: `view:${a.id}`,
                         label: `View original · ${a.filename}`,
@@ -613,30 +746,34 @@ export default function StoryboardPage() {
         </div>
       )}
       {!all.length ? (
-        <EmptyState
-          title={
-            assets.some((a) => a.mime === 'application/pdf')
+        <div className="sb-connect">
+          <StoryboardIllustration />
+          <h3>
+            {assets.some((a) => a.mime === 'application/pdf')
               ? 'Original sheets ready'
-              : 'Your storyboard starts here'
-          }
-          action={
-            <>
+              : 'A sequence starts with an image.'}
+          </h3>
+          <div className="sb-empty-choices">
+            {assets.some((a) => a.mime === 'application/pdf') ? (
               <Button
                 icon="grid"
                 variant="primary"
-                onClick={() => {
-                  const pdf = assets.find((a) => a.mime === 'application/pdf')
-                  pdf ? setExtract(pdf) : setImporting(true)
-                }}
+                onClick={() =>
+                  setExtract(assets.find((a) => a.mime === 'application/pdf'))
+                }
               >
-                {assets.some((a) => a.mime === 'application/pdf')
-                  ? 'Organize panels'
-                  : 'Import artwork'}
+                Organize panels
               </Button>
-              <Button onClick={addPanel}>Add panel</Button>
-            </>
-          }
-        />
+            ) : (
+              <Button icon="edit" variant="primary" onClick={() => addPanel()}>
+                Start drawing
+              </Button>
+            )}
+            <Button icon="import" onClick={() => setImporting(true)}>
+              Import artwork
+            </Button>
+          </div>
+        </div>
       ) : mode === 'split' ? (
         <>
           <div className="sb-split-tabs">
@@ -673,7 +810,21 @@ export default function StoryboardPage() {
                   }}
                 />
               ) : (
-                <div className="sb-connect"><StoryboardIllustration/><h3>Connect a Shot List</h3><p>Bring the technical plan beside the artwork.</p><Button icon="share" onClick={()=>{const panel=current||all[0];if(panel)setPicker(panel);else addPanel()}}>Connect shots</Button></div>
+                <div className="sb-connect">
+                  <StoryboardIllustration />
+                  <h3>Connect a Shot List</h3>
+                  <p>Bring the technical plan beside the artwork.</p>
+                  <Button
+                    icon="share"
+                    onClick={() => {
+                      const panel = current || all[0]
+                      if (panel) setPicker(panel)
+                      else addPanel()
+                    }}
+                  >
+                    Connect shots
+                  </Button>
+                </div>
               )}
             </div>
             <div
@@ -729,20 +880,21 @@ export default function StoryboardPage() {
               {filtered.length ? (
                 gallery
               ) : (
-                <EmptyState
-                  title="No linked panels"
-                  action={
-                    <Button icon="plus" onClick={addPanel}>
-                      Add panel
-                    </Button>
-                  }
-                />
+                <div className="sb-connect">
+                  <StoryboardIllustration />
+                  <h3>No linked panels</h3>
+                  <Button icon="edit" onClick={() => addPanel()}>
+                    Start drawing
+                  </Button>
+                </div>
               )}
             </div>
           </div>
         </>
-      ) : (
+      ) : filtered.length ? (
         gallery
+      ) : (
+        <EmptyState kind="search" title="No matching panels" />
       )}
       {current && mode !== 'split' && (
         <PanelViewer
@@ -755,6 +907,12 @@ export default function StoryboardPage() {
           provider={c.provider!}
           onClose={() => {
             setSelected('')
+            if (query.has('draw') || query.has('panel')) {
+              const next = new URLSearchParams(query)
+              next.delete('draw')
+              next.delete('panel')
+              setQuery(next, { replace: true })
+            }
             if (mode === 'present') setMode('grid')
           }}
           onSelect={setSelected}
@@ -789,6 +947,17 @@ export default function StoryboardPage() {
         <OriginalViewer
           documentId={id}
           asset={original}
+          related={all.flatMap((p) => {
+            const r = revisions.find((r) => r.id === p.activeRevision)
+            return r?.source?.assetId === original.id ||
+              r?.assetId === original.id
+              ? [{ id: p.id, label: p.label, source: r?.source }]
+              : []
+          })}
+          onPanel={(panelId) => {
+            setOriginal(undefined)
+            setSelected(panelId)
+          }}
           onClose={() => setOriginal(undefined)}
           onExtract={() => {
             setExtract(original)

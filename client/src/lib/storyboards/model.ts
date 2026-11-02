@@ -4,12 +4,22 @@ export type Source = {
   assetId: string
   page: number
   rotation: number
+  cropId?: string
   crop: Rect
 }
 export type ShotLink = { listId: string; shotId: string }
 export type Annotation = {
   id: string
-  type: 'pen' | 'arrow' | 'highlight' | 'text' | 'path' | 'rectangle' | 'ellipse' | 'line' | 'callout'
+  type:
+    | 'pen'
+    | 'arrow'
+    | 'highlight'
+    | 'text'
+    | 'path'
+    | 'rectangle'
+    | 'ellipse'
+    | 'line'
+    | 'callout'
   color: string
   width: number
   points: number[][]

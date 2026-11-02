@@ -1,5 +1,15 @@
 import { getStroke } from 'perfect-freehand';
-import { PDFDocument, rgb, PDFFont, degrees } from 'pdf-lib';
+import {
+  PDFDocument,
+  rgb,
+  PDFFont,
+  degrees,
+  pushGraphicsState,
+  popGraphicsState,
+  rectangle,
+  clip,
+  endPath,
+} from 'pdf-lib';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type SharpFactory from 'sharp';
@@ -105,13 +115,48 @@ export async function renderStoryboard(
     page.drawText(label, { x, y: top - 10, font, size: 10 });
     const areaHeight = cellHeight - reserved - 10;
     if (panel.assetId || panel.native) {
-      const image = panel.assetId ? await pdf.embedPng(await sharp(await artwork(panel.assetId), {limitInputPixels:80_000_000}).rotate().png().toBuffer()) : undefined;
-      const dimensions = image || {width:1000,height:Math.max(100,Math.min(2000,Number(panel.nativeHeight)||562.5))};
-      const scale = Math.min(cellWidth / dimensions.width, areaHeight / dimensions.height),
-        w = dimensions.width * scale, h = dimensions.height * scale,
-        ix = x + (cellWidth - w) / 2, iy = top - 20 - h;
-      if(image) page.drawImage(image, {x:ix,y:iy,width:w,height:h});
-      else page.drawRectangle({x:ix,y:iy,width:w,height:h,color:rgb(1,1,1),borderColor:rgb(.85,.87,.88),borderWidth:.3});
+      const image = panel.assetId
+        ? await pdf.embedPng(
+            await sharp(await artwork(panel.assetId), {
+              limitInputPixels: 80_000_000,
+            })
+              .rotate()
+              .png()
+              .toBuffer(),
+          )
+        : undefined;
+      const dimensions = image || {
+        width: 1000,
+        height: Math.max(
+          100,
+          Math.min(2000, Number(panel.nativeHeight) || 562.5),
+        ),
+      };
+      const scale = Math.min(
+          cellWidth / dimensions.width,
+          areaHeight / dimensions.height,
+        ),
+        w = dimensions.width * scale,
+        h = dimensions.height * scale,
+        ix = x + (cellWidth - w) / 2,
+        iy = top - 20 - h;
+      if (image) page.drawImage(image, { x: ix, y: iy, width: w, height: h });
+      else
+        page.drawRectangle({
+          x: ix,
+          y: iy,
+          width: w,
+          height: h,
+          color: rgb(1, 1, 1),
+          borderColor: rgb(0.85, 0.87, 0.88),
+          borderWidth: 0.3,
+        });
+      page.pushOperators(
+        pushGraphicsState(),
+        rectangle(ix, iy, w, h),
+        clip(),
+        endPath(),
+      );
       if (options.annotations || panel.native)
         for (const a of annotations.filter(
           (a) => a.revisionId === panel.activeRevision,
@@ -134,20 +179,57 @@ export async function renderStoryboard(
               y: iy + h - (a.y + p[1] * a.scale) * h,
             }),
             thickness = Math.max(0.2, a.width * w * a.scale);
-          if(a.engine && a.path) {
-            if(typeof a.path !== 'string' || a.path.length > 500000 || /[^MmLlHhVvCcSsQqTtAaZz0-9.,+\-eE\s]/.test(a.path)) throw new BadRequestException('Invalid vector path.');
-            page.drawSvgPath(a.path,{x:ix+a.x*w,y:iy+h-a.y*h,scale:(w/1000)*a.scale,rotate:degrees(-(Number(a.rotation)||0)),...(a.filled?{color}:{borderColor:color,borderWidth:a.width*1000}),opacity:Math.max(0,Math.min(1,a.opacity??1))});
-            if(a.type==='arrow' && a.points?.length===3){const [c,p]=a.points.slice(-2),wh=1000*dimensions.height/dimensions.width,angle=Math.atan2((p[1]-c[1])*wh,(p[0]-c[0])*1000),len=Math.max(10,a.width*3000),x=p[0]*1000,y=p[1]*wh;page.drawSvgPath(`M${x},${y} L${x-len*Math.cos(angle-.4)},${y-len*Math.sin(angle-.4)} L${x-len*Math.cos(angle+.4)},${y-len*Math.sin(angle+.4)} Z`,{x:ix+a.x*w,y:iy+h-a.y*h,scale:(w/1000)*a.scale,rotate:degrees(-(Number(a.rotation)||0)),color,opacity:a.opacity??1})}
+          if (a.engine && a.path) {
+            if (
+              typeof a.path !== 'string' ||
+              a.path.length > 500000 ||
+              /[^MmLlHhVvCcSsQqTtAaZz0-9.,+\-eE\s]/.test(a.path)
+            )
+              throw new BadRequestException('Invalid vector path.');
+            page.drawSvgPath(a.path, {
+              x: ix + a.x * w,
+              y: iy + h - a.y * h,
+              scale: (w / 1000) * a.scale,
+              rotate: degrees(-(Number(a.rotation) || 0)),
+              ...(a.filled
+                ? { color }
+                : { borderColor: color, borderWidth: a.width * 1000 }),
+              opacity: Math.max(0, Math.min(1, a.opacity ?? 1)),
+            });
+            if (a.type === 'arrow' && a.points?.length === 3) {
+              const [c, p] = a.points.slice(-2),
+                wh = (1000 * dimensions.height) / dimensions.width,
+                angle = Math.atan2((p[1] - c[1]) * wh, (p[0] - c[0]) * 1000),
+                len = Math.max(10, a.width * 3000),
+                x = p[0] * 1000,
+                y = p[1] * wh;
+              page.drawSvgPath(
+                `M${x},${y} L${x - len * Math.cos(angle - 0.4)},${y - len * Math.sin(angle - 0.4)} L${x - len * Math.cos(angle + 0.4)},${y - len * Math.sin(angle + 0.4)} Z`,
+                {
+                  x: ix + a.x * w,
+                  y: iy + h - a.y * h,
+                  scale: (w / 1000) * a.scale,
+                  rotate: degrees(-(Number(a.rotation) || 0)),
+                  color,
+                  opacity: a.opacity ?? 1,
+                },
+              );
+            }
           } else if (a.type === 'text') {
             const p = point([0, 0]);
             page.drawText(validate(a.text || ''), {
               ...p,
-              y: p.y - (((a.fontSize || Math.max(18, a.width * 5000)) * w) / 1000) * a.scale,
-              size: (((a.fontSize || Math.max(18, a.width * 5000)) * w) / 1000) * a.scale,
+              y:
+                p.y -
+                (((a.fontSize || Math.max(18, a.width * 5000)) * w) / 1000) *
+                  a.scale,
+              size:
+                (((a.fontSize || Math.max(18, a.width * 5000)) * w) / 1000) *
+                a.scale,
               font,
               color,
-              rotate: degrees(-(Number(a.rotation)||0)),
-              opacity: Math.max(0,Math.min(1,a.opacity??1)),
+              rotate: degrees(-(Number(a.rotation) || 0)),
+              opacity: Math.max(0, Math.min(1, a.opacity ?? 1)),
             });
           } else {
             const worldHeight = (1000 * dimensions.height) / dimensions.width,
@@ -220,6 +302,7 @@ export async function renderStoryboard(
             }
           }
         }
+      page.pushOperators(popGraphicsState());
     }
     detail.forEach((text, i) =>
       page.drawText(text, {

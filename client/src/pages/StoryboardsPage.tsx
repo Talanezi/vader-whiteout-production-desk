@@ -28,6 +28,7 @@ type Board = {
   updatedAt: string
   originatingList?: string
   previewAsset?: string
+  previewHeight?: number
   previewDrawing?: import('../lib/storyboards/model').Annotation[]
 }
 export default function StoryboardsPage() {
@@ -174,6 +175,7 @@ export default function StoryboardsPage() {
                             documentId={b.id}
                             assetId={b.previewAsset}
                             drawing={b.previewDrawing}
+                            drawingHeight={b.previewHeight}
                             label={b.name}
                           />
                         </div>
@@ -237,7 +239,40 @@ export default function StoryboardsPage() {
           )}
         </div>
       ) : (
-        <div className="sb-connect sb-index-empty"><StoryboardIllustration/><h2>Every sequence starts with an image.</h2><div className="sb-empty-choices"><Button icon="import" onClick={()=>{setWorkflow('import');navigate('/storyboards/new')}}>Import artwork</Button><Button icon="plus" variant="primary" onClick={()=>{setWorkflow('blank');navigate('/storyboards/new')}}>Start drawing</Button><Button icon="shots" onClick={()=>{setWorkflow('shots');navigate('/storyboards/new')}}>From Shot List</Button></div></div>
+        <div className="sb-connect sb-index-empty">
+          <StoryboardIllustration />
+          <h2>Every sequence starts with an image.</h2>
+          <div className="sb-empty-choices">
+            <Button
+              icon="import"
+              onClick={() => {
+                setWorkflow('import')
+                navigate('/storyboards/new')
+              }}
+            >
+              Import artwork
+            </Button>
+            <Button
+              icon="plus"
+              variant="primary"
+              onClick={() => {
+                setWorkflow('blank')
+                navigate('/storyboards/new')
+              }}
+            >
+              Start drawing
+            </Button>
+            <Button
+              icon="shots"
+              onClick={() => {
+                setWorkflow('shots')
+                navigate('/storyboards/new')
+              }}
+            >
+              From Shot List
+            </Button>
+          </div>
+        </div>
       )}
       {(creating || rename) && (
         <Overlay

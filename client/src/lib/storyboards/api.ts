@@ -56,10 +56,10 @@ export async function uploadAsset(
     xhr.setRequestHeader('Authorization', `Bearer ${getAuthToken() || ''}`)
     xhr.upload.onprogress = (e) =>
       e.lengthComputable && progress?.(e.loaded / e.total)
-    const abort=()=>xhr.abort()
-    signal?.addEventListener('abort',abort,{once:true})
-    xhr.onloadend=()=>signal?.removeEventListener('abort',abort)
-    xhr.onabort=()=>reject(Error('Upload cancelled.'))
+    const abort = () => xhr.abort()
+    signal?.addEventListener('abort', abort, { once: true })
+    xhr.onloadend = () => signal?.removeEventListener('abort', abort)
+    xhr.onabort = () => reject(Error('Upload cancelled.'))
     xhr.onerror = () =>
       reject(
         Error(
