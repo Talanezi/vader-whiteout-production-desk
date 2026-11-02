@@ -1,0 +1,166 @@
+import * as Y from 'yjs'
+export type Department = {
+  id: string
+  name: string
+  order: number
+  personnel?: string
+  group?: string
+  removedAt?: string
+}
+export type FlowEvent = {
+  id: string
+  type: 'shot' | 'milestone' | 'department' | 'custom'
+  order: number
+  description: string
+  notes?: string
+  start: string | null
+  duration: number | null
+  actualStart?: string | null
+  actualEnd?: string | null
+  fixed: boolean
+  status: string
+  shotId?: string
+  sourceListId?: string
+  reference?: string
+  deletedAt?: string
+  provenance?: unknown
+}
+export function records<T>(d: Y.Doc, k: string): T[] {
+  return [...d.getMap<Y.Map<unknown>>(k).values()].map((m) => m.toJSON() as T)
+}
+export function put(
+  d: Y.Doc,
+  k: string,
+  id: string,
+  value: Record<string, unknown>,
+) {
+  d.transact(() => {
+    let m = d.getMap<Y.Map<unknown>>(k).get(id)
+    if (!m) {
+      m = new Y.Map()
+      d.getMap(k).set(id, m)
+      m.set('id', id)
+    }
+    Object.entries(value).forEach(([k, v]) => {
+      if (v !== undefined) m!.set(k, v)
+    })
+  })
+}
+export function orderedEvents(d: Y.Doc) {
+  return records<FlowEvent>(d, 'events')
+    .filter((e) => !e.deletedAt)
+    .sort(
+      (a, b) =>
+        (a.start ? Date.parse(a.start) : Infinity) -
+          (b.start ? Date.parse(b.start) : Infinity) ||
+        a.order - b.order ||
+        a.id.localeCompare(b.id),
+    )
+}
+export function departments(d: Y.Doc) {
+  return records<Department>(d, 'departments')
+    .filter((e) => !e.removedAt)
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+}
+export function text(d: Y.Doc, k: string, id: string, field: string) {
+  let m = d.getMap<Y.Map<unknown>>(k).get(id)
+  if (!m) {
+    put(d, k, id, {})
+    m = d.getMap<Y.Map<unknown>>(k).get(id)!
+  }
+  const v = m.get(field)
+  if (v instanceof Y.Text) return v
+  const t = new Y.Text(String(v || ''))
+  d.transact(() => m!.set(field, t))
+  return t
+}
+export function instruction(d: Y.Doc, e: string, dep: string) {
+  const id = e + ':' + dep
+  if (!d.getMap('instructions').has(id))
+    put(d, 'instructions', id, {
+      eventId: e,
+      departmentId: dep,
+      text: new Y.Text(),
+    })
+  return text(d, 'instructions', id, 'text')
+}
+export function addEvent(d: Y.Doc, value: Partial<FlowEvent> = {}) {
+  const id = value.id || crypto.randomUUID()
+  put(d, 'events', id, {
+    type: 'custom',
+    description: '',
+    start: null,
+    duration: null,
+    fixed: false,
+    status: 'planned',
+    order: Math.max(0, ...orderedEvents(d).map((e) => e.order)) + 1024,
+    ...value,
+  })
+  return id
+}
+export function duration(e: FlowEvent, shot?: Y.Map<unknown>) {
+  if (e.duration != null) return e.duration
+  const n = shot?.get('estimatedMinutes')
+  return n !== '' && n != null && Number.isFinite(Number(n)) && Number(n) >= 0
+    ? Number(n)
+    : null
+}
+export function localParts(value: string, zone: string) {
+  if (!value) return ''
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value))
+  const v = (k: string) => p.find((p) => p.type === k)?.value || ''
+  return `${v('year')}-${v('month')}-${v('day')} ${v('hour')}:${v('minute')}`
+}
+/** Resolve every possible offset around the local day. DST folds/gaps require an explicit choice. */
+export function localCandidates(local: string, zone: string) {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(local))
+    throw Error('Use YYYY-MM-DD HH:mm.')
+  const target = Date.parse(local.replace(' ', 'T') + ':00Z')
+  if (!Number.isFinite(target)) throw Error('Enter a valid date and time.')
+  const offsets = new Set<number>()
+  for (let h = -36; h <= 36; h++) {
+    const sample = target + h * 3600000,
+      shown = localParts(new Date(sample).toISOString(), zone)
+    offsets.add(Date.parse(shown.replace(' ', 'T') + ':00Z') - sample)
+  }
+  return [...offsets]
+    .map((o) => new Date(target - o).toISOString())
+    .filter((v) => localParts(v, zone) === local)
+    .sort()
+}
+export function parseDuration(s: string) {
+  if (!s.trim()) return null
+  const t = s.trim().toLowerCase()
+  let n: number
+  if (/^\d+(\.\d+)?$/.test(t)) n = Number(t)
+  else if (
+    /^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in)?)?$/.test(t)
+  ) {
+    const m = t.match(
+      /^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in)?)?$/,
+    )!
+    n = Number(m[1] || 0) * 60 + Number(m[2] || 0)
+  } else throw Error('Use minutes, 1h 20m, or leave blank for unknown.')
+  if (!Number.isFinite(n) || n < 0 || n > 10080)
+    throw Error('Duration must be between zero and seven days.')
+  return n
+}
+export function moveEvent(d: Y.Doc, e: FlowEvent, target: FlowEvent) {
+  d.transact(() => {
+    const all = orderedEvents(d).filter((x) => x.id !== e.id),
+      i = all.findIndex((x) => x.id === target.id),
+      before = all[i - 1]
+    put(d, 'events', e.id, {
+      start: target.start,
+      order: ((before?.order || target.order - 2048) + target.order) / 2,
+    })
+  })
+}

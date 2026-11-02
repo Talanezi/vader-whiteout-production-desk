@@ -1,3 +1,4 @@
+import { FlowsService } from './flows/flows.service';
 import 'reflect-metadata';
 import { webcrypto } from 'crypto';
 
@@ -18,6 +19,8 @@ async function bootstrap() {
   await app.get(ShotlistsService).attach(app.getHttpServer());
 
   await app.get(StoryboardsService).attach(app.getHttpServer());
+
+  await app.get(FlowsService).attach(app.getHttpServer());
 
   app.enableCors({
     origin: true,

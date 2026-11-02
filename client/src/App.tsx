@@ -7,6 +7,8 @@ import CallSheetEditorPage from './pages/CallSheetEditorPage'
 import RosterPage from './pages/RosterPage'
 import ShotListsPage from './pages/ShotListsPage'
 import DotsLoader from './components/whiteout/DotsLoader'
+const FlowsPage = lazy(() => import('./pages/FlowsPage'))
+const FlowPage = lazy(() => import('./pages/FlowPage'))
 const StoryboardsPage = lazy(() => import('./pages/StoryboardsPage'))
 const StoryboardPage = lazy(() => import('./pages/StoryboardPage'))
 const ShotListPage = lazy(() => import('./pages/ShotListPage'))
@@ -64,6 +66,7 @@ const router = createHashRouter([
           </Suspense>
         ),
       },
+      ...['/flows', '/flows/new', '/flows/:id'].map(path => ({path, element: <Suspense fallback={storyboardFallback}>{path === '/flows/:id' ? <FlowPage/> : <FlowsPage/>}</Suspense>})),
       { path: '/roster', element: <RosterPage /> },
       { path: '/callsheets/new', element: <CallSheetNewPage /> },
       { path: '/callsheets/:id/edit', element: <CallSheetEditorPage /> },

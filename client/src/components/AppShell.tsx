@@ -21,7 +21,7 @@ function AppShell() {
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const shotWorkspace =
-    /^\/shotlists\/[^/]+$/.test(location.pathname) &&
+    /^\/(shotlists|flows)\/[^/]+$/.test(location.pathname) &&
     !location.pathname.endsWith('/new')
   const editor = /^\/callsheets\/.+\/edit$/.test(location.pathname)
   useEffect(() => {
@@ -73,6 +73,7 @@ function AppShell() {
         <Icon name="grid" />
         <span className="pd-nav-text">Storyboards</span>
       </NavLink>
+      <NavLink to="/flows" title={collapsed ? 'Flow of the Day' : undefined} className={({ isActive }) => `pd-nav-link ${isActive ? 'is-active' : ''}`}><Icon name="calendar"/><span className="pd-nav-text">Flow of the Day</span></NavLink>
       <NavLink
         to="/roster"
         title={collapsed ? 'Roster' : undefined}

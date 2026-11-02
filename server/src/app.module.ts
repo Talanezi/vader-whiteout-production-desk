@@ -1,3 +1,4 @@
+import { FlowsModule } from './flows/flows.module';
 import { StoryboardsModule } from './storyboards/storyboards.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -34,6 +35,7 @@ import { ShotlistsModule } from './shotlists/shotlists.module';
     AuthModule,
     ShotlistsModule,
     StoryboardsModule,
+    FlowsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
