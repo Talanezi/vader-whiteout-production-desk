@@ -199,9 +199,12 @@ export async function renderStoryboard(
             }),
             thickness = Math.max(0.2, a.width * w * a.scale);
           if (a.engine && a.path) {
+            // A normal pressure stroke can exceed 500KB after VectorCraft expands
+            // samples into filled outlines. Match the bounded collaboration payload
+            // instead of rejecting valid saved artwork; keep syntax/size validation.
             if (
               typeof a.path !== 'string' ||
-              a.path.length > 500000 ||
+              a.path.length > 2_000_000 ||
               /[^MmLlHhVvCcSsQqTtAaZz0-9.,+\-eE\s]/.test(a.path)
             )
               throw new BadRequestException('Invalid vector path.');

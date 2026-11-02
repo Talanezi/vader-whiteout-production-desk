@@ -10,6 +10,7 @@ function run(name, env = {}) {
 }
 for (const file of [
   'studio-engine',
+  'studio-long-path-pdf',
   'creative-geometry',
   'panel-identity',
   'collaboration-error',
