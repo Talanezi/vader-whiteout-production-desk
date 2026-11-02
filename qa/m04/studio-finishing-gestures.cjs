@@ -143,13 +143,13 @@ const state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
       )
     }
     await page
-      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .getByRole('button', { name: 'Studio settings', exact: true })
       .click()
     await page
       .getByRole('checkbox', { name: 'Shape Assistance', exact: true })
       .uncheck()
     await page
-      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .getByRole('button', { name: 'Studio settings', exact: true })
       .click()
     const count = (await records()).length
     await draw(Array.from({ length: 20 }, (_, i) => [650 + i * 6, 420]))
@@ -195,7 +195,7 @@ const state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
     )
     const inputMode = async (label) => {
       await page
-        .getByRole('button', { name: 'Studio input settings', exact: true })
+        .getByRole('button', { name: 'Studio settings', exact: true })
         .click()
       await page
         .getByRole('button', { name: 'Drawing input', exact: true })
@@ -204,7 +204,7 @@ const state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
         .getByRole('menuitemradio', { name: label, exact: true })
         .click()
       await page
-        .getByRole('button', { name: 'Studio input settings', exact: true })
+        .getByRole('button', { name: 'Studio settings', exact: true })
         .click()
     }
     await inputMode('Touch Drawing')
@@ -252,7 +252,7 @@ const state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json'))
     await page.reload()
     await page.locator('.sb-card-art').first().click()
     await page
-      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .getByRole('button', { name: 'Studio settings', exact: true })
       .click()
     assert.match(
       await page

@@ -20,6 +20,7 @@ if (!fs.existsSync('/tmp/m04/studio-import-record.json')) run('studio-import')
 if (!fs.existsSync('/tmp/m04/studio-scene16-record.json')) run('studio-scene16')
 for (const browser of ['chromium', 'webkit']) {
   for (const file of [
+    'studio-final-controls',
     'studio-finishing-input',
     'studio-finishing-gestures',
     'studio-finishing-inspector',

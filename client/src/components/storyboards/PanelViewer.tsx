@@ -230,7 +230,7 @@ export default function PanelViewer({
                   Studio
                 </Button>
                 <StudioIcon
-                  name="settings"
+                  name="panel"
                   label={inspector ? 'Hide details' : 'Details'}
                   active={inspector}
                   onClick={() => setInspector((v) => !v)}
@@ -315,7 +315,7 @@ export default function PanelViewer({
             />
             {present && (
               <StudioIcon
-                name="settings"
+                name="panel"
                 label="Notes & shots"
                 active={showNotes}
                 onClick={() => setShowNotes((v) => !v)}

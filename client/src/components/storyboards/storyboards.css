@@ -1295,3 +1295,59 @@
 .sb-shot-select {
   position: relative;
 }
+
+/* Keep the print header/footer outside the independently scrolling settings and PDF. */
+.sb-print[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(850px, calc(100dvh - 48px));
+  overflow: hidden;
+}
+.sb-print > .pd-overlay-header,
+.sb-print > .pd-overlay-footer {
+  flex: none;
+}
+.sb-print > .pd-overlay-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sb-print .sb-print-layout {
+  height: 100%;
+  min-height: 0;
+}
+.sb-print .sb-print-settings {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.sb-print .sb-print-preview {
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+}
+.sb-print .pd-pdf-pages {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sb-print .pd-pdf-page-toolbar {
+  flex: none;
+  flex-wrap: wrap;
+}
+.sb-print .pd-pdf-canvas-scroll {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+  overscroll-behavior: contain;
+}
+@media (max-width: 700px) {
+  .sb-print .sb-print-layout {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .sb-print .sb-print-settings {
+    max-height: min(220px, 35dvh);
+  }
+}

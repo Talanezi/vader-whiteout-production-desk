@@ -23,6 +23,8 @@ export const glyphs: Record<string, string> = {
   previous: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   settings: 'M4 7h16M4 17h16M8 4v6M16 14v6',
+  panel: 'M3 4h18v16H3zM15 4v16',
+  gear: 'M9.5 3h5l.5 2.4 1.9 1.1 2.3-.8 2.5 4.3-1.8 1.6v2.2l1.8 1.6-2.5 4.3-2.3-.8-1.9 1.1-.5 1.4h-5L9 20l-1.9-1.1-2.3.8-2.5-4.3 1.8-1.6v-2.2L2.3 10l2.5-4.3 2.3.8L9 5.4zM15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0',
   trash: 'M4 6h16M8 6V3h8v3M6 6l1 15h10l1-15M10 10v7M14 10v7',
   layers: 'M12 3L2 8l10 5 10-5zM2 12l10 5 10-5M2 16l10 5 10-5',
   check: 'M4 12l5 5L20 6',

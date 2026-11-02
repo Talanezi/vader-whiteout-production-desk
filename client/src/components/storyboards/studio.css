@@ -1322,15 +1322,21 @@
   flex: 0 0 30px;
 }
 .sb-input-settings {
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  z-index: 7;
+  position: relative;
+  flex: none;
 }
 .sb-input-settings > .sb-tool-properties {
   position: absolute;
   right: 0;
-  top: 36px;
+  bottom: calc(100% + 14px);
+  top: auto;
+  max-height: min(320px, calc(100dvh - 180px));
+}
+.sb-settings-label {
+  display: block;
+  margin: 0 0 8px;
+  color: #9caebd;
+  font-size: 11px;
 }
 .sb-assist-toggle {
   display: flex;

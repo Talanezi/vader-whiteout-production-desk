@@ -111,7 +111,7 @@ const webkit = process.env.M04_BROWSER === 'webkit',
     )
     await page.getByRole('button', { name: 'Brush (B)', exact: true }).click()
     await page
-      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .getByRole('button', { name: 'Studio settings', exact: true })
       .click()
     await page
       .getByRole('button', { name: 'Drawing input', exact: true })
@@ -120,7 +120,7 @@ const webkit = process.env.M04_BROWSER === 'webkit',
       .getByRole('menuitemradio', { name: 'Touch Drawing', exact: true })
       .click()
     await page
-      .getByRole('button', { name: 'Studio input settings', exact: true })
+      .getByRole('button', { name: 'Studio settings', exact: true })
       .click()
     await canvas.dispatchEvent('pointerdown', {
       pointerId: 99,

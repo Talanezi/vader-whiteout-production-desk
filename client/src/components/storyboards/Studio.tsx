@@ -1566,6 +1566,7 @@ export default function Studio({
                 if (penPath.current) finishPen()
                 setTool(id)
                 setProperties(false)
+                setSettings(false)
               }}
             />
           ))}
@@ -1588,6 +1589,60 @@ export default function Studio({
             disabled={!canRedo}
             onClick={onRedo}
           />
+          <span className="sb-dock-divider" />
+          <div className="sb-input-settings">
+            <StudioIcon
+              name="gear"
+              label="Studio settings"
+              active={settings}
+              aria-expanded={settings}
+              aria-haspopup="dialog"
+              onClick={() => setSettings((v) => !v)}
+            />
+            {settings && (
+              <div
+                className="sb-tool-properties"
+                role="dialog"
+                aria-label="Studio settings"
+              >
+                <strong>Studio settings</strong>
+                <span className="sb-settings-label">Drawing input</span>
+                <Menu
+                  ariaLabel="Drawing input"
+                  label={
+                    inputMode === 'auto'
+                      ? 'Auto'
+                      : inputMode === 'touch'
+                        ? 'Touch Drawing'
+                        : 'Navigation Only'
+                  }
+                  value={inputMode}
+                  onChange={(v) => {
+                    setInputMode(v)
+                    localStorage.setItem('whiteout:studio-input', v)
+                  }}
+                  items={[
+                    { value: 'auto', label: 'Auto' },
+                    { value: 'touch', label: 'Touch Drawing' },
+                    { value: 'navigate', label: 'Navigation Only' },
+                  ]}
+                />
+                <label className="sb-assist-toggle">
+                  <DrawCheckbox
+                    checked={assist}
+                    onChange={(e) => {
+                      setAssist(e.target.checked)
+                      localStorage.setItem(
+                        'whiteout:studio-shapes',
+                        String(e.target.checked),
+                      )
+                    }}
+                  />
+                  Shape Assistance
+                </label>
+              </div>
+            )}
+          </div>
         </div>
       )}
       {annotating && (
@@ -1739,54 +1794,6 @@ export default function Studio({
                   </label>
                 </>
               )}
-            </div>
-          )}
-        </div>
-      )}
-      {annotating && (
-        <div className="sb-input-settings">
-          <StudioIcon
-            name="settings"
-            label="Studio input settings"
-            active={settings}
-            onClick={() => setSettings((v) => !v)}
-          />
-          {settings && (
-            <div className="sb-tool-properties">
-              <strong>Input</strong>
-              <Menu
-                ariaLabel="Drawing input"
-                label={
-                  inputMode === 'auto'
-                    ? 'Auto'
-                    : inputMode === 'touch'
-                      ? 'Touch Drawing'
-                      : 'Navigation Only'
-                }
-                value={inputMode}
-                onChange={(v) => {
-                  setInputMode(v)
-                  localStorage.setItem('whiteout:studio-input', v)
-                }}
-                items={[
-                  { value: 'auto', label: 'Auto' },
-                  { value: 'touch', label: 'Touch Drawing' },
-                  { value: 'navigate', label: 'Navigation Only' },
-                ]}
-              />
-              <label className="sb-assist-toggle">
-                <DrawCheckbox
-                  checked={assist}
-                  onChange={(e) => {
-                    setAssist(e.target.checked)
-                    localStorage.setItem(
-                      'whiteout:studio-shapes',
-                      String(e.target.checked),
-                    )
-                  }}
-                />
-                Shape Assistance
-              </label>
             </div>
           )}
         </div>
