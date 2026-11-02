@@ -123,6 +123,14 @@ const state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),
       'true',
     )
     assert.equal(await page.locator('.sb-viewer-comment-rail').count(), 0)
+    await page.getByRole('tab', { name: 'Details', exact: true }).click()
+    await page.locator('.sb-viewer-comment-rail button').click()
+    assert.equal(
+      await page
+        .getByRole('tab', { name: 'Comments', exact: true })
+        .getAttribute('aria-selected'),
+      'true',
+    )
     await page.getByRole('button', { name: 'Back', exact: true }).click()
     await page
       .getByRole('dialog', { name: 'Panel viewer', exact: true })

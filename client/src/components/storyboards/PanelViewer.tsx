@@ -126,7 +126,10 @@ export default function PanelViewer({
       'annotations',
     ).filter((a) => a.revisionId === revision?.id),
     index = all.findIndex((p) => p.id === panel.id),
-    commentCount = activeCommentCounts(doc).get(panel.id) || 0
+    commentCount = activeCommentCounts(doc).get(panel.id) || 0,
+    showCommentIndicator =
+      commentCount > 0 &&
+      !((present ? showNotes : inspector) && inspectorTab === 'comments')
   useEffect(() => {
     setViewRevision('')
     setInspectorTab(commentsRequested ? 'comments' : 'details')
@@ -327,7 +330,9 @@ export default function PanelViewer({
             )}
           </div>
         </header>
-        <div className="sb-viewer-body">
+        <div
+          className={`sb-viewer-body ${showCommentIndicator ? 'has-comment-rail' : ''}`}
+        >
           <div className="sb-viewer-art">
             {media.error ? (
               <div className="sb-connect">
@@ -422,24 +427,21 @@ export default function PanelViewer({
               </div>
             )}
           </div>
-          {!!commentCount &&
-            !(
-              (present ? showNotes : inspector) && inspectorTab === 'comments'
-            ) && (
-              <div className="sb-viewer-comment-rail">
-                <CommentIndicator
-                  floating
-                  count={commentCount}
-                  label={panelIdentity(panel, index, snapshots)}
-                  onOpen={() => {
-                    setViewRevision('')
-                    setInspectorTab('comments')
-                    if (present) setShowNotes(true)
-                    else setInspector(true)
-                  }}
-                />
-              </div>
-            )}
+          {showCommentIndicator && (
+            <div className="sb-viewer-comment-rail">
+              <CommentIndicator
+                floating
+                count={commentCount}
+                label={panelIdentity(panel, index, snapshots)}
+                onOpen={() => {
+                  setViewRevision('')
+                  setInspectorTab('comments')
+                  if (present) setShowNotes(true)
+                  else setInspector(true)
+                }}
+              />
+            </div>
+          )}
           {((!present && inspector) || (present && showNotes)) && (
             <PanelInspector
               documentId={documentId}
