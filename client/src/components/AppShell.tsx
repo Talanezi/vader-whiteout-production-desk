@@ -73,7 +73,16 @@ function AppShell() {
         <Icon name="grid" />
         <span className="pd-nav-text">Storyboards</span>
       </NavLink>
-      <NavLink to="/flows" title={collapsed ? 'Flow of the Day' : undefined} className={({ isActive }) => `pd-nav-link ${isActive ? 'is-active' : ''}`}><Icon name="calendar"/><span className="pd-nav-text">Flow of the Day</span></NavLink>
+      <NavLink
+        to="/flows"
+        title={collapsed ? 'Flow of the Day' : undefined}
+        className={({ isActive }) =>
+          `pd-nav-link ${isActive ? 'is-active' : ''}`
+        }
+      >
+        <Icon name="calendar" />
+        <span className="pd-nav-text">Flow of the Day</span>
+      </NavLink>
       <NavLink
         to="/roster"
         title={collapsed ? 'Roster' : undefined}

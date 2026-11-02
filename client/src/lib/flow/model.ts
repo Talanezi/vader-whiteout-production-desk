@@ -11,6 +11,7 @@ export type FlowEvent = {
   id: string
   type: 'shot' | 'milestone' | 'department' | 'custom'
   order: number
+  category?: string
   description: string
   notes?: string
   start: string | null
@@ -99,15 +100,19 @@ export function instruction(d: Y.Doc, e: string, dep: string) {
 }
 export function addEvent(d: Y.Doc, value: Partial<FlowEvent> = {}) {
   const id = value.id || crypto.randomUUID()
-  put(d, 'events', id, {
-    type: 'custom',
-    description: '',
-    start: null,
-    duration: null,
-    fixed: false,
-    status: 'planned',
-    order: Math.max(0, ...orderedEvents(d).map((e) => e.order)) + 1024,
-    ...value,
+  d.transact(() => {
+    put(d, 'events', id, {
+      type: 'custom',
+      description: '',
+      notes: '',
+      start: null,
+      duration: null,
+      fixed: value.type === 'milestone',
+      status: 'planned',
+      order: Math.max(0, ...orderedEvents(d).map((e) => e.order)) + 1024,
+      ...value,
+    })
+    for (const dep of departments(d)) instruction(d, id, dep.id)
   })
   return id
 }

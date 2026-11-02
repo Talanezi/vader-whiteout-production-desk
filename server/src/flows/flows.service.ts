@@ -141,18 +141,28 @@ export class FlowsService implements OnModuleDestroy {
           const shot: any = source.shots[id];
           if (!shot || shot.deleted || shot.deletedAt)
             throw new BadRequestException('A selected shot is unavailable.');
-          setRecord(d, 'events', randomUUID(), {
+          const eventId = randomUUID();
+          setRecord(d, 'events', eventId, {
             type: 'shot',
             shotId: id,
             sourceListId: p.listId,
             reference: String(shot.number || ''),
             order: (i + 1) * 1024,
             description: '',
+            notes: '',
             duration: null,
             start: cursor,
             status: 'planned',
             fixed: false,
           });
+          for (const dep of d.getMap<Y.Map<unknown>>('departments').values()) {
+            const departmentId = String(dep.get('id'));
+            setRecord(d, 'instructions', eventId + ':' + departmentId, {
+              eventId,
+              departmentId,
+              text: '',
+            });
+          }
           const n = shot.estimatedMinutes;
           cursor =
             cursor &&

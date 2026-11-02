@@ -20,8 +20,13 @@ node qa/m05/drag.cjs
 M05_BROWSER=webkit node qa/m05/browser.cjs
 M05_BROWSER=webkit node qa/m05/journeys.cjs
 M05_BROWSER=webkit node qa/m05/drag.cjs
+node qa/m05/connections.cjs
+node qa/m05/shift.cjs
+node qa/m05/surfaces.cjs
 node qa/m05/security.cjs
 NODE_PATH=/tmp/m032/runtime/server/node_modules node qa/m05/print.cjs
+node qa/m05/workbook-pdf.cjs
+node qa/m05/callsheet.cjs
 node qa/m04/regression.cjs
 ```
 

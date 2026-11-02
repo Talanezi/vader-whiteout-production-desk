@@ -16,7 +16,13 @@ export default function ShotPicker({
   connectedListId,
   onConfirm,
   onClose,
+  flowContext = false,
+  onConnectList,
+  selectionLimit,
 }: {
+  onConnectList?: (id: string) => void
+  selectionLimit?: number
+  flowContext?: boolean
   initial?: ShotLink[]
   connectedListId?: string
   onConfirm: (links: ShotLink[]) => void
@@ -54,7 +60,12 @@ export default function ShotPicker({
         !s.deleted &&
         !s.deletedAt &&
         (!scene || s.sceneId === scene) &&
-        [s.number, s.coverage, data?.scenes[String(s.sceneId)]?.number]
+        [
+          s.number,
+          s.coverage,
+          ...(flowContext ? [s.subject] : []),
+          data?.scenes[String(s.sceneId)]?.number,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(search.toLowerCase()),
@@ -71,23 +82,30 @@ export default function ShotPicker({
   const toggle = (id: string, on: boolean) =>
     setSelected((old) =>
       on
-        ? [
-            ...old.filter((x) => x.listId !== listId || x.shotId !== id),
-            { listId, shotId: id },
-          ]
+        ? selectionLimit === 1
+          ? [{ listId, shotId: id }]
+          : [
+              ...old.filter((x) => x.listId !== listId || x.shotId !== id),
+              { listId, shotId: id },
+            ]
         : old.filter((x) => x.listId !== listId || x.shotId !== id),
     )
   return (
     <Overlay
       title="Link shots"
       onClose={onClose}
-      className="sb-shot-picker"
+      className={`sb-shot-picker ${flowContext ? 'flow-shot-picker' : ''}`}
       footer={
         <>
           <span className="sb-picker-count">{selected.length} selected</span>
           <Button disabled={!selected.length} onClick={() => setSelected([])}>
             Clear selection
           </Button>
+          {onConnectList && (
+            <Button disabled={!listId} onClick={() => onConnectList(listId)}>
+              Connect without scheduling
+            </Button>
+          )}
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={() => onConfirm(selected)}>
             Use selected shots
@@ -127,32 +145,37 @@ export default function ShotPicker({
         onChange={setSearch}
       />
       <div className="sb-shot-options">
-        <label>
-          <DrawCheckbox
-            aria-label="Select shown shots"
-            checked={!!shots.length && shots.every(([id]) => checked(id))}
-            indeterminate={
-              shots.some(([id]) => checked(id)) &&
-              !shots.every(([id]) => checked(id))
-            }
-            onChange={(e) => {
-              const ids = new Set(shots.map(([id]) => id))
-              setSelected((old) =>
-                e.target.checked
-                  ? [
-                      ...old.filter(
-                        (x) => x.listId !== listId || !ids.has(x.shotId),
-                      ),
-                      ...shots.map(([id]) => ({ listId, shotId: id })),
-                    ]
-                  : old.filter(
-                      (x) => x.listId !== listId || !ids.has(x.shotId),
-                    ),
-              )
-            }}
-          />
-          Select shown shots
-        </label>
+        {selectionLimit !== 1 && (
+          <>
+            {' '}
+            <label>
+              <DrawCheckbox
+                aria-label="Select shown shots"
+                checked={!!shots.length && shots.every(([id]) => checked(id))}
+                indeterminate={
+                  shots.some(([id]) => checked(id)) &&
+                  !shots.every(([id]) => checked(id))
+                }
+                onChange={(e) => {
+                  const ids = new Set(shots.map(([id]) => id))
+                  setSelected((old) =>
+                    e.target.checked
+                      ? [
+                          ...old.filter(
+                            (x) => x.listId !== listId || !ids.has(x.shotId),
+                          ),
+                          ...shots.map(([id]) => ({ listId, shotId: id })),
+                        ]
+                      : old.filter(
+                          (x) => x.listId !== listId || !ids.has(x.shotId),
+                        ),
+                  )
+                }}
+              />
+              Select shown shots
+            </label>
+          </>
+        )}
         {shots.map(([id, s]) => (
           <label key={id}>
             <DrawCheckbox
@@ -162,6 +185,21 @@ export default function ShotPicker({
             />
             <span>
               <strong>{String(s.number || 'Untitled shot')}</strong>
+              {flowContext && (
+                <small>
+                  {[
+                    s.subject,
+                    s.camera,
+                    s.framing,
+                    s.lens,
+                    s.estimatedMinutes !== '' && s.estimatedMinutes != null
+                      ? s.estimatedMinutes + ' min'
+                      : 'Duration unknown',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </small>
+              )}
               <small>
                 Scene {String(data?.scenes[String(s.sceneId)]?.number || '—')} ·{' '}
                 {id.slice(0, 8)}

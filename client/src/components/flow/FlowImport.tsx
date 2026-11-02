@@ -13,7 +13,14 @@ import {
   type Mapping,
 } from '../../lib/flow/import'
 import { uploadWorkbook } from '../../lib/flow/api'
-import { put, addEvent, departments, localParts } from '../../lib/flow/model'
+import {
+  put,
+  addEvent,
+  departments,
+  localParts,
+  orderedEvents,
+  instruction,
+} from '../../lib/flow/model'
 import { StudioGlyph } from '../storyboards/StudioControls'
 export default function FlowImport({
   id,
@@ -55,6 +62,23 @@ export default function FlowImport({
             'Unlabeled'),
       }))
     : []
+  const unmapped = rows.flatMap((r) =>
+    (
+      (r.provenance as { cells: { address: string; formatted: string }[] })
+        .cells || []
+    )
+      .filter(
+        (c) =>
+          ![
+            mapping?.planned,
+            mapping?.secondary,
+            mapping?.action,
+            mapping?.estimate,
+            ...Object.keys(mapping?.departments || {}),
+          ].includes(c.address.replace(/\d/g, '')),
+      )
+      .map((c) => `${c.address}: ${c.formatted}`),
+  )
   async function choose(f: File) {
     setBusy(true)
     setError('')
@@ -64,6 +88,9 @@ export default function FlowImport({
       const parsed = readWorkbook(await f.arrayBuffer())
       setProgress(1)
       setFile(f)
+      setMatches({})
+      setTypes({})
+      setSourceShots([])
       setSheets(parsed)
       setSheetIndex(0)
       setMapping(suggest(parsed[0]))
@@ -106,7 +133,9 @@ export default function FlowImport({
           ...new Uint8Array(
             await crypto.subtle.digest(
               'SHA-256',
-              new TextEncoder().encode(hash + ':' + sheet.name + ':' + key),
+              new TextEncoder().encode(
+                id + ':' + hash + ':' + sheet.name + ':' + key,
+              ),
             ),
           ),
         ]
@@ -160,6 +189,9 @@ export default function FlowImport({
                 order: (existing.length + i + 1) * 1024,
               })
           })
+          for (const event of orderedEvents(staged))
+            for (const departmentId of Object.values(ids))
+              instruction(staged, event.id, departmentId)
           rows.forEach((r) => {
             const linked = matches[r.row],
               shot = sourceShots.find((s) => s.id === linked)
@@ -268,6 +300,9 @@ export default function FlowImport({
             !file ||
             !mapping?.planned ||
             !reviewed ||
+            Object.values(mapping?.departments || {}).some(
+              (name) => !name.trim(),
+            ) ||
             rows.some((r) => r.warning) ||
             !rows.length ||
             !date
@@ -323,6 +358,8 @@ export default function FlowImport({
                 label={sheet?.name || 'Worksheet'}
                 value={String(sheetIndex)}
                 onChange={(v) => {
+                  setMatches({})
+                  setTypes({})
                   setSheetIndex(Number(v))
                   setMapping(suggest(sheets[Number(v)]))
                   setReviewed(false)
@@ -416,6 +453,18 @@ export default function FlowImport({
                 {Object.entries(mapping?.departments || {}).map(([c, name]) => (
                   <label key={c}>
                     {c}
+                    <IconButton
+                      name="close"
+                      label={`Unmap department column ${c}`}
+                      onClick={() =>
+                        setMapping((m) => {
+                          if (!m) return m
+                          const departments = { ...m.departments }
+                          delete departments[c]
+                          return { ...m, departments }
+                        })
+                      }
+                    />
                     <input
                       aria-label={`Department in column ${c}`}
                       value={name}
@@ -507,6 +556,19 @@ export default function FlowImport({
                   </tbody>
                 </table>
               </div>
+              {unmapped.length > 0 && (
+                <details className="flow-warning">
+                  <summary>
+                    {unmapped.length} source cells are retained only in the
+                    original and provenance
+                  </summary>
+                  <ul>
+                    {unmapped.map((value, i) => (
+                      <li key={i}>{value}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <h3>Mapped Flow · {rows.length} events</h3>
               <div className="flow-mapped-preview">
                 <table>

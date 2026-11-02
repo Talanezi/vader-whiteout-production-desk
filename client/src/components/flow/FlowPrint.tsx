@@ -26,6 +26,8 @@ export default function FlowPrint({
     [personnel, setPersonnel] = useState(true),
     [notes, setNotes] = useState(true),
     [bytes, setBytes] = useState<Uint8Array>(),
+    [readyBytes, setReadyBytes] = useState<Uint8Array>(),
+    [generatedConfig, setGeneratedConfig] = useState(''),
     [url, setUrl] = useState(''),
     [error, setError] = useState(''),
     [pending, setPending] = useState(true),
@@ -46,6 +48,7 @@ export default function FlowPrint({
     setPending(true)
     setError('')
     setBytes(undefined)
+    setReadyBytes(undefined)
     const timer = setTimeout(() => {
       void flowFetch(`/${id}/pdf`, {
         method: 'POST',
@@ -55,7 +58,10 @@ export default function FlowPrint({
       })
         .then((r) => r.arrayBuffer())
         .then((b) => {
-          if (alive) setBytes(new Uint8Array(b))
+          if (alive) {
+            setBytes(new Uint8Array(b))
+            setGeneratedConfig(config)
+          }
         })
         .catch((e) => {
           if (alive && e.name !== 'AbortError') setError(e.message)
@@ -236,35 +242,40 @@ export default function FlowPrint({
               </Button>
             </div>
           ) : bytes ? (
-            <PdfPages bytes={bytes} />
+            <PdfPages bytes={bytes} onReady={setReadyBytes} />
           ) : null}
           <div className="flow-print-actions">
-            {url && (
-              <>
-                <a
-                  className="pd-button pd-button-primary"
-                  href={url}
-                  download="Whiteout - Flow of the Day.pdf"
-                >
-                  Download PDF
-                </a>
-                <Button
-                  icon="file"
-                  onClick={() => {
-                    const frame = document.createElement('iframe')
-                    frame.style.display = 'none'
-                    frame.src = url
-                    document.body.append(frame)
-                    frame.onload = () => {
-                      frame.contentWindow?.print()
-                      setTimeout(() => frame.remove(), 60000)
-                    }
-                  }}
-                >
-                  Print PDF
-                </Button>
-              </>
-            )}
+            {url &&
+              bytes &&
+              readyBytes === bytes &&
+              generatedConfig === config &&
+              !pending &&
+              !error && (
+                <>
+                  <a
+                    className="pd-button pd-button-primary"
+                    href={url}
+                    download="Whiteout - Flow of the Day.pdf"
+                  >
+                    Download PDF
+                  </a>
+                  <Button
+                    icon="file"
+                    onClick={() => {
+                      const frame = document.createElement('iframe')
+                      frame.style.display = 'none'
+                      frame.src = url
+                      document.body.append(frame)
+                      frame.onload = () => {
+                        frame.contentWindow?.print()
+                        setTimeout(() => frame.remove(), 60000)
+                      }
+                    }}
+                  >
+                    Print PDF
+                  </Button>
+                </>
+              )}
           </div>
         </main>
       </div>

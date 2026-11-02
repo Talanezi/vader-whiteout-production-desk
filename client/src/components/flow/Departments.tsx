@@ -3,7 +3,13 @@ import type * as Y from 'yjs'
 import { Overlay } from '../whiteout/Overlay'
 import { Button, IconButton } from '../whiteout/Button'
 import DrawCheckbox from '../whiteout/DrawCheckbox'
-import { departments, put, type Department } from '../../lib/flow/model'
+import {
+  departments,
+  put,
+  orderedEvents,
+  instruction,
+  type Department,
+} from '../../lib/flow/model'
 export default function Departments({
   doc,
   hidden,
@@ -52,11 +58,16 @@ export default function Departments({
             <div>
               <input
                 aria-label={`Department ${i + 1} name`}
-                value={d.name}
+                key={d.id + ':' + d.name}
+                defaultValue={d.name}
                 maxLength={100}
-                onChange={(e) =>
-                  put(doc, 'departments', d.id, { name: e.target.value })
-                }
+                onBlur={(e) => {
+                  if (e.target.value.trim())
+                    put(doc, 'departments', d.id, {
+                      name: e.target.value.trim(),
+                    })
+                  else e.target.value = d.name
+                }}
               />
               <input
                 aria-label={`${d.name} personnel`}
@@ -104,11 +115,16 @@ export default function Departments({
         onSubmit={(e) => {
           e.preventDefault()
           if (name.trim()) {
-            put(doc, 'departments', crypto.randomUUID(), {
-              name: name.trim(),
-              personnel: '',
-              group: '',
-              order: Math.max(0, ...all.map((d) => d.order)) + 1024,
+            const id = crypto.randomUUID()
+            doc.transact(() => {
+              put(doc, 'departments', id, {
+                name: name.trim(),
+                personnel: '',
+                group: '',
+                order: Math.max(0, ...all.map((d) => d.order)) + 1024,
+              })
+              for (const event of orderedEvents(doc))
+                instruction(doc, event.id, id)
             })
             setName('')
           }

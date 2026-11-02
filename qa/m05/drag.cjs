@@ -88,6 +88,24 @@ async function api(p, b) {
       ),
     )
     await p.getByRole('button', { name: 'Time Map', exact: true }).click()
+    const beforeMove = await api('/flows/' + flow.id + '/snapshot')
+    const known = p
+      .locator('.flow-time-block')
+      .filter({ hasText: '19-1' })
+      .first()
+      .locator('button')
+      .first()
+    await known.focus()
+    await known.press('ArrowRight')
+    await p.getByRole('button', { name: 'Apply move', exact: true }).click()
+    await p.getByText('Saved', { exact: true }).waitFor()
+    const afterMove = await api('/flows/' + flow.id + '/snapshot')
+    for (const [id, event] of Object.entries(beforeMove.state.events))
+      assert.equal(
+        afterMove.state.events[id].duration,
+        event.duration,
+        'Moving does not freeze inherited estimates',
+      )
     const resize = p.locator('.flow-resize-duration').first(),
       box = await resize.boundingBox()
     await p.mouse.move(box.x + box.width / 2, box.y + 15)

@@ -24,7 +24,11 @@ export default function TimeMap({
   departments: Department[]
   zone: string
   shots?: Y.Map<Y.Map<unknown>>
-  onMove: (e: FlowEvent, start: string, duration: number | null) => void
+  onMove: (
+    e: FlowEvent,
+    start: string,
+    duration: number | null | undefined,
+  ) => void
   onInspect: (e: FlowEvent) => void
   selected: Set<string>
   onSelect: (e: FlowEvent) => void
@@ -178,7 +182,7 @@ export default function TimeMap({
                               : new Date(
                                   Date.parse(e.start!) + delta * 60000,
                                 ).toISOString(),
-                            resize ? (base || 0) + delta : base,
+                            resize ? (base || 0) + delta : undefined,
                           )
                       }
                     }
@@ -206,7 +210,7 @@ export default function TimeMap({
                                   Date.parse(e.start!) +
                                     (v.key === 'ArrowRight' ? 5 : -5) * 60000,
                                 ).toISOString(),
-                                base,
+                                undefined,
                               )
                             } else if (v.key === 'Enter') onInspect(e)
                           }}

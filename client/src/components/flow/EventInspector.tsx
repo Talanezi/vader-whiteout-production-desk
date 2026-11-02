@@ -4,6 +4,7 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
 import Menu from '../whiteout/Menu'
+import Combobox from '../whiteout/Combobox'
 import { ErrorNotice } from '../whiteout/Feedback'
 import PanelDiscussion from '../storyboards/PanelDiscussion'
 import CollaborativeText from '../shots/CollaborativeText'
@@ -99,6 +100,29 @@ export default function EventInspector({
               }))}
             />
           </label>
+          {event.type === 'custom' && (
+            <label>
+              Category
+              <Combobox
+                label="Activity category"
+                value={event.category || ''}
+                options={[
+                  ...new Set([
+                    'Transport',
+                    'Rehearsal',
+                    'Location move',
+                    'Equipment strike',
+                    ...Array.from(doc.getMap<Y.Map<unknown>>('events').values())
+                      .map((e) => String(e.get('category') || ''))
+                      .filter(Boolean),
+                  ]),
+                ]}
+                onChange={(category) =>
+                  put(doc, 'events', event.id, { category })
+                }
+              />
+            </label>
+          )}
           <label>
             Current Action
             <CollaborativeText
@@ -135,11 +159,16 @@ export default function EventInspector({
           <div className="flow-inline">
             <Button
               icon="play"
+              disabled={Boolean(event.actualStart)}
               onClick={() =>
-                put(doc, 'events', event.id, {
-                  actualStart: new Date().toISOString(),
-                  status: 'in-progress',
-                })
+                event.actualEnd && Date.parse(event.actualEnd) < Date.now()
+                  ? setError(
+                      'Correct the existing completion before starting this event.',
+                    )
+                  : put(doc, 'events', event.id, {
+                      actualStart: new Date().toISOString(),
+                      status: 'in-progress',
+                    })
               }
             >
               Start now
@@ -148,10 +177,14 @@ export default function EventInspector({
               icon="check"
               disabled={!event.actualStart}
               onClick={() =>
-                put(doc, 'events', event.id, {
-                  actualEnd: new Date().toISOString(),
-                  status: 'complete',
-                })
+                event.actualStart && Date.parse(event.actualStart) > Date.now()
+                  ? setError(
+                      'Actual completion cannot precede the actual start.',
+                    )
+                  : put(doc, 'events', event.id, {
+                      actualEnd: new Date().toISOString(),
+                      status: 'complete',
+                    })
               }
             >
               Complete now

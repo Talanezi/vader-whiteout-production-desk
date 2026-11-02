@@ -138,7 +138,7 @@ function Workspace({
     [shift, setShift] = useState(false),
     [shiftMinutes, setShiftMinutes] = useState('15')
   const allSaved = c.saved && (!source || source.saved || Boolean(source.error))
-  const key = `whiteout:flow:${id}:layout`,
+  const key = `whiteout:flow:${id}:user:${c.session!.user.id}:layout`,
     [layout, setLayout] = useState<{
       hidden: string[]
       widths: Record<string, number>
@@ -309,6 +309,25 @@ function Workspace({
                     ?.get('text') || '',
                 ).trim(),
             ),
+        )
+      : []
+  const crossingFixed =
+    move && proposedStart
+      ? events.filter(
+          (anchor) =>
+            anchor.id !== move.event.id &&
+            anchor.fixed &&
+            anchor.start &&
+            Date.parse(anchor.start) >= Date.parse(proposedStart) &&
+            Date.parse(anchor.start) <
+              Date.parse(proposedStart) +
+                (move.duration ??
+                  duration(
+                    move.event,
+                    sourceShots?.get(move.event.shotId || ''),
+                  ) ??
+                  0) *
+                  60000,
         )
       : []
   const changing = move?.event,
@@ -801,6 +820,16 @@ function Workspace({
       )}
       {picker && (
         <ShotPicker
+          selectionLimit={relink ? 1 : undefined}
+          onConnectList={
+            !listId && !relink
+              ? (value) => {
+                  meta.set('listId', value)
+                  setPicker(false)
+                }
+              : undefined
+          }
+          flowContext
           connectedListId={listId || undefined}
           onClose={() => {
             setPicker(false)
@@ -821,6 +850,7 @@ function Workspace({
                 put(doc, 'events', relink, {
                   shotId: links[0].shotId,
                   sourceListId: links[0].listId,
+                  reference: str(sourceShots?.get(links[0].shotId), 'number'),
                   type: 'shot',
                 })
               } else
@@ -864,7 +894,18 @@ function Workspace({
           footer={
             <Button
               onClick={() => {
-                meta.set('listId', '')
+                doc.transact(() => {
+                  for (const event of events) {
+                    if (event.sourceListId === listId && event.shotId) {
+                      const shot = sourceShots?.get(event.shotId)
+                      if (shot)
+                        put(doc, 'events', event.id, {
+                          reference: str(shot, 'number'),
+                        })
+                    }
+                  }
+                  meta.set('listId', '')
+                })
                 setDisconnect(false)
               }}
             >
@@ -950,6 +991,15 @@ function Workspace({
           }
         >
           <div className="flow-change-preview">
+            {crossingFixed.length > 0 && (
+              <p className="flow-warning">
+                This interval crosses fixed milestones:{' '}
+                {crossingFixed
+                  .map((e) => e.description || e.reference || 'Fixed event')
+                  .join(', ')}
+                .
+              </p>
+            )}
             {overlap.length > 0 && (
               <p className="flow-warning">
                 Shared department work overlaps{' '}
@@ -959,6 +1009,16 @@ function Workspace({
                   )
                   .join(', ')}
                 . Parallel work may be intended; review before applying.
+              </p>
+            )}
+            {move.duration !== undefined && (
+              <p>
+                Duration:{' '}
+                {duration(
+                  move.event,
+                  sourceShots?.get(move.event.shotId || ''),
+                ) ?? 'Unknown'}{' '}
+                → {move.duration ?? 'Unknown'} min
               </p>
             )}
             <strong>

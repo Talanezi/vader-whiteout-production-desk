@@ -432,6 +432,7 @@ export default function FlowsPage() {
       )}
       {picker && (
         <ShotPicker
+          flowContext
           initial={links}
           onClose={() => setPicker(false)}
           onConfirm={(l) => {

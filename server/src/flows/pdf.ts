@@ -172,6 +172,7 @@ export async function renderFlow(
             ? String(shot.number) + ' ' + String(shot.subject || '')
             : String(e.reference || 'Shot') + ' · source unavailable'
           : '',
+        e.category,
         e.description,
         valid ? String(shot.coverage || '') : '',
         dur(e) != null

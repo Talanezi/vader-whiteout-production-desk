@@ -45,6 +45,8 @@ export function capture(d: Y.Doc): any {
 export function validateMeta(m: any) {
   if (typeof m.name !== 'string' || m.name.length > 180 || !m.name.trim())
     throw new BadRequestException('Enter a Flow title up to 180 characters.');
+  if (typeof m.zone !== 'string' || !m.zone.trim())
+    throw new BadRequestException('Choose a named production timezone.');
   try {
     new Intl.DateTimeFormat('en', { timeZone: m.zone }).format();
   } catch {
@@ -68,6 +70,18 @@ export function validateFlow(s: any) {
     if (Object.keys(s[k]).length > (k === 'events' ? 5000 : 20000))
       throw new BadRequestException('Flow collection limit exceeded.');
   }
+  for (const d of Object.values(s.departments) as any[])
+    if (
+      typeof d.name !== 'string' ||
+      !d.name.trim() ||
+      d.name.length > 100 ||
+      !Number.isFinite(d.order) ||
+      (d.personnel != null &&
+        (typeof d.personnel !== 'string' || d.personnel.length > 1000))
+    )
+      throw new BadRequestException(
+        'Departments need a name up to 100 characters and valid order/personnel.',
+      );
   for (const e of Object.values(s.events) as any[]) {
     if (
       !['shot', 'milestone', 'department', 'custom'].includes(e.type) ||

@@ -70,6 +70,16 @@ async function req(p, b) {
       .getByRole('menuitemradio', { name: 'M05 Fixture Source', exact: true })
       .last()
       .click()
+    const pickerSearch = page
+      .getByRole('dialog', { name: 'Link shots' })
+      .getByRole('searchbox')
+    await pickerSearch.fill('Production subject 1')
+    await page
+      .getByRole('dialog', { name: 'Link shots' })
+      .getByRole('checkbox')
+      .nth(1)
+      .waitFor()
+    await pickerSearch.fill('')
     const firstBox = page
       .getByRole('dialog', { name: 'Link shots' })
       .getByRole('checkbox')

@@ -66,7 +66,14 @@ const router = createHashRouter([
           </Suspense>
         ),
       },
-      ...['/flows', '/flows/new', '/flows/:id'].map(path => ({path, element: <Suspense fallback={storyboardFallback}>{path === '/flows/:id' ? <FlowPage/> : <FlowsPage/>}</Suspense>})),
+      ...['/flows', '/flows/new', '/flows/:id'].map((path) => ({
+        path,
+        element: (
+          <Suspense fallback={storyboardFallback}>
+            {path === '/flows/:id' ? <FlowPage /> : <FlowsPage />}
+          </Suspense>
+        ),
+      })),
       { path: '/roster', element: <RosterPage /> },
       { path: '/callsheets/new', element: <CallSheetNewPage /> },
       { path: '/callsheets/:id/edit', element: <CallSheetEditorPage /> },

@@ -52,7 +52,7 @@ export function checkWorkbook(b: Buffer) {
       comment = b.readUInt16LE(p + 32),
       name = b.subarray(p + 46, p + 46 + n).toString();
     if (name === '[Content_Types].xml') types = true;
-    if (/vbaProject|\.bin$/i.test(name))
+    if (/vbaProject|xl\/activeX\//i.test(name))
       throw new BadRequestException(
         'Macro-enabled workbooks are not supported.',
       );

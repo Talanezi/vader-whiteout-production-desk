@@ -47,6 +47,9 @@ export function uploadWorkbook(
     const xhr = new XMLHttpRequest()
     xhr.open('POST', flowBase + '/' + id + '/sources')
     xhr.setRequestHeader('Authorization', 'Bearer ' + (getAuthToken() || ''))
+    xhr.timeout = 60000
+    xhr.ontimeout = () =>
+      reject(Error('Upload timed out. The original is safe; retry the import.'))
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total)
     }
