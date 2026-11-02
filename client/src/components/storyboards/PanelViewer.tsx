@@ -18,7 +18,9 @@ import { shotRequest } from '../../lib/shotApi'
 import Studio from './Studio'
 import { StoryboardIllustration } from './StoryboardIdentity'
 import { StudioIcon } from './StudioControls'
-import PanelInspector from './PanelInspector'
+import PanelInspector, { type InspectorTab } from './PanelInspector'
+import CommentIndicator from './CommentIndicator'
+import { activeCommentCounts } from '../../lib/storyboards/comments'
 import { panelIdentity } from '../../lib/storyboards/panelIdentity'
 import ShotPicker, { type LinkedSnapshot } from './ShotPicker'
 export default function PanelViewer({
@@ -33,6 +35,7 @@ export default function PanelViewer({
   onSelect,
   onReplace,
   present = false,
+  commentsRequested = false,
 }: {
   documentId: string
   doc: Y.Doc
@@ -45,6 +48,7 @@ export default function PanelViewer({
   onSelect: (id: string) => void
   onReplace: () => void
   present?: boolean
+  commentsRequested?: boolean
 }) {
   useDocumentScrollLock()
   const [closing, setClosing] = useState(false),
@@ -99,7 +103,10 @@ export default function PanelViewer({
     [picker, setPicker] = useState(false),
     [viewRevision, setViewRevision] = useState(''),
     [showNotes, setShowNotes] = useState(false),
-    [inspector, setInspector] = useState(false),
+    [inspector, setInspector] = useState(commentsRequested),
+    [inspectorTab, setInspectorTab] = useState<InspectorTab>(
+      commentsRequested ? 'comments' : 'details',
+    ),
     [snapshots, setSnapshots] = useState<Record<string, LinkedSnapshot>>({})
   const revisions = values<ArtworkRevision & { panelId: string }>(
       doc,
@@ -118,11 +125,14 @@ export default function PanelViewer({
       doc,
       'annotations',
     ).filter((a) => a.revisionId === revision?.id),
-    index = all.findIndex((p) => p.id === panel.id)
+    index = all.findIndex((p) => p.id === panel.id),
+    commentCount = activeCommentCounts(doc).get(panel.id) || 0
   useEffect(() => {
     setViewRevision('')
+    setInspectorTab(commentsRequested ? 'comments' : 'details')
+    if (commentsRequested) setInspector(true)
     setAnnotating(!present && revision?.kind === 'native')
-  }, [panel.id])
+  }, [panel.id, commentsRequested])
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -233,7 +243,10 @@ export default function PanelViewer({
                   name="panel"
                   label={inspector ? 'Hide details' : 'Details'}
                   active={inspector}
-                  onClick={() => setInspector((v) => !v)}
+                  onClick={() => {
+                    if (!inspector) setInspectorTab('details')
+                    setInspector((v) => !v)
+                  }}
                 />
               </>
             )}
@@ -259,42 +272,30 @@ export default function PanelViewer({
                   { value: '750', label: 'Classic · 4:3' },
                   { value: '1000', label: 'Square · 1:1' },
                   { value: '418.41', label: 'Scope · 2.39:1' },
+                  {
+                    value: 'fit:contain',
+                    label: 'Fit with padding',
+                    disabled: !revision?.frame,
+                  },
+                  {
+                    value: 'fit:crop',
+                    label: 'Crop to frame',
+                    disabled: !revision?.frame,
+                  },
                 ]}
                 disabled={!revision || !!viewRevision}
                 onChange={(v) =>
                   revision &&
                   put(doc, 'revisions', revision.id, {
                     frame:
-                      v === 'original'
-                        ? null
-                        : {
-                            height: Number(v),
-                            fit: revision.frame?.fit || 'contain',
-                          },
-                  })
-                }
-              />
-            )}
-            {!present && (
-              <Menu
-                ariaLabel="Artwork fit"
-                icon="expand"
-                compact
-                label={
-                  revision?.frame?.fit === 'crop'
-                    ? 'Crop to frame'
-                    : 'Fit artwork'
-                }
-                value={revision?.frame?.fit || 'contain'}
-                disabled={!revision?.frame || !!viewRevision}
-                items={[
-                  { value: 'contain', label: 'Fit with padding' },
-                  { value: 'crop', label: 'Crop to frame' },
-                ]}
-                onChange={(v) =>
-                  revision?.frame &&
-                  put(doc, 'revisions', revision.id, {
-                    frame: { ...revision.frame, fit: v },
+                      v.startsWith('fit:') && revision.frame
+                        ? { ...revision.frame, fit: v.slice(4) }
+                        : v === 'original'
+                          ? null
+                          : {
+                              height: Number(v),
+                              fit: revision.frame?.fit || 'contain',
+                            },
                   })
                 }
               />
@@ -318,7 +319,10 @@ export default function PanelViewer({
                 name="panel"
                 label="Notes & shots"
                 active={showNotes}
-                onClick={() => setShowNotes((v) => !v)}
+                onClick={() => {
+                  if (!showNotes) setInspectorTab('details')
+                  setShowNotes((v) => !v)
+                }}
               />
             )}
           </div>
@@ -418,6 +422,24 @@ export default function PanelViewer({
               </div>
             )}
           </div>
+          {!!commentCount &&
+            !(
+              (present ? showNotes : inspector) && inspectorTab === 'comments'
+            ) && (
+              <div className="sb-viewer-comment-rail">
+                <CommentIndicator
+                  floating
+                  count={commentCount}
+                  label={panelIdentity(panel, index, snapshots)}
+                  onOpen={() => {
+                    setViewRevision('')
+                    setInspectorTab('comments')
+                    if (present) setShowNotes(true)
+                    else setInspector(true)
+                  }}
+                />
+              </div>
+            )}
           {((!present && inspector) || (present && showNotes)) && (
             <PanelInspector
               documentId={documentId}
@@ -434,6 +456,8 @@ export default function PanelViewer({
               onLink={() => setPicker(true)}
               onReplace={onReplace}
               present={present}
+              tab={inspectorTab}
+              onTabChange={setInspectorTab}
             />
           )}
         </div>

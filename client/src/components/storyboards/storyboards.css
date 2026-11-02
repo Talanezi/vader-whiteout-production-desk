@@ -1351,3 +1351,129 @@
     max-height: min(220px, 35dvh);
   }
 }
+/* Comment discovery stays in the caption or its own rail, never over artwork. */
+.sb-comment-indicator {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  gap: 5px;
+  height: 28px;
+  min-width: 36px;
+  padding: 0 7px;
+  margin-left: auto;
+  border: 1px solid #355264;
+  border-radius: 9px;
+  background: #142632;
+  color: #a8dbf1;
+  font:
+    500 11px/1 Inter,
+    system-ui;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.sb-comment-indicator svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.sb-comment-indicator:hover {
+  background: #203d50;
+  border-color: #6899b1;
+  transform: translateY(-1px);
+}
+.sb-comment-indicator:active {
+  transform: scale(0.96);
+}
+.sb-comment-indicator:focus-visible {
+  outline: 2px solid #8bd5fa;
+  outline-offset: 3px;
+}
+.sb-comment-count {
+  font-variant-numeric: tabular-nums;
+}
+.sb-comment-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  padding: 6px 8px;
+  border: 1px solid #355264;
+  border-radius: 6px;
+  background: #152531;
+  color: #d6e8f2;
+  white-space: nowrap;
+  font-size: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  z-index: 10;
+}
+.sb-comment-indicator:hover .sb-comment-tip,
+.sb-comment-indicator:focus-visible .sb-comment-tip {
+  opacity: 1;
+  transform: none;
+}
+.sb-viewer-comment-rail {
+  flex: 0 0 52px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sb-viewer-comment-rail .sb-comment-indicator {
+  margin: 0;
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 12px;
+}
+.sb-viewer-comment-rail .sb-comment-count {
+  position: absolute;
+  right: -5px;
+  top: -6px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid #355264;
+  background: #25475a;
+  color: #d2efff;
+  font-size: 9px;
+}
+.sb-viewer-comment-rail .sb-comment-tip {
+  right: calc(100% + 9px);
+  bottom: 50%;
+  transform: translateY(50%);
+}
+.sb-viewer-comment-rail .sb-comment-indicator:hover .sb-comment-tip,
+.sb-viewer-comment-rail .sb-comment-indicator:focus-visible .sb-comment-tip {
+  transform: translateY(50%);
+}
+@media (max-width: 650px) {
+  .sb-viewer-comment-rail {
+    flex-basis: 44px;
+  }
+}
+@media (pointer: coarse) {
+  .sb-comment-indicator {
+    min-height: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-comment-indicator,
+  .sb-comment-tip {
+    transition: none;
+  }
+}

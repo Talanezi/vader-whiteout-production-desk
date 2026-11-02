@@ -1,5 +1,6 @@
 import { useEffect, useState, type ButtonHTMLAttributes } from 'react'
 export const glyphs: Record<string, string> = {
+  comment: 'M4 4h16v12H9l-5 4V4zM8 8h8M8 12h5',
   send: 'M3 3l19 9-19 9 4-9zM7 12h15',
   reply: 'M10 5l-7 7 7 7M3 12h10c5 0 7 2 8 6',
   pipette: 'M14 3l7 7-3 3-2-2-8 8-5 2 2-5 8-8-2-2z',

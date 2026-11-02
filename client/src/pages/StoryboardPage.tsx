@@ -1,3 +1,5 @@
+import CommentIndicator from '../components/storyboards/CommentIndicator'
+import { activeCommentCounts } from '../lib/storyboards/comments'
 import InlineDelete from '../components/whiteout/InlineDelete'
 import { waitForStoryboardSaved } from '../lib/storyboards/waitForSaved'
 import { panelIdentity } from '../lib/storyboards/panelIdentity'
@@ -50,6 +52,8 @@ export default function StoryboardPage() {
     [query, setQuery] = useSearchParams(),
     c = useStoryboardCollaboration(id),
     notify = useToast()
+  const [commentPanel, setCommentPanel] = useState('')
+  const commentCounts = activeCommentCounts(c.doc)
   const [dropped, setDropped] = useState<File[]>()
   const [mobileSplit, setMobileSplit] = useState('art')
   const [pdfOpen, setPdfOpen] = useState(false),
@@ -123,6 +127,7 @@ export default function StoryboardPage() {
   const assetRequest = useRef(0)
   useEffect(() => {
     assetRequest.current++
+    setCommentPanel('')
     setSelected(query.get('panel') || '')
     setImporting(query.has('import'))
     setMode('grid')
@@ -591,6 +596,7 @@ export default function StoryboardPage() {
                 <button
                   className="sb-card-art"
                   onClick={() => {
+                    setCommentPanel('')
                     setSelected(p.id)
                     if (mode === 'split') setShot(p.links[0]?.shotId || '')
                   }}
@@ -651,6 +657,15 @@ export default function StoryboardPage() {
                       {p.links.length > 2 ? ` +${p.links.length - 2}` : ''}
                     </small>
                   )}
+                  <CommentIndicator
+                    count={commentCounts.get(p.id) || 0}
+                    label={panelIdentity(p, all.indexOf(p), linkedData)}
+                    onOpen={() => {
+                      setCommentPanel(p.id)
+                      setSelected(p.id)
+                      if (mode === 'split') setMode('grid')
+                    }}
+                  />
                   {p.notes && <p>{p.notes}</p>}
                 </footer>
               </>
@@ -1113,6 +1128,7 @@ export default function StoryboardPage() {
           undo={c.undo}
           provider={c.provider!}
           onClose={() => {
+            setCommentPanel('')
             setSelected('')
             if (query.has('draw') || query.has('panel')) {
               const next = new URLSearchParams(query)
@@ -1122,9 +1138,13 @@ export default function StoryboardPage() {
             }
             if (mode === 'present') setMode('grid')
           }}
-          onSelect={setSelected}
+          onSelect={(panelId) => {
+            setCommentPanel('')
+            setSelected(panelId)
+          }}
           onReplace={() => setReplace(current)}
           present={mode === 'present'}
+          commentsRequested={commentPanel === current.id}
         />
       )}
       {(importing || replace || extract) && (

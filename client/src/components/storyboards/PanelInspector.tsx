@@ -21,6 +21,7 @@ import Artwork from './Artwork'
 import PanelDiscussion from './PanelDiscussion'
 import { StudioGlyph, StudioIcon } from './StudioControls'
 import type { LinkedSnapshot } from './ShotPicker'
+export type InspectorTab = 'details' | 'comments' | 'history'
 type Revision = ArtworkRevision & { id: string; panelId: string }
 export default function PanelInspector({
   documentId,
@@ -37,6 +38,8 @@ export default function PanelInspector({
   onLink,
   onReplace,
   present = false,
+  tab,
+  onTabChange: setTab,
 }: {
   documentId: string
   doc: Y.Doc
@@ -52,11 +55,11 @@ export default function PanelInspector({
   onLink: () => void
   onReplace: () => void
   present?: boolean
+  tab: InspectorTab
+  onTabChange: (tab: InspectorTab) => void
 }) {
-  const [tab, setTab] = useState('details'),
-    [error, setError] = useState('')
+  const [error, setError] = useState('')
   useEffect(() => {
-    setTab('details')
     setError('')
   }, [panel.id])
   const title = panelIdentity(panel, index, snapshots),
@@ -127,7 +130,7 @@ export default function PanelInspector({
                 if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
                   e.preventDefault()
                   const next = (i + (e.key === 'ArrowRight' ? 1 : 2)) % 3
-                  setTab(['details', 'comments', 'history'][next])
+                  setTab((['details', 'comments', 'history'] as const)[next])
                   if (next !== 2) onPreview('')
                   e.currentTarget.parentElement
                     ?.querySelectorAll('button')
@@ -151,7 +154,7 @@ export default function PanelInspector({
       )}
       <div className="sb-inspector-scroll" role="tabpanel">
         {error && <ErrorNotice>{error}</ErrorNotice>}
-        {(present || tab === 'details') && (
+        {(tab === 'details' || (present && tab !== 'comments')) && (
           <>
             <section className="sb-inspector-section">
               <h3>{title}</h3>
@@ -295,7 +298,7 @@ export default function PanelInspector({
             )}
           </>
         )}
-        {!present && tab === 'comments' && (
+        {tab === 'comments' && (
           <PanelDiscussion doc={doc} panelId={panel.id} user={user} />
         )}
         {!present && tab === 'history' && (
