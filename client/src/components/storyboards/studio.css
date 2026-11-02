@@ -1291,3 +1291,14 @@
     margin-top: 6px;
   }
 }
+@media (max-width: 480px) and (min-height: 500px) {
+  .sb-import-pane-tabs {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 6px 0 0 auto;
+  }
+  .sb-import-studio > .pd-overlay-body > .sb-toolstrip {
+    padding-right: 0;
+  }
+}
