@@ -17,7 +17,8 @@ import {
 } from '../../lib/storyboards/model'
 import { useMedia } from '../../lib/storyboards/useMedia'
 import { shotRequest } from '../../lib/shotApi'
-import AnnotationCanvas from './AnnotationCanvas'
+import Studio from './Studio'
+import { StudioIcon } from './StudioControls'
 import PanelDiscussion from './PanelDiscussion'
 import ShotPicker, { type LinkedSnapshot } from './ShotPicker'
 export default function PanelViewer({
@@ -57,6 +58,8 @@ export default function PanelViewer({
     closeTimer.current = setTimeout(onClose, 140)
   }
   useEffect(() => () => clearTimeout(closeTimer.current), [])
+  const [idle,setIdle]=useState(false)
+  useEffect(()=>{if(!present)return;let timer:ReturnType<typeof setTimeout>;const active=()=>{setIdle(false);clearTimeout(timer);timer=setTimeout(()=>setIdle(true),2500)};window.addEventListener('pointermove',active);window.addEventListener('keydown',active);active();return()=>{clearTimeout(timer);window.removeEventListener('pointermove',active);window.removeEventListener('keydown',active)}},[present])
   const [viewerZoom, setViewerZoom] = useState(1)
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined)
   const [noteText, setNoteText] = useState<Y.Text>()
@@ -72,15 +75,13 @@ export default function PanelViewer({
       previous?.isConnected && previous.focus()
     }
   }, [])
-  const [annotating, setAnnotating] = useState(false),
+  const [annotating, setAnnotating] = useState(!present && panel.activeRevision?.startsWith('native-')),
     [show, setShow] = useState(true),
     [picker, setPicker] = useState(false),
     [history, setHistory] = useState(false),
     [viewRevision, setViewRevision] = useState(''),
     [showNotes, setShowNotes] = useState(false),
-    [inspector, setInspector] = useState(
-      () => matchMedia('(min-width:1000px)').matches,
-    ),
+    [inspector, setInspector] = useState(false),
     [snapshots, setSnapshots] = useState<Record<string, LinkedSnapshot>>({})
   const revisions = values<ArtworkRevision & { panelId: string }>(
       doc,
@@ -102,7 +103,7 @@ export default function PanelViewer({
     index = all.findIndex((p) => p.id === panel.id)
   useEffect(() => {
     setViewRevision('')
-    setAnnotating(false)
+    setAnnotating(!present && revision?.kind==='native')
   }, [panel.id])
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -169,33 +170,23 @@ export default function PanelViewer({
         e.preventDefault()
         requestClose()
       }}
-      className={`sb-viewer ${present ? 'sb-present' : ''} ${closing ? 'is-closing' : ''}`}
+      className={`sb-viewer ${present ? 'sb-present' : ''} ${closing ? 'is-closing' : ''} ${idle?'is-idle':''}`}
       aria-label={present ? 'Present storyboard' : 'Panel viewer'}
     >
       <div className="sb-viewer-frame">
         <header>
-          <Button icon="back" onClick={requestClose}>
-            Back
-          </Button>
+          <StudioIcon name="previous" label="Back" onClick={requestClose} />
           <h2>{panel.label || `Panel ${index + 1}`}</h2>
           <span>
             {index + 1} / {all.length}
           </span>
-          <Button
-            disabled={index === 0}
-            onClick={() => onSelect(all[index - 1].id)}
-          >
-            Previous
-          </Button>
-          <Button
-            disabled={index === all.length - 1}
-            onClick={() => onSelect(all[index + 1].id)}
-          >
-            Next
-          </Button>
+          <StudioIcon name="previous" label="Previous panel" disabled={index === 0} onClick={() => onSelect(all[index - 1].id)} />
+          <StudioIcon name="next" label="Next panel" disabled={index === all.length - 1} onClick={() => onSelect(all[index + 1].id)} />
           {!present && (
             <>
               <Button
+                icon="edit"
+                variant={annotating?'primary':'secondary'}
                 aria-pressed={annotating}
                 disabled={
                   !revision ||
@@ -203,30 +194,15 @@ export default function PanelViewer({
                 }
                 onClick={() => setAnnotating((v) => !v)}
               >
-                Annotate
+                Studio
               </Button>
-              <Button onClick={() => setHistory((v) => !v)}>
-                Artwork history
-              </Button>
-              <Button onClick={() => setInspector((v) => !v)}>
-                {inspector ? 'Hide details' : 'Details'}
-              </Button>
+              <StudioIcon name="layers" label="Artwork history" active={history} onClick={() => setHistory(v=>!v)} />
+              <StudioIcon name="settings" label={inspector?'Hide details':'Details'} active={inspector} onClick={()=>setInspector(v=>!v)} />
             </>
           )}
+          <StudioIcon name="fullscreen" label="Full screen" disabled={!document.fullscreenEnabled} onClick={() => { const frame = dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame'); void (document.fullscreenElement ? document.exitFullscreen() : frame?.requestFullscreen())?.catch(() => {}) }} />
           {present && (
             <>
-              <Button
-                disabled={!document.fullscreenEnabled}
-                onClick={() => {
-                  const frame =
-                    dialog.current?.querySelector<HTMLElement>(
-                      '.sb-viewer-frame',
-                    )
-                  void frame?.requestFullscreen().catch(() => {})
-                }}
-              >
-                Full screen
-              </Button>
               <Button onClick={() => setShowNotes((v) => !v)}>
                 Notes & shots
               </Button>
@@ -245,12 +221,13 @@ export default function PanelViewer({
           <div className="sb-viewer-art">
             {media.error ? (
               <p role="alert">{media.error}</p>
-            ) : media.url ? (
-              <AnnotationCanvas
+            ) : (media.url || revision?.kind === 'native') ? (
+              <Studio
                 key={revision?.id}
                 url={media.url}
+                nativeHeight={revision?.height || 562.5}
                 objects={objects}
-                visible={show}
+                visible={show || revision?.kind === 'native'}
                 annotating={annotating}
                 onCommit={(a, continuous = false) => {
                   if (!continuous) undo.stopCapturing()
@@ -261,6 +238,7 @@ export default function PanelViewer({
                     })
                   if (!continuous) undo.stopCapturing()
                 }}
+                onZoomChange={setViewerZoom}
                 onRemove={(id) => {
                   undo.stopCapturing()
                   doc.getMap('annotations').delete(id)

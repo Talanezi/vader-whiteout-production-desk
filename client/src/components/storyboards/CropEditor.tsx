@@ -1,4 +1,6 @@
 import { useRef, useState, useLayoutEffect } from 'react'
+import InlineDelete from '../whiteout/InlineDelete'
+import { StudioIcon } from './StudioControls'
 import { Button } from '../whiteout/Button'
 import { clampRect, type Rect } from '../../lib/storyboards/model'
 export type CropRegion = Rect & { id: string; label: string }
@@ -8,20 +10,26 @@ export default function CropEditor({
   height,
   regions,
   onChange,
+  selectedId,
+  onSelect,
 }: {
   image: string
   width: number
   height: number
   regions: CropRegion[]
   onChange: (r: CropRegion[]) => void
+  selectedId?: string
+  onSelect?: (id:string)=>void
 }) {
   const [viewportWidth, setViewportWidth] = useState(width)
-  const [selected, setSelected] = useState(''),
+  const [localSelected, setLocalSelected] = useState(''),
     [zoom, setZoom] = useState(1),
     [mode, setMode] = useState<'crop' | 'pan'>('crop')
   const [draft, setDraft] = useState<CropRegion[]>(),
     [undo, setUndo] = useState<CropRegion[][]>([]),
     [redo, setRedo] = useState<CropRegion[][]>([])
+  const selected = selectedId === undefined ? localSelected : selectedId
+  const setSelected = (id:string) => {setLocalSelected(id);onSelect?.(id)}
   const svg = useRef<SVGSVGElement>(null),
     scroll = useRef<HTMLDivElement>(null)
   const drag = useRef<
@@ -144,64 +152,11 @@ export default function CropEditor({
   const active = current.find((r) => r.id === selected)
   return (
     <div className="sb-crop-editor">
-      <div className="sb-toolstrip">
-        <Button
-          onClick={() => {
-            const box = scroll.current!
-            setZoom(
-              Math.min(
-                1,
-                box.clientHeight / ((box.clientWidth * height) / width),
-              ),
-            )
-          }}
-        >
-          Fit page
-        </Button>
-        <Button onClick={() => setMode(mode === 'crop' ? 'pan' : 'crop')}>
-          {mode === 'crop' ? 'Draw regions' : 'Pan page'}
-        </Button>
-        <Button
-          onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
-          aria-label="Zoom out"
-        >
-          −
-        </Button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <Button
-          onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-          aria-label="Zoom in"
-        >
-          +
-        </Button>
-        <Button
-          disabled={!undo.length}
-          onClick={() => {
-            const prev = undo[undo.length - 1]
-            setRedo((r) => [...r, regions])
-            setUndo((u) => u.slice(0, -1))
-            onChange(prev)
-          }}
-        >
-          Undo
-        </Button>
-        <Button
-          disabled={!redo.length}
-          onClick={() => {
-            const next = redo[redo.length - 1]
-            setUndo((u) => [...u, regions])
-            setRedo((r) => r.slice(0, -1))
-            onChange(next)
-          }}
-        >
-          Redo
-        </Button>
-        <Button
-          disabled={!active}
-          onClick={() => commit(regions.filter((r) => r.id !== selected))}
-        >
-          Remove region
-        </Button>
+      <div className="sb-toolstrip sb-crop-tools" role="toolbar" aria-label="Crop tools">
+        <StudioIcon name="fit" label="Fit page" onClick={()=>{const box=scroll.current!;setZoom(Math.min(1,box.clientHeight/((box.clientWidth*height)/width)))}}/>
+        <StudioIcon name="rectangle" label="Draw regions" active={mode==='crop'} onClick={()=>setMode('crop')}/><StudioIcon name="hand" label="Pan page" active={mode==='pan'} onClick={()=>setMode('pan')}/>
+        <span className="sb-dock-divider"/><StudioIcon name="minus" label="Zoom out" onClick={()=>setZoom(z=>Math.max(.25,z-.25))}/><output>{Math.round(zoom*100)}%</output><StudioIcon name="plus" label="Zoom in" onClick={()=>setZoom(z=>Math.min(4,z+.25))}/>
+        <span className="sb-dock-divider"/><StudioIcon name="undo" label="Undo crop" disabled={!undo.length} onClick={()=>{const prev=undo[undo.length-1];setRedo(r=>[...r,regions]);setUndo(u=>u.slice(0,-1));onChange(prev)}}/><StudioIcon name="redo" label="Redo crop" disabled={!redo.length} onClick={()=>{const next=redo[redo.length-1];setUndo(u=>[...u,regions]);setRedo(r=>r.slice(0,-1));onChange(next)}}/>
       </div>
       <div className="sb-crop-scroll" ref={scroll}>
         <svg
@@ -272,7 +227,7 @@ export default function CropEditor({
           ))}
         </svg>
       </div>
-      <div className="sb-crop-review">
+      {onSelect ? <div className="sb-crop-properties">{active?<><input aria-label={`Region ${current.findIndex(r=>r.id===active.id)+1} original label`} placeholder="Original label" value={active.label} onChange={e=>onChange(regions.map(r=>r.id===active.id?{...r,label:e.target.value}:r))}/><StudioIcon name="duplicate" label="Duplicate crop" onClick={()=>{const id=crypto.randomUUID();commit([...regions,{...active,id,x:Math.min(1-active.width,active.x+.015),y:Math.min(1-active.height,active.y+.015)}]);setSelected(id)}}/><InlineDelete label="crop" onConfirm={async()=>{commit(regions.filter(r=>r.id!==active.id));setSelected('')}}/></>:<span>Select a frame to adjust its label.</span>}</div> : (      <div className="sb-crop-review">
         {current.map((r, i) => (
           <div className={r.id === selected ? 'is-selected' : ''} key={r.id}>
             <button
@@ -319,7 +274,8 @@ export default function CropEditor({
             </Button>
           </div>
         ))}
-      </div>
+      </div>)}
+
     </div>
   )
 }

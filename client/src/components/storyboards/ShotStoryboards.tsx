@@ -9,6 +9,7 @@ type Entry = {
   panelId: string
   label: string
   assetId?: string
+  drawing?: import('../../lib/storyboards/model').Annotation[]
 }
 export default function ShotStoryboards({
   listId,
@@ -44,6 +45,7 @@ export default function ShotStoryboards({
             <Artwork
               documentId={item.boardId}
               assetId={item.assetId}
+              drawing={item.drawing}
               label={item.label || item.name}
             />
             <span>{item.label || item.name}</span>

@@ -1,3 +1,4 @@
+import { StoryboardIllustration } from '../components/storyboards/StoryboardIdentity'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { PageHeader, SearchField } from '../components/whiteout/Workspace'
@@ -27,6 +28,7 @@ type Board = {
   updatedAt: string
   originatingList?: string
   previewAsset?: string
+  previewDrawing?: import('../lib/storyboards/model').Annotation[]
 }
 export default function StoryboardsPage() {
   const navigate = useNavigate(),
@@ -104,7 +106,7 @@ export default function StoryboardsPage() {
           : {}),
       })
       navigate(
-        `/storyboards/${board.id}${workflow === 'import' ? '?import=1' : ''}`,
+        `/storyboards/${board.id}${workflow === 'import' ? '?import=1' : workflow === 'blank' ? '?draw=1' : ''}`,
       )
     } catch (e) {
       setError((e as Error).message)
@@ -166,11 +168,12 @@ export default function StoryboardsPage() {
                 <DocumentRow key={b.id} to={`/storyboards/${b.id}`}>
                   <td className="pd-document-title">
                     <div className="sb-document-identity">
-                      {b.previewAsset && (
+                      {(b.previewAsset || b.previewDrawing) && (
                         <div className="sb-index-thumb">
                           <Artwork
                             documentId={b.id}
                             assetId={b.previewAsset}
+                            drawing={b.previewDrawing}
                             label={b.name}
                           />
                         </div>
@@ -234,15 +237,7 @@ export default function StoryboardsPage() {
           )}
         </div>
       ) : (
-        <EmptyState
-          kind="empty"
-          title="No storyboards yet"
-          action={
-            <Button onClick={() => navigate('/storyboards/new')}>
-              New storyboard
-            </Button>
-          }
-        />
+        <div className="sb-connect sb-index-empty"><StoryboardIllustration/><h2>Every sequence starts with an image.</h2><div className="sb-empty-choices"><Button icon="import" onClick={()=>{setWorkflow('import');navigate('/storyboards/new')}}>Import artwork</Button><Button icon="plus" variant="primary" onClick={()=>{setWorkflow('blank');navigate('/storyboards/new')}}>Start drawing</Button><Button icon="shots" onClick={()=>{setWorkflow('shots');navigate('/storyboards/new')}}>From Shot List</Button></div></div>
       )}
       {(creating || rename) && (
         <Overlay
@@ -292,7 +287,7 @@ export default function StoryboardsPage() {
               {[
                 ['import', 'Import artwork'],
                 ['shots', 'From Shot List'],
-                ['blank', 'Blank storyboard'],
+                ['blank', 'Start drawing'],
               ].map(([id, label]) => (
                 <Button
                   key={id}

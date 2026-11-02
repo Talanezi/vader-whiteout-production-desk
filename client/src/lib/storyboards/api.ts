@@ -48,6 +48,7 @@ export async function uploadAsset(
   id: string,
   file: File,
   progress?: (p: number) => void,
+  signal?: AbortSignal,
 ): Promise<MediaAsset> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -55,6 +56,10 @@ export async function uploadAsset(
     xhr.setRequestHeader('Authorization', `Bearer ${getAuthToken() || ''}`)
     xhr.upload.onprogress = (e) =>
       e.lengthComputable && progress?.(e.loaded / e.total)
+    const abort=()=>xhr.abort()
+    signal?.addEventListener('abort',abort,{once:true})
+    xhr.onloadend=()=>signal?.removeEventListener('abort',abort)
+    xhr.onabort=()=>reject(Error('Upload cancelled.'))
     xhr.onerror = () =>
       reject(
         Error(

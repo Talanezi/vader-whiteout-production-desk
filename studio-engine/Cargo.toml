@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = [".", "vendor/geom", "vendor/color", "vendor/doc", "vendor/brush"]
+[workspace.package]
+version = "0.20.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[workspace.lints.rust]
+unsafe_code = "deny"
+[workspace.dependencies]
+vectorcraft-geom = { path = "vendor/geom" }
+vectorcraft-color = { path = "vendor/color" }
+vectorcraft-doc = { path = "vendor/doc" }
+kurbo = { version = "0.13", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp", "tga"] }
+tiff = "0.11"
+hayro-ccitt = "0.3"
+zune-jpeg = "0.5"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+[package]
+name = "whiteout-studio-engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[lib]
+crate-type = ["cdylib", "rlib"]
+[dependencies]
+vectorcraft-geom = { workspace = true }
+vectorcraft-brush = { path = "vendor/brush" }
+vectorcraft-doc = { workspace = true }
+vectorcraft-color = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+[profile.release]
+lto = true
+opt-level = "s"
+codegen-units = 1
+strip = true
+panic = "abort"

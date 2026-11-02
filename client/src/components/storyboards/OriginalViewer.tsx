@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { Overlay } from '../whiteout/Overlay'
+import { StudioIcon } from './StudioControls'
 import { Button } from '../whiteout/Button'
 import DotsLoader from '../whiteout/DotsLoader'
 import { boardFetch, type MediaAsset } from '../../lib/storyboards/api'
@@ -85,21 +86,8 @@ export default function OriginalViewer({
       }
     >
       <div className="sb-toolstrip">
-        <Button disabled={!page} onClick={() => setPage((p) => p - 1)}>
-          Previous
-        </Button>
-        <span>
-          Page {page + 1} of {pdf?.numPages || '…'}
-        </span>
-        <Button
-          disabled={!pdf || page >= pdf.numPages - 1}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </Button>
-        <Button onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>−</Button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <Button onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>+</Button>
+        <StudioIcon name="previous" label="Previous source page" disabled={!page} onClick={()=>setPage(p=>p-1)}/><span>Page {page+1} of {pdf?.numPages||'…'}</span><StudioIcon name="next" label="Next source page" disabled={!pdf||page>=pdf.numPages-1} onClick={()=>setPage(p=>p+1)}/><span className="sb-dock-divider"/><StudioIcon name="minus" label="Zoom out source" onClick={()=>setZoom(z=>Math.max(1,z-.25))}/><span>{Math.round(zoom*100)}%</span><StudioIcon name="plus" label="Zoom in source" onClick={()=>setZoom(z=>Math.min(4,z+.25))}/>
+
       </div>
       {error && <p role="alert">{error}</p>}
       <div className="sb-original-scroll">

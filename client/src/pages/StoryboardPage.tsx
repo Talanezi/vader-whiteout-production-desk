@@ -27,9 +27,12 @@ import {
   values,
   put,
   type Panel,
+  type Annotation,
   type ArtworkRevision,
 } from '../lib/storyboards/model'
 import { boardRequest, type MediaAsset } from '../lib/storyboards/api'
+import { StoryboardIllustration } from '../components/storyboards/StoryboardIdentity'
+import { StudioGlyph } from '../components/storyboards/StudioControls'
 import Artwork from '../components/storyboards/Artwork'
 import ArtworkImport from '../components/storyboards/ArtworkImport'
 import OriginalViewer from '../components/storyboards/OriginalViewer'
@@ -166,17 +169,26 @@ export default function StoryboardPage() {
     })
   function addPanel() {
     const panelId = crypto.randomUUID()
+    const revisionId = 'native-' + crypto.randomUUID()
+    const position = all.findIndex(p => p.id === selected)
+    const previous = position >= 0 ? all[position] : all[all.length - 1]
+    const next = position >= 0 ? all[position + 1] : undefined
+    put(c.doc, 'revisions', revisionId, {id:revisionId,panelId,kind:'native',width:1000,height:562.5,uploader:c.session?.user.id,uploaderName:c.session?.user.name,createdAt:new Date().toISOString()})
     put(c.doc, 'panels', panelId, {
       id: panelId,
       label: '',
       notes: '',
-      order: (all[all.length - 1]?.order || 0) + 1024,
+      activeRevision: revisionId,
+      order: next ? ((previous?.order || 0) + next.order) / 2 : (previous?.order || 0) + 1024,
       links:
         mode === 'split' && shot && origin
           ? [{ listId: origin, shotId: shot }]
           : [],
     })
+    setSelected(panelId)
   }
+  const drawingStarted = useRef('')
+  useEffect(() => {if(query.get('draw') && c.synced && drawingStarted.current!==id){drawingStarted.current=id;if(all.length)setSelected(all[0].id);else addPanel()}},[c.synced,query,all.length])
   function reorder(from: string, to: string) {
     if (from === to) return
     const order = all.map((p) => p.id),
@@ -365,6 +377,7 @@ export default function StoryboardPage() {
                     assetId={
                       revisions.find((r) => r.id === p.activeRevision)?.assetId
                     }
+                    drawing={revisions.find(r=>r.id===p.activeRevision)?.kind === 'native' ? values<Annotation & {revisionId:string}>(c.doc,'annotations').filter(a=>a.revisionId===p.activeRevision) : undefined}
                     label={p.label || `Panel ${i + 1}`}
                   />
                 </button>
@@ -413,9 +426,7 @@ export default function StoryboardPage() {
             : { duration: 120 }
         }
       >
-        <div className="pd-drag-preview">
-          Moving {all.find((p) => p.id === dragging)?.label || 'panel'}
-        </div>
+        {dragging && <div className="sb-art-drag"><Artwork documentId={id} assetId={revisions.find(r=>r.id===all.find(p=>p.id===dragging)?.activeRevision)?.assetId} label="Dragged storyboard panel" drawing={revisions.find(r=>r.id===all.find(p=>p.id===dragging)?.activeRevision)?.kind==='native' ? values<Annotation & {revisionId:string}>(c.doc,'annotations').filter(a=>a.revisionId===all.find(p=>p.id===dragging)?.activeRevision) : undefined} /></div>}
       </DragOverlay>
     </DragDropProvider>
   )
@@ -437,9 +448,7 @@ export default function StoryboardPage() {
         ← Storyboards
       </Link>
       <PageHeader title={name}>
-        <span role="status">
-          {c.saved ? 'Saved' : c.connected ? 'Synchronizing…' : 'Reconnecting…'}
-        </span>
+        <span role="status" className={`pd-sync-state ${c.connected&&c.saved?'is-saved':''}`} data-sync={c.error?'error':!c.connected?'disconnected':c.saved?'saved':'syncing'}><i />{c.error?'Save interrupted':!c.connected?'Reconnecting':c.saved?'Saved':'Syncing'}</span>
         <div className="pd-collaborators">
           {c.peers
             .filter((p) => p.user)
@@ -664,7 +673,7 @@ export default function StoryboardPage() {
                   }}
                 />
               ) : (
-                <p>Link a panel to a Shot List to use Split view.</p>
+                <div className="sb-connect"><StoryboardIllustration/><h3>Connect a Shot List</h3><p>Bring the technical plan beside the artwork.</p><Button icon="share" onClick={()=>{const panel=current||all[0];if(panel)setPicker(panel);else addPanel()}}>Connect shots</Button></div>
               )}
             </div>
             <div

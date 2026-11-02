@@ -9,7 +9,7 @@ export type Source = {
 export type ShotLink = { listId: string; shotId: string }
 export type Annotation = {
   id: string
-  type: 'pen' | 'arrow' | 'highlight' | 'text'
+  type: 'pen' | 'arrow' | 'highlight' | 'text' | 'path' | 'rectangle' | 'ellipse' | 'line' | 'callout'
   color: string
   width: number
   points: number[][]
@@ -17,10 +17,20 @@ export type Annotation = {
   y: number
   scale: number
   text?: string
+  engine?: string
+  path?: string
+  filled?: boolean
+  opacity?: number
+  rotation?: number
+  bounds?: number[]
+  fontSize?: number
 }
 export type ArtworkRevision = {
   id: string
-  assetId: string
+  assetId?: string
+  kind?: 'native'
+  width?: number
+  height?: number
   source?: Source
   uploaderName?: string
   uploader: number
