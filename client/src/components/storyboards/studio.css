@@ -1250,6 +1250,10 @@
     overflow-x: auto;
     flex-wrap: nowrap;
   }
+  .sb-import-studio > .pd-overlay-body > .sb-toolstrip > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
   .sb-import-pane-tabs {
     position: absolute;
     right: 10px;
