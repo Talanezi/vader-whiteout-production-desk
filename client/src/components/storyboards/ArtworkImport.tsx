@@ -650,6 +650,9 @@ export default function ArtworkImport({
                     <>
                       <span role="alert">{item.error}</span>
                       <Button
+                        variant="quiet"
+                        icon="retry"
+                        aria-label={`Retry ${item.file.name}`}
                         onClick={() =>
                           setItems((old) =>
                             old.map((v) =>

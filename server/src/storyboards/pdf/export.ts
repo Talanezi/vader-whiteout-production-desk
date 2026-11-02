@@ -96,7 +96,7 @@ export async function renderStoryboard(
       slot = index % count,
       x = margin + (slot % cols) * (cellWidth + gap),
       top = height - margin - 32 - Math.floor(slot / cols) * (cellHeight + gap),
-      label = validate(panel.label || `Panel ${index + 1}`),
+      label = validate(panel.title || panel.label || `Panel ${index + 1}`),
       notes = options.notes ? validate(String(panel.notes || '')) : '',
       links = options.shots
         ? validate(await shotLabels(panel.links || []))

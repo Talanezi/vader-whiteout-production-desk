@@ -2,12 +2,8 @@ import useDocumentScrollLock from '../../lib/useDocumentScrollLock'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type * as Y from 'yjs'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
-import CollaborativeText from '../shots/CollaborativeText'
-import { panelNotes } from '../../lib/storyboards/model'
-import { Link } from 'react-router-dom'
 import Menu from '../whiteout/Menu'
 import { Button } from '../whiteout/Button'
-import DrawCheckbox from '../whiteout/DrawCheckbox'
 import DotsLoader from '../whiteout/DotsLoader'
 import {
   put,
@@ -88,10 +84,6 @@ export default function PanelViewer({
   }, [present])
   const [viewerZoom, setViewerZoom] = useState(1)
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined)
-  const [noteText, setNoteText] = useState<Y.Text>()
-  useEffect(() => {
-    setNoteText(panelNotes(doc, panel.id))
-  }, [doc, panel.id])
   const dialog = useRef<HTMLDialogElement>(null)
   useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null
@@ -104,9 +96,7 @@ export default function PanelViewer({
   const [annotating, setAnnotating] = useState(
       !present && panel.activeRevision?.startsWith('native-'),
     ),
-    [show, setShow] = useState(true),
     [picker, setPicker] = useState(false),
-    [history, setHistory] = useState(false),
     [viewRevision, setViewRevision] = useState(''),
     [showNotes, setShowNotes] = useState(false),
     [inspector, setInspector] = useState(false),
@@ -224,111 +214,114 @@ export default function PanelViewer({
             disabled={index === all.length - 1}
             onClick={() => onSelect(all[index + 1].id)}
           />
-          {!present && (
-            <>
-              <Button
-                icon="edit"
-                variant={annotating ? 'primary' : 'secondary'}
-                aria-pressed={annotating}
-                disabled={
-                  !revision ||
-                  (!!viewRevision && viewRevision !== panel.activeRevision)
+          <div className={`sb-panel-tools ${present ? 'is-present' : ''}`}>
+            {!present && (
+              <>
+                <Button
+                  icon="edit"
+                  variant={annotating ? 'primary' : 'secondary'}
+                  aria-pressed={annotating}
+                  disabled={
+                    !revision ||
+                    (!!viewRevision && viewRevision !== panel.activeRevision)
+                  }
+                  onClick={() => setAnnotating((v) => !v)}
+                >
+                  Studio
+                </Button>
+                <StudioIcon
+                  name="settings"
+                  label={inspector ? 'Hide details' : 'Details'}
+                  active={inspector}
+                  onClick={() => setInspector((v) => !v)}
+                />
+              </>
+            )}
+            {!present && (
+              <Menu
+                ariaLabel="Drawing frame"
+                icon="columns"
+                label={
+                  revision?.frame?.height === 562.5
+                    ? '16:9 frame'
+                    : revision?.frame?.height === 750
+                      ? '4:3 frame'
+                      : revision?.frame?.height === 1000
+                        ? 'Square frame'
+                        : revision?.frame?.height === 418.41
+                          ? 'Scope frame'
+                          : 'Original frame'
                 }
-                onClick={() => setAnnotating((v) => !v)}
-              >
-                Studio
-              </Button>
+                value={String(revision?.frame?.height || 'original')}
+                items={[
+                  { value: 'original', label: 'Original' },
+                  { value: '562.5', label: 'Widescreen · 16:9' },
+                  { value: '750', label: 'Classic · 4:3' },
+                  { value: '1000', label: 'Square · 1:1' },
+                  { value: '418.41', label: 'Scope · 2.39:1' },
+                ]}
+                disabled={!revision || !!viewRevision}
+                onChange={(v) =>
+                  revision &&
+                  put(doc, 'revisions', revision.id, {
+                    frame:
+                      v === 'original'
+                        ? null
+                        : {
+                            height: Number(v),
+                            fit: revision.frame?.fit || 'contain',
+                          },
+                  })
+                }
+              />
+            )}
+            {!present && (
+              <Menu
+                ariaLabel="Artwork fit"
+                icon="expand"
+                compact
+                label={
+                  revision?.frame?.fit === 'crop'
+                    ? 'Crop to frame'
+                    : 'Fit artwork'
+                }
+                value={revision?.frame?.fit || 'contain'}
+                disabled={!revision?.frame || !!viewRevision}
+                items={[
+                  { value: 'contain', label: 'Fit with padding' },
+                  { value: 'crop', label: 'Crop to frame' },
+                ]}
+                onChange={(v) =>
+                  revision?.frame &&
+                  put(doc, 'revisions', revision.id, {
+                    frame: { ...revision.frame, fit: v },
+                  })
+                }
+              />
+            )}
+            <StudioIcon
+              name="fullscreen"
+              label="Full screen"
+              disabled={!document.fullscreenEnabled}
+              onClick={() => {
+                const frame =
+                  dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame')
+                void (
+                  document.fullscreenElement
+                    ? document.exitFullscreen()
+                    : frame?.requestFullscreen()
+                )?.catch(() => {})
+              }}
+            />
+            {present && (
               <StudioIcon
                 name="settings"
-                label={inspector ? 'Hide details' : 'Details'}
-                active={inspector}
-                onClick={() => setInspector((v) => !v)}
+                label="Notes & shots"
+                active={showNotes}
+                onClick={() => setShowNotes((v) => !v)}
               />
-            </>
-          )}
-          {!present && (
-            <Menu
-              ariaLabel="Drawing frame"
-              icon="columns"
-              label={
-                revision?.frame?.height === 562.5
-                  ? '16:9 frame'
-                  : revision?.frame?.height === 750
-                    ? '4:3 frame'
-                    : revision?.frame?.height === 1000
-                      ? 'Square frame'
-                      : revision?.frame?.height === 418.41
-                        ? 'Scope frame'
-                        : 'Original frame'
-              }
-              value={String(revision?.frame?.height || 'original')}
-              items={[
-                { value: 'original', label: 'Original' },
-                { value: '562.5', label: 'Widescreen · 16:9' },
-                { value: '750', label: 'Classic · 4:3' },
-                { value: '1000', label: 'Square · 1:1' },
-                { value: '418.41', label: 'Scope · 2.39:1' },
-              ]}
-              disabled={!revision || !!viewRevision}
-              onChange={(v) =>
-                revision &&
-                put(doc, 'revisions', revision.id, {
-                  frame:
-                    v === 'original'
-                      ? null
-                      : {
-                          height: Number(v),
-                          fit: revision.frame?.fit || 'contain',
-                        },
-                })
-              }
-            />
-          )}
-          {!present && (
-            <Menu
-              ariaLabel="Artwork fit"
-              compact
-              label={
-                revision?.frame?.fit === 'crop'
-                  ? 'Crop to frame'
-                  : 'Fit artwork'
-              }
-              value={revision?.frame?.fit || 'contain'}
-              disabled={!revision?.frame || !!viewRevision}
-              items={[
-                { value: 'contain', label: 'Fit with padding' },
-                { value: 'crop', label: 'Crop to frame' },
-              ]}
-              onChange={(v) =>
-                revision?.frame &&
-                put(doc, 'revisions', revision.id, {
-                  frame: { ...revision.frame, fit: v },
-                })
-              }
-            />
-          )}
-          <StudioIcon
-            name="fullscreen"
-            label="Full screen"
-            disabled={!document.fullscreenEnabled}
-            onClick={() => {
-              const frame =
-                dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame')
-              void (
-                document.fullscreenElement
-                  ? document.exitFullscreen()
-                  : frame?.requestFullscreen()
-              )?.catch(() => {})
-            }}
-          />
-          {present && (
-            <StudioIcon
-              name="settings"
-              label="Notes & shots"
-              active={showNotes}
-              onClick={() => setShowNotes((v) => !v)}
-            />
-          )}
+            )}
+          </div>
         </header>
         <div className="sb-viewer-body">
           <div className="sb-viewer-art">

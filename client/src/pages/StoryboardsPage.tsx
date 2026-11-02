@@ -29,6 +29,7 @@ type Board = {
   originatingList?: string
   previewAsset?: string
   previewHeight?: number
+  previewFrame?: import('../lib/storyboards/framing').ArtworkFrame
   previewDrawing?: import('../lib/storyboards/model').Annotation[]
 }
 export default function StoryboardsPage() {
@@ -176,6 +177,7 @@ export default function StoryboardsPage() {
                             assetId={b.previewAsset}
                             drawing={b.previewDrawing}
                             drawingHeight={b.previewHeight}
+                            frame={b.previewFrame}
                             label={b.name}
                           />
                         </div>

@@ -10,6 +10,7 @@ type Entry = {
   label: string
   assetId?: string
   drawingHeight?: number
+  frame?: import('../../lib/storyboards/framing').ArtworkFrame
   drawing?: import('../../lib/storyboards/model').Annotation[]
 }
 export default function ShotStoryboards({
@@ -48,6 +49,7 @@ export default function ShotStoryboards({
               assetId={item.assetId}
               drawing={item.drawing}
               drawingHeight={item.drawingHeight}
+              frame={item.frame}
               label={item.label || item.name}
             />
             <span>{item.label || item.name}</span>

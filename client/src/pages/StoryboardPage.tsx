@@ -78,8 +78,10 @@ export default function StoryboardPage() {
     const element = splitRef.current
     if (!element) return
     const measure = () => {
-      const top = element.getBoundingClientRect().top
-      const value = `${Math.max(160, window.innerHeight - top - 24)}px`
+      const top = element.getBoundingClientRect().top + window.scrollY
+      const content = element.closest('.pd-content')
+      const bottom = content ? Math.max(24,parseFloat(getComputedStyle(content).paddingBottom)||0) : 24
+      const value = `${Math.max(160, window.innerHeight - top - bottom)}px`
       if (element.style.height !== value) element.style.height = value
     }
     measure()
@@ -102,7 +104,9 @@ export default function StoryboardPage() {
       'revisions',
     ),
     current = all.find((p) => p.id === selected),
-    origin = c.doc.getMap('meta').has('originatingList') ? String(c.doc.getMap('meta').get('originatingList') || '') : String(all.flatMap(p=>p.links)[0]?.listId || '')
+    origin = c.doc.getMap('meta').has('originatingList')
+      ? String(c.doc.getMap('meta').get('originatingList') || '')
+      : String(all.flatMap((p) => p.links)[0]?.listId || '')
   const [inlineDeleting, setInlineDeleting] = useState(''),
     [disconnecting, setDisconnecting] = useState(false),
     [duplicateState, setDuplicateState] = useState<
@@ -327,45 +331,80 @@ export default function StoryboardPage() {
         }
     })
   }
-  function remove(chosen: Panel[] = deleting || []) {
+  const panelDeletionPending = useRef(new Set<string>())
+  async function remove(chosen: Panel[] = deleting || []) {
+    if (!c.connected)
+      throw Error('Reconnect before deleting. Panels are retained.')
     const active = new Set(panels(c.doc).map((p) => p.id)),
-      records = chosen.filter((p) => active.has(p.id)),
+      records = chosen.filter(
+        (p) => active.has(p.id) && !panelDeletionPending.current.has(p.id),
+      ),
       stamp = new Date().toISOString()
+    if (!records.length) return
+    records.forEach((p) => panelDeletionPending.current.add(p.id))
+    c.undo.stopCapturing()
     c.doc.transact(() =>
       records.forEach((p) => put(c.doc, 'panels', p.id, { deletedAt: stamp })),
     )
-    setDeleting(undefined)
-    setInlineDeleting('')
-    setMulti(new Set())
-    setSelected('')
-    if (!records.length) return
-    notify(
-      `${records.length} panel${records.length === 1 ? '' : 's'} deleted.`,
-      {
-        action: {
-          label: 'Restore',
-          run: () =>
-            c.doc.transact(() =>
-              records.forEach((p) => {
-                if (
-                  c.doc
-                    .getMap<import('yjs').Map<unknown>>('panels')
-                    .get(p.id)
-                    ?.get('deletedAt') === stamp
-                )
-                  put(c.doc, 'panels', p.id, { deletedAt: null })
-              }),
-            ),
+    c.undo.stopCapturing()
+    try {
+      await waitForStoryboardSaved(c.doc, c.provider)
+      setDeleting(undefined)
+      setInlineDeleting('')
+      setMulti(new Set())
+      setSelected('')
+      notify(
+        `${records.length} panel${records.length === 1 ? '' : 's'} deleted.`,
+        {
+          action: {
+            label: 'Restore',
+            run: () => {
+              c.undo.stopCapturing()
+              c.doc.transact(() =>
+                records.forEach((p) => {
+                  if (
+                    c.doc
+                      .getMap<import('yjs').Map<unknown>>('panels')
+                      .get(p.id)
+                      ?.get('deletedAt') === stamp
+                  )
+                    put(c.doc, 'panels', p.id, { deletedAt: null })
+                }),
+              )
+              c.undo.stopCapturing()
+              void waitForStoryboardSaved(c.doc, c.provider).catch((e) =>
+                notify((e as Error).message, { state: 'error' }),
+              )
+            },
+          },
         },
-      },
-    )
+      )
+    } catch (e) {
+      c.doc.transact(() =>
+        records.forEach((p) => {
+          if (
+            c.doc
+              .getMap<import('yjs').Map<unknown>>('panels')
+              .get(p.id)
+              ?.get('deletedAt') === stamp
+          )
+            put(c.doc, 'panels', p.id, { deletedAt: null })
+        }),
+      )
+      notify('Deletion was not confirmed. Panels retained.', { state: 'error' })
+      throw e
+    } finally {
+      records.forEach((p) => panelDeletionPending.current.delete(p.id))
+    }
   }
   async function duplicatePanels(records: Panel[]) {
     if (duplicatePending.current) return
     duplicatePending.current = true
     setDuplicateState('pending')
     try {
+      c.undo.stopCapturing()
       c.doc.transact(() => records.forEach(duplicate))
+      c.undo.stopCapturing()
       await waitForStoryboardSaved(c.doc, c.provider)
       setDuplicateState('success')
       setDuplicateId(records.length === 1 ? records[0].id : '')
@@ -498,8 +537,7 @@ export default function StoryboardPage() {
                       label={panelIdentity(p, i, linkedData)}
                       onCancel={() => setInlineDeleting('')}
                       onConfirm={async () => {
-                        remove([p])
-                        await waitForStoryboardSaved(c.doc, c.provider)
+                        await remove([p])
                       }}
                     />
                   ) : (

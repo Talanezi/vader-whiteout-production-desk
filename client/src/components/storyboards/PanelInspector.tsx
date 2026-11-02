@@ -10,7 +10,10 @@ import {
   type ArtworkRevision,
   type Panel,
 } from '../../lib/storyboards/model'
-import { panelIdentity } from '../../lib/storyboards/panelIdentity'
+import {
+  panelIdentity,
+  linkedShotLabel,
+} from '../../lib/storyboards/panelIdentity'
 import CollaborativeText from '../shots/CollaborativeText'
 import { Button } from '../whiteout/Button'
 import { ErrorNotice } from '../whiteout/Feedback'
@@ -196,7 +199,7 @@ export default function PanelInspector({
                           <Link
                             to={`/shotlists/${l.listId}?shot=${l.shotId}&scene=${shot.sceneId}`}
                           >
-                            {String(shot.number)}
+                            {linkedShotLabel(snapshots[l.listId], l.shotId)}
                             <small> · {l.shotId.slice(0, 8)}</small>
                           </Link>
                           <p>{String(shot.coverage || '')}</p>
@@ -361,15 +364,23 @@ export default function PanelInspector({
                     {r.id === panel.activeRevision && <em>Current</em>}
                   </span>
                 </button>
-                {r.id !== panel.activeRevision && (
-                  <Button
-                    variant="quiet"
-                    icon="undo"
-                    onClick={() => checkpoint(r, true)}
-                  >
-                    Restore version
-                  </Button>
-                )}
+                {r.id !== panel.activeRevision &&
+                  !r.assetId &&
+                  r.kind !== 'native' && (
+                    <small className="sb-inspector-muted">
+                      Artwork was not stored for this version.
+                    </small>
+                  )}
+                {r.id !== panel.activeRevision &&
+                  (r.assetId || r.kind === 'native') && (
+                    <Button
+                      variant="quiet"
+                      icon="undo"
+                      onClick={() => checkpoint(r, true)}
+                    >
+                      Restore version
+                    </Button>
+                  )}
               </article>
             ))}
           </section>

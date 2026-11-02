@@ -247,6 +247,7 @@ export default function Studio({
           remove: Set<string>
           parts: Map<string, Annotation[]>
           paths: Map<string, number[][]>
+          bounds: Map<string, number[]>
         }
       | undefined
     >(undefined)
@@ -419,6 +420,39 @@ export default function Studio({
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [annotating, onUndo, onRedo, tool, engine])
+  useEffect(() => {
+    if (!properties && !settings) return
+    const outside = (e: PointerEvent) => {
+      const portal = (e.target as Element).closest(
+        '[role="menu"],[role="listbox"]',
+      )
+      const target =
+        (portal?.id &&
+          host.current?.querySelector(
+            `[aria-controls="${CSS.escape(portal.id)}"]`,
+          )) ||
+        (e.target as Node)
+      if (
+        !host.current?.querySelector('.sb-properties-anchor')?.contains(target)
+      )
+        setProperties(false)
+      if (!host.current?.querySelector('.sb-input-settings')?.contains(target))
+        setSettings(false)
+    }
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setProperties(false)
+        setSettings(false)
+      }
+    }
+    document.addEventListener('pointerdown', outside)
+    window.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      window.removeEventListener('keydown', escape)
+    }
+  }, [properties, settings])
   function point(e: { clientX: number; clientY: number }) {
     const b = svg.current!.getBoundingClientRect()
     return [
@@ -562,6 +596,26 @@ export default function Studio({
         if (state.remove.has(original.id)) continue
         const points = state.paths.get(original.id) || trace(original)
         state.paths.set(original.id, points)
+        let bounds = state.bounds.get(original.id)
+        if (!bounds && points.length) {
+          bounds = [
+            Math.min(...points.map((p) => p[0])),
+            Math.min(...points.map((p) => p[1])),
+            Math.max(...points.map((p) => p[0])),
+            Math.max(...points.map((p) => p[1])),
+          ]
+          state.bounds.set(original.id, bounds)
+        }
+        const tolerance =
+          r + (original.width * 1000 * (original.scale || 1)) / 2
+        if (
+          bounds &&
+          (Math.max(sweep[0][0], p[0]) + tolerance < bounds[0] ||
+            Math.min(sweep[0][0], p[0]) - tolerance > bounds[2] ||
+            Math.max(sweep[0][1], p[1]) + tolerance < bounds[1] ||
+            Math.min(sweep[0][1], p[1]) - tolerance > bounds[3])
+        )
+          continue
         if (
           strokeIntersects(
             points,
@@ -667,6 +721,11 @@ export default function Studio({
       } catch {}
     }, 800)
   }
+  function applyPickedColor(value: string) {
+    if (tool === 'select' && active)
+      onCommit(calculate({ ...active, color: value }))
+    else setColor(value)
+  }
   async function pickColor() {
     const System = (
       window as unknown as {
@@ -676,7 +735,7 @@ export default function Studio({
     if (System) {
       try {
         const result = await new System().open()
-        setColor(result.sRGBHex)
+        applyPickedColor(result.sRGBHex)
         return
       } catch (e) {
         if ((e as Error).name === 'AbortError') return
@@ -687,7 +746,12 @@ export default function Studio({
         '.sb-studio-composition',
       )
       if (!group) return
-      sampler.current = await compositionPixels(group, height, frameBox)
+      sampler.current = await compositionPixels(
+        group,
+        height,
+        frameBox,
+        frameBox.width * scale * window.devicePixelRatio,
+      )
       setProperties(false)
       setSampling(true)
     } catch (e) {
@@ -706,7 +770,7 @@ export default function Studio({
         p[1] >= frameBox.y &&
         p[1] <= frameBox.y + frameBox.height
       )
-        setColor(sampler.current.sample(p[0], p[1]))
+        applyPickedColor(sampler.current.sample(p[0], p[1]))
       setSampling(false)
       return
     }
@@ -790,6 +854,7 @@ export default function Studio({
         remove: new Set(),
         parts: new Map(),
         paths: new Map(),
+        bounds: new Map(),
       }
       gesture.current = {
         kind: 'erase',
@@ -797,6 +862,8 @@ export default function Studio({
         client: [e.clientX, e.clientY],
         pan,
       }
+      if (eraseMode === 'whole' && object?.type === 'text')
+        erasing.current.remove.add(object.id)
       eraseTo(p)
       return
     }
@@ -1351,23 +1418,27 @@ export default function Studio({
                 strokeWidth={1 / scale}
               />
               {['arrow', 'path'].includes(selectedObject.type) &&
-                selectedObject.points.map((p, i) => (
-                  <circle
-                    key={i}
-                    data-handle="point"
-                    data-index={i}
-                    cx={p[0] * 1000}
-                    cy={p[1] * height}
-                    r={6 / scale}
-                    fill={
-                      i === 0 || i === selectedObject.points.length - 1
-                        ? '#fff'
-                        : '#87d8ff'
-                    }
-                    stroke="#278bc0"
-                    strokeWidth={1 / scale}
-                  />
-                ))}
+                selectedObject.points.map((p, i) =>
+                  selectedObject.engine?.includes('fragment') &&
+                  i > 0 &&
+                  i < selectedObject.points.length - 1 ? null : (
+                    <circle
+                      key={i}
+                      data-handle="point"
+                      data-index={i}
+                      cx={p[0] * 1000}
+                      cy={p[1] * height}
+                      r={6 / scale}
+                      fill={
+                        i === 0 || i === selectedObject.points.length - 1
+                          ? '#fff'
+                          : '#87d8ff'
+                      }
+                      stroke="#278bc0"
+                      strokeWidth={1 / scale}
+                    />
+                  ),
+                )}
             </g>
           )}
           {buildingPath && penPath.current && (
@@ -1536,7 +1607,13 @@ export default function Studio({
                     ? 'Eraser'
                     : 'Brush'}
             </span>
-            <small>{Math.round(shownWidth)} px</small>
+            <small>
+              {tool === 'erase'
+                ? eraseMode === 'partial'
+                  ? `${radius} px radius`
+                  : 'Whole stroke'
+                : `${Math.round(shownWidth)} px`}
+            </small>
             <StudioGlyph name="settings" />
           </button>
           {properties && (

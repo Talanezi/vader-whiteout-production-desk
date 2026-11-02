@@ -74,9 +74,7 @@ export default function ShotPane({
             <tr>
               <th>Shot</th>
               <th>Action / coverage</th>
-              <th>
-                <span className="pd-sr-only">Technical details</span>
-              </th>
+              <th aria-label="Technical details" />
             </tr>
           </thead>
           <tbody>
@@ -93,6 +91,7 @@ export default function ShotPane({
                   <td>
                     <button
                       className="sb-shot-select"
+                      aria-label={`Shot ${str(s, 'number')} · Scene ${str(scenes(c.doc).get(str(s, 'sceneId')), 'number')} · ${id.slice(0, 8)}`}
                       onClick={() => onSelect(id)}
                       aria-pressed={selected.includes(id)}
                     >
@@ -101,7 +100,6 @@ export default function ShotPane({
                         Scene{' '}
                         {str(scenes(c.doc).get(str(s, 'sceneId')), 'number')}
                       </small>
-                      <span className="pd-sr-only"> · {id.slice(0, 8)}</span>
                     </button>
                   </td>
                   <td>

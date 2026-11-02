@@ -1,3 +1,4 @@
+import { collaborationError } from '../collaboration-error';
 import {
   BadRequestException,
   ForbiddenException,
@@ -99,6 +100,17 @@ export class StoryboardsService implements OnModuleDestroy {
                   a.localeCompare(b, undefined, { numeric: true }),
                 ),
                 panelCount: panels.length,
+                previewFrame: (() => {
+                  const p = [...panels]
+                    .sort((a, b) => a.order - b.order)
+                    .find((p) => p.activeRevision);
+                  return p
+                    ? d
+                        .getMap<Y.Map<unknown>>('revisions')
+                        .get(p.activeRevision)
+                        ?.get('frame') || null
+                    : null;
+                })(),
                 previewHeight: (() => {
                   const p = [...panels]
                     .sort((a, b) => a.order - b.order)
@@ -234,8 +246,9 @@ export class StoryboardsService implements OnModuleDestroy {
             boardId: row.id,
             name: row.name,
             panelId: panel.id,
-            label: panel.label,
+            label: panel.title || panel.label,
             assetId: revision?.get('assetId') || null,
+            frame: revision?.get('frame') || null,
             drawingHeight: revision?.get('height') || 562.5,
             drawing:
               revision?.get('kind') === 'native'
@@ -471,46 +484,67 @@ export class StoryboardsService implements OnModuleDestroy {
       maxDebounce: 1500,
       stopOnSignals: false,
       onAuthenticate: async ({ token, documentName }) => {
-        if (!token || token.length > 8192) throw new Error('Session required');
-        const user = await this.auth.verifySchedulerToken(token);
-        await this.authorize(documentName, user);
-        return { user, token, checkedAt: Date.now() };
+        try {
+          if (!token || token.length > 8192)
+            throw new Error('Session required');
+          const user = await this.auth.verifySchedulerToken(token);
+          await this.authorize(documentName, user);
+          return { user, token, checkedAt: Date.now() };
+        } catch (error) {
+          throw collaborationError(error, 4403);
+        }
       },
       beforeHandleMessage: async ({ context, documentName }) => {
-        if (Date.now() - context.checkedAt > 30000) {
-          const user = await this.auth.verifySchedulerToken(context.token);
-          if (user.userID !== context.user.userID)
-            throw new Error('Session changed');
-          context.user = user;
-          context.checkedAt = Date.now();
+        try {
+          if (Date.now() - context.checkedAt > 30000) {
+            const user = await this.auth.verifySchedulerToken(context.token);
+            if (user.userID !== context.user.userID)
+              throw new Error('Session changed');
+            context.user = user;
+            context.checkedAt = Date.now();
+          }
+          await this.authorize(documentName, context.user);
+        } catch (error) {
+          throw collaborationError(error, 4403);
         }
-        await this.authorize(documentName, context.user);
       },
       onLoadDocument: async ({ documentName, document }) => {
-        const [row] = await this.db.query(
-          'SELECT state FROM storyboard_documents WHERE id=$1',
-          [documentName],
-        );
-        if (!row) throw new Error('Unavailable');
-        Y.applyUpdate(document, row.state);
-        return document;
+        try {
+          const [row] = await this.db.query(
+            'SELECT state FROM storyboard_documents WHERE id=$1',
+            [documentName],
+          );
+          if (!row) throw new Error('Unavailable');
+          Y.applyUpdate(document, row.state);
+          return document;
+        } catch (error) {
+          throw collaborationError(error, 4403);
+        }
       },
       onStoreDocument: async ({ documentName, document }) => {
         try {
-          await this.persist(documentName, document);
-        } catch (e) {
-          document.broadcastStateless(
-            JSON.stringify({ type: 'persistence-error' }),
-          );
-          throw e;
+          try {
+            await this.persist(documentName, document);
+          } catch (e) {
+            document.broadcastStateless(
+              JSON.stringify({ type: 'persistence-error' }),
+            );
+            throw e;
+          }
+        } catch (error) {
+          throw collaborationError(error, 1013);
         }
       },
       onStateless: async ({ payload, documentName, document, connection }) => {
-        if (payload !== 'persistence-status') return;
-        await this.persist(documentName, document);
-        connection.sendStateless(
-          JSON.stringify({ type: 'persisted', digest: digest(document) }),
-        );
+        try {
+          if (payload !== 'persistence-status') return;
+          await this.persist(documentName, document);
+          connection.sendStateless(
+            JSON.stringify({ type: 'persisted', digest: digest(document) }),
+          );
+        } catch (error) {
+          throw collaborationError(error, 1013);
+        }
       },
     });
     this.recheck = setInterval(() => {

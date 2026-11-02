@@ -1,3 +1,4 @@
+import { collaborationError } from '../collaboration-error';
 import {
   BadRequestException,
   ForbiddenException,
@@ -9,11 +10,7 @@ import { randomUUID, createHash } from 'crypto';
 import { Server, Hocuspocus } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { AuthService } from '../auth/auth.service';
-import {
-  snapshot,
-  metadata,
-  type PrintOptions,
-} from './pdf/shotlist-report';
+import { snapshot, metadata, type PrintOptions } from './pdf/shotlist-report';
 import type { TablePrintSpec } from './pdf/table-print';
 import { renderSpreadsheet } from './pdf/spreadsheet';
 import type { Server as HttpServer } from 'http';
@@ -236,61 +233,82 @@ export class ShotlistsService implements OnModuleDestroy {
     // service authoritative for both HTTP and WebSocket authentication.
     this.collab.configure({
       onAuthenticate: async ({ token, documentName }) => {
-        if (!token || token.length > 8192) throw new Error('Session required');
-        const user = await this.auth.verifySchedulerToken(token);
-        await this.authorize(documentName, user);
-        return { user, token, checkedAt: Date.now() };
+        try {
+          if (!token || token.length > 8192)
+            throw new Error('Session required');
+          const user = await this.auth.verifySchedulerToken(token);
+          await this.authorize(documentName, user);
+          return { user, token, checkedAt: Date.now() };
+        } catch (error) {
+          throw collaborationError(error, 4403);
+        }
       },
       beforeHandleMessage: async ({ documentName, context }) => {
-        // Refresh the full authorization identity, not only the session validity.
-        // Recheck before handling the first message after the freshness window.
-        if (Date.now() - context.checkedAt > 30000) {
-          const user = await this.auth.verifySchedulerToken(context.token);
-          if (user.userID !== context.user.userID)
-            throw new Error('Session changed');
-          await this.authorize(documentName, user);
-          context.user = user;
-          context.checkedAt = Date.now();
-        } else await this.authorize(documentName, context.user);
+        try {
+          // Refresh the full authorization identity, not only the session validity.
+          // Recheck before handling the first message after the freshness window.
+          if (Date.now() - context.checkedAt > 30000) {
+            const user = await this.auth.verifySchedulerToken(context.token);
+            if (user.userID !== context.user.userID)
+              throw new Error('Session changed');
+            await this.authorize(documentName, user);
+            context.user = user;
+            context.checkedAt = Date.now();
+          } else await this.authorize(documentName, context.user);
+        } catch (error) {
+          throw collaborationError(error, 4403);
+        }
       },
       onLoadDocument: async ({ documentName, document }) => {
-        const [row] = await this.db.query(
-          'SELECT state FROM shot_list_documents WHERE id=$1',
-          [documentName],
-        );
-        if (!row) throw new Error('Shot list unavailable');
-        Y.applyUpdate(document, row.state);
-        return document;
+        try {
+          const [row] = await this.db.query(
+            'SELECT state FROM shot_list_documents WHERE id=$1',
+            [documentName],
+          );
+          if (!row) throw new Error('Shot list unavailable');
+          Y.applyUpdate(document, row.state);
+          return document;
+        } catch (error) {
+          throw collaborationError(error, 4403);
+        }
       },
       onStoreDocument: async ({ documentName, document }) => {
         try {
-          await this.persist(document, documentName);
+          try {
+            await this.persist(document, documentName);
+          } catch (error) {
+            document.broadcastStateless(
+              JSON.stringify({ type: 'persistence-error' }),
+            );
+            throw error;
+          }
         } catch (error) {
-          document.broadcastStateless(
-            JSON.stringify({ type: 'persistence-error' }),
-          );
-          throw error;
+          throw collaborationError(error, 1013);
         }
       },
       onStateless: async ({ payload, document, documentName, connection }) => {
-        if (payload !== 'persistence-status') return;
-        if (this.failedSaves.has(documentName))
-          await this.persist(document, documentName);
-        const [row] = await this.db.query(
-          'SELECT state FROM shot_list_documents WHERE id=$1',
-          [documentName],
-        );
-        const stored = new Y.Doc();
-        Y.applyUpdate(stored, row.state);
-        connection.sendStateless(
-          JSON.stringify({
-            type: 'persisted',
-            digest: createHash('sha256')
-              .update(Y.encodeSnapshot(Y.snapshot(stored)))
-              .digest('hex'),
-          }),
-        );
-        stored.destroy();
+        try {
+          if (payload !== 'persistence-status') return;
+          if (this.failedSaves.has(documentName))
+            await this.persist(document, documentName);
+          const [row] = await this.db.query(
+            'SELECT state FROM shot_list_documents WHERE id=$1',
+            [documentName],
+          );
+          const stored = new Y.Doc();
+          Y.applyUpdate(stored, row.state);
+          connection.sendStateless(
+            JSON.stringify({
+              type: 'persisted',
+              digest: createHash('sha256')
+                .update(Y.encodeSnapshot(Y.snapshot(stored)))
+                .digest('hex'),
+            }),
+          );
+          stored.destroy();
+        } catch (error) {
+          throw collaborationError(error, 1013);
+        }
       },
     });
     this.recheck = setInterval(() => {
