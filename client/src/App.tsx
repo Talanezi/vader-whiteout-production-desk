@@ -21,6 +21,12 @@ const storyboardFallback = (
     <span className="pd-sr-only">Loading storyboards</span>
   </div>
 )
+const flowFallback = (
+  <div className="pd-loading" role="status">
+    <DotsLoader />
+    <span className="pd-sr-only">Loading Flow of the Day</span>
+  </div>
+)
 const router = createHashRouter([
   {
     element: <AppShell />,
@@ -69,7 +75,7 @@ const router = createHashRouter([
       ...['/flows', '/flows/new', '/flows/:id'].map((path) => ({
         path,
         element: (
-          <Suspense fallback={storyboardFallback}>
+          <Suspense fallback={flowFallback}>
             {path === '/flows/:id' ? <FlowPage /> : <FlowsPage />}
           </Suspense>
         ),
