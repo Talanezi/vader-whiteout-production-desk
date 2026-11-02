@@ -27,7 +27,16 @@ export function setRecord(
 ) {
   const m = new Y.Map();
   d.getMap(k).set(id, m);
-  Object.entries({ id, ...data }).forEach(([k, v]) => m.set(k, v));
+  Object.entries({ id, ...data }).forEach(([field, value]) =>
+    m.set(
+      field,
+      typeof value === 'string' &&
+        ((k === 'events' && ['description', 'notes'].includes(field)) ||
+          (k === 'instructions' && field === 'text'))
+        ? new Y.Text(value)
+        : value,
+    ),
+  );
   return m;
 }
 export function capture(d: Y.Doc): any {
@@ -41,7 +50,12 @@ export function validateMeta(m: any) {
   } catch {
     throw new BadRequestException('Choose a valid named production timezone.');
   }
-  if (m.date && !/^\d{4}-\d{2}-\d{2}$/.test(m.date))
+  if (
+    m.date &&
+    (!/^\d{4}-\d{2}-\d{2}$/.test(m.date) ||
+      !Number.isFinite(Date.parse(m.date + 'T12:00:00Z')) ||
+      new Date(m.date + 'T12:00:00Z').toISOString().slice(0, 10) !== m.date)
+  )
     throw new BadRequestException('Choose a valid production date.');
 }
 export function validateFlow(s: any) {
@@ -60,6 +74,11 @@ export function validateFlow(s: any) {
       !Number.isFinite(e.order)
     )
       throw new BadRequestException('Invalid event.');
+    for (const k of ['description', 'notes', 'reference'])
+      if (e[k] != null && (typeof e[k] !== 'string' || e[k].length > 30000))
+        throw new BadRequestException(
+          'Event text is limited to 30,000 characters.',
+        );
     for (const k of ['start', 'actualStart', 'actualEnd'])
       if (
         e[k] != null &&
@@ -89,4 +108,17 @@ export function validateFlow(s: any) {
     )
       throw new BadRequestException('Invalid department instruction.');
   }
+}
+
+/** Canonical JSON keeps revision and artifact identity stable across CRDT reloads. */
+export function stableJSON(value: unknown): string {
+  return JSON.stringify(value, (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .map((k) => [k, v[k]]),
+        )
+      : v,
+  );
 }

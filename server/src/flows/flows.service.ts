@@ -1,3 +1,4 @@
+import * as decoding from 'lib0/decoding';
 import { collaborationError } from '../collaboration-error';
 import {
   BadRequestException,
@@ -25,6 +26,7 @@ import {
   setRecord,
   validateFlow,
   validateMeta,
+  stableJSON,
 } from './model';
 /** Flow-specific data only. M03 technical fields are resolved from its authorized live document. */
 @Injectable()
@@ -33,6 +35,22 @@ export class FlowsService implements OnModuleDestroy {
   private sockets?: WebSocketServer;
   private recheck?: ReturnType<typeof setInterval>;
   private queues = new Map<string, Promise<void>>();
+  private messageQueues = new Map<string, Promise<void>>();
+  private async messageTurn(id: string) {
+    const prior = this.messageQueues.get(id) || Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+      tail = prior.then(() => gate);
+    this.messageQueues.set(id, tail);
+    await prior;
+    return () =>
+      setImmediate(() => {
+        release();
+        if (this.messageQueues.get(id) === tail) this.messageQueues.delete(id);
+      });
+  }
   private lease?: ReturnType<DataSource['createQueryRunner']>;
   constructor(
     private readonly db: DataSource,
@@ -53,7 +71,10 @@ export class FlowsService implements OnModuleDestroy {
   async list(user: Collaborator) {
     this.shots.assertProductionMember(user);
     const rows = await this.db.query(
-      'SELECT id,name,state,updated_at AS "updatedAt" FROM flow_documents WHERE production=\'whiteout\' AND archived_at IS NULL ORDER BY updated_at DESC,id',
+      `SELECT f.id,f.name,f.state,f.updated_at AS "updatedAt",(SELECT count(*)::integer FROM flow_revisions r WHERE r.document_id=f.id) AS "revisionCount" FROM flow_documents f WHERE f.production='whiteout' AND f.archived_at IS NULL ORDER BY f.updated_at DESC,f.id`,
+    );
+    const names = await this.db.query(
+      'SELECT id,name FROM shot_list_documents',
     );
     return {
       items: rows.map(({ state, ...row }: any) => {
@@ -64,6 +85,7 @@ export class FlowsService implements OnModuleDestroy {
           return {
             ...row,
             ...meta,
+            listName: names.find((x: any) => x.id === meta.listId)?.name || '',
             eventCount: [...d.getMap<Y.Map<unknown>>('events').values()].filter(
               (e) => !e.get('deletedAt'),
             ).length,
@@ -109,6 +131,12 @@ export class FlowsService implements OnModuleDestroy {
         if (!Array.isArray(p.shotIds) || p.shotIds.length > 3000)
           throw new BadRequestException('Choose valid shots.');
         d.getMap('meta').set('listId', p.listId);
+        if (
+          p.start != null &&
+          (typeof p.start !== 'string' || !Number.isFinite(Date.parse(p.start)))
+        )
+          throw new BadRequestException('Choose a valid filming start.');
+        let cursor: string | null = p.start || null;
         for (const [i, id] of p.shotIds.entries()) {
           const shot: any = source.shots[id];
           if (!shot || shot.deleted || shot.deletedAt)
@@ -121,10 +149,19 @@ export class FlowsService implements OnModuleDestroy {
             order: (i + 1) * 1024,
             description: '',
             duration: null,
-            start: null,
+            start: cursor,
             status: 'planned',
             fixed: false,
           });
+          const n = shot.estimatedMinutes;
+          cursor =
+            cursor &&
+            n !== '' &&
+            n != null &&
+            Number.isFinite(Number(n)) &&
+            Number(n) >= 0
+              ? new Date(Date.parse(cursor) + Number(n) * 60000).toISOString()
+              : null;
         }
       }
       await this.db.query(
@@ -187,6 +224,8 @@ export class FlowsService implements OnModuleDestroy {
   }
   async manage(id: string, user: Collaborator, p: any) {
     await this.authorize(id, user, true);
+    if (!p || typeof p !== 'object' || Array.isArray(p))
+      throw new BadRequestException('Choose a valid Flow action.');
     if (p.action === 'archive' || p.action === 'restore') {
       await this.db.query(
         'UPDATE flow_documents SET archived_at=$2,updated_at=now() WHERE id=$1',
@@ -211,34 +250,70 @@ export class FlowsService implements OnModuleDestroy {
         const next = randomUUID(),
           copy = new Y.Doc();
         try {
-          Y.applyUpdate(copy, Y.encodeStateAsUpdate(d));
-          copy.transact(() => {
-            const meta = copy.getMap('meta');
-            meta.set(
-              'name',
-              (String(meta.get('name')) + ' — copy').slice(0, 180),
+          const state = capture(d),
+            departmentIds = new Map(
+              Object.keys(state.departments).map((id) => [id, randomUUID()]),
+            ),
+            eventIds = new Map(
+              Object.keys(state.events).map((id) => [id, randomUUID()]),
             );
-            meta.set('date', '');
-            meta.set('status', 'draft');
-            meta.set('author', user.name);
-            for (const k of ['comments', 'history', 'imports'])
-              copy.getMap(k).clear();
-            for (const v of copy.getMap<Y.Map<unknown>>('events').values()) {
-              v.set('start', null);
-              v.set('actualStart', null);
-              v.set('actualEnd', null);
-              v.set('status', 'planned');
-            }
-          });
-          await this.db.query(
-            'INSERT INTO flow_documents(id,name,creator_id,state) VALUES($1,$2,$3,$4)',
-            [
-              next,
-              copy.getMap('meta').get('name'),
-              user.userID,
-              Buffer.from(Y.encodeStateAsUpdate(copy)),
-            ],
+          Object.entries(state.meta).forEach(([k, v]) =>
+            copy.getMap('meta').set(k, v),
           );
+          const meta = copy.getMap('meta');
+          meta.set(
+            'name',
+            (typeof p.name === 'string' && p.name.trim()
+              ? p.name.trim()
+              : String(meta.get('name')) + ' — copy'
+            ).slice(0, 180),
+          );
+          meta.set('date', p.date || '');
+          if (p.zone) meta.set('zone', p.zone);
+          meta.set('status', 'draft');
+          meta.set('author', user.name);
+          validateMeta(meta.toJSON());
+          for (const [old, newId] of departmentIds) {
+            const { id: _, ...v } = state.departments[old];
+            setRecord(copy, 'departments', newId, v);
+          }
+          for (const [old, newId] of eventIds) {
+            const { id: _, ...v } = state.events[old];
+            setRecord(copy, 'events', newId, {
+              ...v,
+              start: null,
+              actualStart: null,
+              actualEnd: null,
+              status: 'planned',
+            });
+          }
+          for (const i of Object.values(state.instructions) as any[]) {
+            const eventId = eventIds.get(i.eventId),
+              departmentId = departmentIds.get(i.departmentId);
+            if (eventId && departmentId)
+              setRecord(copy, 'instructions', eventId + ':' + departmentId, {
+                eventId,
+                departmentId,
+                text: i.text,
+              });
+          }
+          for (const [key, value] of Object.entries(state.imports))
+            setRecord(copy, 'imports', key, value as Record<string, unknown>);
+          await this.db.transaction(async (manager) => {
+            await manager.query(
+              'INSERT INTO flow_documents(id,name,creator_id,state) VALUES($1,$2,$3,$4)',
+              [
+                next,
+                meta.get('name'),
+                user.userID,
+                Buffer.from(Y.encodeStateAsUpdate(copy)),
+              ],
+            );
+            await manager.query(
+              'INSERT INTO flow_sources(id,document_id,storage_key,filename,sha256,bytes,creator_id) SELECT gen_random_uuid(),$2,storage_key,filename,sha256,bytes,$3 FROM flow_sources WHERE document_id=$1',
+              [id, next, user.userID],
+            );
+          });
           return { id: next };
         } finally {
           copy.destroy();
@@ -338,7 +413,7 @@ export class FlowsService implements OnModuleDestroy {
   ) {
     await this.authorize(id, user);
     const key = createHash('sha256')
-      .update(JSON.stringify({ state, settings }))
+      .update(stableJSON({ state, settings }))
       .digest('hex');
     await this.db.query(
       'INSERT INTO flow_prints(id,document_id,digest,settings,snapshot,pdf,creator_id) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(document_id,digest) DO NOTHING',
@@ -419,7 +494,13 @@ export class FlowsService implements OnModuleDestroy {
           throw collaborationError(error, 4403);
         }
       },
-      beforeHandleMessage: async ({ context, documentName }) => {
+      beforeHandleMessage: async ({
+        context,
+        documentName,
+        document,
+        update,
+      }) => {
+        const release = await this.messageTurn(documentName);
         try {
           if (Date.now() - context.checkedAt > 30000) {
             const user = await this.auth.verifySchedulerToken(context.token);
@@ -429,8 +510,36 @@ export class FlowsService implements OnModuleDestroy {
             context.checkedAt = Date.now();
           }
           await this.authorize(documentName, context.user);
+          // Validate a candidate CRDT state before applying a sync update. Invalid
+          // data never poisons the live document or its durable saved snapshot.
+          const decoder = decoding.createDecoder(update);
+          decoding.readVarString(decoder);
+          const messageType = decoding.readVarUint(decoder);
+          if (messageType === 0 || messageType === 4) {
+            const syncType = decoding.readVarUint(decoder);
+            if (syncType === 1 || syncType === 2) {
+              const delta = decoding.readVarUint8Array(decoder),
+                candidate = new Y.Doc();
+              try {
+                Y.applyUpdate(candidate, Y.encodeStateAsUpdate(document));
+                Y.applyUpdate(candidate, delta);
+                validateFlow(capture(candidate));
+              } finally {
+                candidate.destroy();
+              }
+            }
+          }
         } catch (error) {
+          if (error instanceof BadRequestException) {
+            console.warn('Flow update rejected:', error.message);
+            throw Object.assign(new Error(error.message), {
+              code: 4400,
+              reason: error.message.slice(0, 110),
+            });
+          }
           throw collaborationError(error, 4403);
+        } finally {
+          release();
         }
       },
       onLoadDocument: async ({ documentName, document }) => {

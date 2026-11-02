@@ -344,8 +344,13 @@ export class ShotlistsService implements OnModuleDestroy {
     );
     http.on('upgrade', (request, socket, head) => {
       const url = new URL(request.url || '/', 'http://localhost');
-      // Storyboards has an independently authenticated collaboration endpoint.
-      if (url.pathname === '/api/storyboards/collaboration') return;
+      // Other workspaces authenticate independently before accepting updates.
+      if (
+        ['/api/storyboards/collaboration', '/api/flows/collaboration'].includes(
+          url.pathname,
+        )
+      )
+        return;
       if (
         url.pathname !== '/api/shotlists/collaboration' ||
         url.search ||

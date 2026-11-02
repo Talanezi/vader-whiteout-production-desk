@@ -15,6 +15,9 @@ export default function TimeMap({
   shots,
   onMove,
   onInspect,
+  selected,
+  onSelect,
+  onShowInFlow,
 }: {
   doc: Y.Doc
   events: FlowEvent[]
@@ -23,6 +26,9 @@ export default function TimeMap({
   shots?: Y.Map<Y.Map<unknown>>
   onMove: (e: FlowEvent, start: string, duration: number | null) => void
   onInspect: (e: FlowEvent) => void
+  selected: Set<string>
+  onSelect: (e: FlowEvent) => void
+  onShowInFlow: (e: FlowEvent) => void
 }) {
   const [zoom, setZoom] = useState(2),
     [drag, setDrag] = useState<{ id: string; delta: number; resize: boolean }>()
@@ -56,6 +62,24 @@ export default function TimeMap({
           Zoom out
         </Button>
         <small>{zoom * 30}px / 30 min</small>
+        {selected.size === 1 && events.some((e) => selected.has(e.id)) && (
+          <>
+            <Button
+              icon="edit"
+              onClick={() => onInspect(events.find((e) => selected.has(e.id))!)}
+            >
+              Edit timing
+            </Button>
+            <Button
+              icon="columns"
+              onClick={() =>
+                onShowInFlow(events.find((e) => selected.has(e.id))!)
+              }
+            >
+              Show in Department Flow
+            </Button>
+          </>
+        )}
       </div>
       <div className="flow-map-scroll">
         <div className="flow-map-inner" style={{ width: width + 150 }}>
@@ -91,7 +115,12 @@ export default function TimeMap({
             const positioned = lane.map((e) => {
               const start = Date.parse(e.start!),
                 end =
-                  start + (duration(e, shots?.get(e.shotId || '')) || 5) * 60000
+                  start +
+                  Math.max(
+                    84 / zoom,
+                    duration(e, shots?.get(e.shotId || '')) || 0,
+                  ) *
+                    60000
               let track = ends.findIndex((v) => v <= start)
               if (track < 0) track = ends.length
               ends[track] = end
@@ -113,7 +142,7 @@ export default function TimeMap({
                         ((Date.parse(e.start!) - first) / 60000) * zoom +
                         (resize ? 0 : delta * zoom),
                       w = Math.max(
-                        42,
+                        84,
                         ((base || 0) + (resize ? delta : 0)) * zoom,
                       )
                     function pointer(
@@ -131,6 +160,11 @@ export default function TimeMap({
                         delta = Math.round((v.clientX - start) / zoom / 5) * 5
                         if (resize) delta = Math.max(-(base || 0), delta)
                         setDrag({ id: e.id, delta, resize })
+                      }
+                      el.onpointercancel = () => {
+                        el.onpointermove = null
+                        el.onpointerup = null
+                        setDrag(undefined)
                       }
                       el.onpointerup = () => {
                         el.onpointermove = null
@@ -151,11 +185,13 @@ export default function TimeMap({
                     return (
                       <div
                         key={e.id}
-                        className={`flow-time-block ${e.type === 'milestone' ? 'is-milestone' : ''} ${drag?.id === e.id ? 'is-moving' : ''}`}
+                        title={`${e.description || e.reference || 'Department activity'} · ${localParts(e.start!, zone)} · ${base == null ? 'Duration unknown' : base + ' min'}`}
+                        className={`flow-time-block ${selected.has(e.id) ? 'is-selected' : ''} ${base == null ? 'is-point' : ''} ${e.type === 'milestone' ? 'is-milestone' : ''} ${drag?.id === e.id ? 'is-moving' : ''}`}
                         style={{ left, width: w, top: track * 55 + 6 }}
                       >
                         <button
                           onPointerDown={(v) => pointer(v, false)}
+                          onClick={() => onSelect(e)}
                           onDoubleClick={() => onInspect(e)}
                           aria-label={`Move ${e.description || e.reference || 'event'}`}
                           onKeyDown={(v) => {

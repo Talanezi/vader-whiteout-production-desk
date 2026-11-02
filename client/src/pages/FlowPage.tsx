@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useBlocker,
+} from 'react-router-dom'
 import * as Y from 'yjs'
 import { DragDropProvider, DragOverlay } from '@dnd-kit/react'
+import { isSortable } from '@dnd-kit/react/sortable'
 import { useFlowCollaboration } from '../lib/flow/useFlowCollaboration'
 import { useShotCollaboration } from '../lib/useShotCollaboration'
 import { flowRequest, flowFetch } from '../lib/flow/api'
@@ -61,7 +67,7 @@ export default function FlowPage() {
   const { id = '' } = useParams(),
     c = useFlowCollaboration(id)
   if (!getAuthToken() || c.error === 'UNAUTHORIZED') return <SessionState />
-  if (!c.synced || !c.provider || !c.session)
+  if (!c.synced || !c.provider || !c.session || c.session.id !== id)
     return (
       <div className="pd-page">
         {c.error ? (
@@ -87,6 +93,12 @@ function Workspace({
   id: string
   source?: ReturnType<typeof useShotCollaboration>
 }) {
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      c.synced &&
+      (!c.connected || !c.saved) &&
+      currentLocation.pathname !== nextLocation.pathname,
+  )
   const doc = c.doc,
     meta = doc.getMap('meta'),
     listId = String(meta.get('listId') || ''),
@@ -125,6 +137,7 @@ function Workspace({
     }>(),
     [shift, setShift] = useState(false),
     [shiftMinutes, setShiftMinutes] = useState('15')
+  const allSaved = c.saved && (!source || source.saved || Boolean(source.error))
   const key = `whiteout:flow:${id}:layout`,
     [layout, setLayout] = useState<{
       hidden: string[]
@@ -141,7 +154,8 @@ function Workspace({
         return { hidden: [], widths: {} }
       }
     }),
-    dragStart = useRef<string[]>([])
+    dragStart = useRef<string[]>([]),
+    dropTarget = useRef('')
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(layout))
@@ -259,6 +273,44 @@ function Workspace({
       setError((e as Error).message)
     }
   }
+  const proposedStart = move?.target?.start || move?.start
+  const overlap =
+    move && proposedStart
+      ? events.filter(
+          (other) =>
+            other.id !== move.event.id &&
+            other.start &&
+            duration(other, sourceShots?.get(other.shotId || '')) != null &&
+            Date.parse(other.start) <
+              Date.parse(proposedStart) +
+                (move.duration ??
+                  duration(
+                    move.event,
+                    sourceShots?.get(move.event.shotId || ''),
+                  ) ??
+                  0) *
+                  60000 &&
+            Date.parse(other.start) +
+              (duration(other, sourceShots?.get(other.shotId || '')) || 0) *
+                60000 >
+              Date.parse(proposedStart) &&
+            deps.some(
+              (d) =>
+                String(
+                  doc
+                    .getMap<Y.Map<unknown>>('instructions')
+                    .get(move.event.id + ':' + d.id)
+                    ?.get('text') || '',
+                ).trim() &&
+                String(
+                  doc
+                    .getMap<Y.Map<unknown>>('instructions')
+                    .get(other.id + ':' + d.id)
+                    ?.get('text') || '',
+                ).trim(),
+            ),
+        )
+      : []
   const changing = move?.event,
     shiftBase =
       events.find((e) => selected.has(e.id) && e.start) ||
@@ -284,14 +336,16 @@ function Workspace({
         </div>
         <div className="flow-document-actions">
           <span className="flow-save" role="status">
-            {!c.saved && <DotsLoader small />}
+            {!allSaved && !c.error && !source?.error && <DotsLoader small />}
             {c.error
               ? 'Save interrupted'
-              : !c.connected
-                ? 'Reconnecting'
-                : c.saved
-                  ? 'Saved'
-                  : 'Syncing'}
+              : source?.error && c.saved
+                ? 'Flow saved · source unavailable'
+                : !c.connected || Boolean(source && !source.connected)
+                  ? 'Reconnecting'
+                  : allSaved
+                    ? 'Saved'
+                    : 'Syncing'}
           </span>
           <div className="pd-collaborators">
             {c.peers
@@ -459,6 +513,40 @@ function Workspace({
       {selected.size > 0 && (
         <div className="flow-selection">
           <strong>{selected.size} selected</strong>
+          <Button
+            icon={copied ? 'check' : 'copy'}
+            className={copied ? 'flow-copy-success' : ''}
+            onClick={() => {
+              const rows = events
+                .filter((e) => selected.has(e.id))
+                .map((e) =>
+                  [
+                    e.start ? localParts(e.start, zone) : '',
+                    e.description || e.reference || '',
+                    ...deps.map((d) =>
+                      String(
+                        doc
+                          .getMap<Y.Map<unknown>>('instructions')
+                          .get(e.id + ':' + d.id)
+                          ?.get('text') || '',
+                      ),
+                    ),
+                  ]
+                    .map((v) => v.replace(/\t/g, ' ').replace(/\n/g, ' '))
+                    .join('\t'),
+                )
+                .join('\n')
+              void navigator.clipboard
+                .writeText(rows)
+                .then(() => {
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1800)
+                })
+                .catch(() => setError('Could not copy the selected events.'))
+            }}
+          >
+            Copy selected
+          </Button>
           <Button icon="copy" onClick={duplicate}>
             Duplicate selected
           </Button>
@@ -477,15 +565,35 @@ function Workspace({
       <DragDropProvider
         sensors={shotSensors}
         onDragStart={(e) => {
+          dropTarget.current = ''
           dragStart.current = filter.map((e) => e.id)
           setDragging(String(e.operation.source?.id || ''))
+        }}
+        onDragOver={(e) => {
+          const target = String(e.operation.target?.id || '')
+          if (
+            events.some((v) => v.id === target) &&
+            target !== e.operation.source?.id
+          )
+            dropTarget.current = target
         }}
         onDragEnd={(e) => {
           const from = String(e.operation.source?.id || ''),
             to = String(e.operation.target?.id || '')
           setDragging('')
-          if (e.canceled || from === to || !to) return
-          const target = events.find((v) => v.id === to)
+          if (e.canceled) return
+          if (from.startsWith('rail:') && to === 'flow:end') {
+            const shot = sourceShots?.get(from.slice(5))
+            if (shot) schedule(shot)
+            return
+          }
+          const sortable = e.operation.source
+          const targetId =
+            !from.startsWith('rail:') && isSortable(sortable)
+              ? dragStart.current[sortable.index]
+              : dropTarget.current || to
+          if (!targetId || targetId === from) return
+          const target = events.find((v) => v.id === targetId)
           if (!target) return
           if (from.startsWith('rail:')) {
             const shot = sourceShots?.get(from.slice(5))
@@ -535,6 +643,17 @@ function Workspace({
               />
             ) : (
               <TimeMap
+                selected={selected}
+                onSelect={(e) => setSelected(new Set([e.id]))}
+                onShowInFlow={(e) => {
+                  setMode('flow')
+                  setSelected(new Set([e.id]))
+                  requestAnimationFrame(() =>
+                    document
+                      .querySelector(`[data-event="${e.id}"]`)
+                      ?.scrollIntoView({ block: 'nearest' }),
+                  )
+                }}
                 doc={doc}
                 events={filter}
                 departments={visible}
@@ -603,6 +722,24 @@ function Workspace({
           )}
         </DragOverlay>
       </DragDropProvider>
+      {blocker.state === 'blocked' && (
+        <Overlay
+          title="Changes are not saved yet"
+          onClose={() => blocker.reset()}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => blocker.reset()}>
+                Keep editing
+              </Button>
+              <Button variant="danger" onClick={() => blocker.proceed()}>
+                Leave without saving
+              </Button>
+            </>
+          }
+        >
+          <p>Keep this document open to reconnect and save your changes.</p>
+        </Overlay>
+      )}
       {time && events.find((e) => e.id === time) && (
         <TimeEditor
           event={events.find((e) => e.id === time)!}
@@ -813,6 +950,17 @@ function Workspace({
           }
         >
           <div className="flow-change-preview">
+            {overlap.length > 0 && (
+              <p className="flow-warning">
+                Shared department work overlaps{' '}
+                {overlap
+                  .map(
+                    (e) => e.description || e.reference || 'another activity',
+                  )
+                  .join(', ')}
+                . Parallel work may be intended; review before applying.
+              </p>
+            )}
             <strong>
               {changing?.description ||
                 changing?.reference ||

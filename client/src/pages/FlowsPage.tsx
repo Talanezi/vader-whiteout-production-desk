@@ -12,6 +12,8 @@ import {
   useToast,
 } from '../components/whiteout/Feedback'
 import { getAuthToken } from '../lib/api'
+import { localCandidates } from '../lib/flow/model'
+import { shotRequest } from '../lib/shotApi'
 import { flowRequest } from '../lib/flow/api'
 import ShotPicker from '../components/storyboards/ShotPicker'
 import type { ShotLink } from '../lib/storyboards/model'
@@ -24,6 +26,8 @@ type Item = {
   status: string
   author: string
   eventCount: number
+  revisionCount?: number
+  listName?: string
   listId?: string
   updatedAt: string
 }
@@ -43,6 +47,11 @@ export default function FlowsPage() {
     [zone, setZone] = useState('America/Los_Angeles'),
     [workflow, setWorkflow] = useState('shots'),
     [links, setLinks] = useState<ShotLink[]>([]),
+    [selectedShots, setSelectedShots] = useState<
+      Record<string, Record<string, unknown>>
+    >({}),
+    [startLocal, setStartLocal] = useState(''),
+    [previous, setPrevious] = useState(''),
     [picker, setPicker] = useState(false),
     [pending, setPending] = useState(false),
     [remove, setRemove] = useState<Item>(),
@@ -94,11 +103,28 @@ export default function FlowsPage() {
     setPending(true)
     setError('')
     try {
+      if (workflow === 'previous') {
+        if (!previous) throw Error('Choose a previous Flow.')
+        const copy = await flowRequest<{ id: string }>(`/${previous}/manage`, {
+          action: 'duplicate',
+          name,
+          date,
+          zone,
+        })
+        navigate(`/flows/${copy.id}`)
+        return
+      }
+      const candidates = startLocal.trim()
+        ? localCandidates(startLocal.trim(), zone)
+        : []
+      if (startLocal.trim() && candidates.length !== 1)
+        throw Error('Choose an unambiguous production-local filming start.')
       const r = await flowRequest<{ id: string }>('', {
         id: request.current,
         name,
         date,
         zone,
+        start: candidates[0] || null,
         ...(workflow === 'shots'
           ? { listId: links[0]?.listId, shotIds: links.map((l) => l.shotId) }
           : {}),
@@ -186,11 +212,15 @@ export default function FlowsPage() {
                     <Link className="pd-document-link" to={`/flows/${i.id}`}>
                       {i.name}
                     </Link>
-                    {i.listId && <small>Connected Shot List</small>}
+                    {i.listId && (
+                      <small>{i.listName || 'Shot List unavailable'}</small>
+                    )}
                   </td>
                   <td>{i.date || 'Unscheduled'}</td>
                   <td>
-                    <span className="pd-status">{i.status || 'draft'}</span>
+                    <span className="pd-status">
+                      {i.status || 'draft'} · {i.revisionCount || 0} revisions
+                    </span>
                   </td>
                   <td>{i.eventCount}</td>
                   <td>
@@ -271,6 +301,7 @@ export default function FlowsPage() {
               ['shots', 'shots', 'From Shot List'],
               ['import', 'import', 'Import Excel'],
               ['blank', 'file', 'Start blank'],
+              ['previous', 'copy', 'Use previous day'],
             ].map(([id, icon, label]) => (
               <Button
                 key={id}
@@ -307,6 +338,14 @@ export default function FlowsPage() {
           </div>
           {workflow === 'shots' && (
             <section className="flow-creation-shots">
+              <label className="flow-field">
+                Optional filming start · production local
+                <input
+                  placeholder="YYYY-MM-DD HH:mm"
+                  value={startLocal}
+                  onChange={(e) => setStartLocal(e.target.value)}
+                />
+              </label>
               <Button icon="shots" onClick={() => setPicker(true)}>
                 {links.length
                   ? `${links.length} shots selected`
@@ -321,7 +360,25 @@ export default function FlowsPage() {
                     {links.map((l, i) => (
                       <li key={l.shotId}>
                         <Link to={`/shotlists/${l.listId}?shot=${l.shotId}`}>
-                          Shot {i + 1} · {l.shotId.slice(0, 8)}
+                          {String(
+                            selectedShots[l.shotId]?.number ||
+                              'Shot ' + (i + 1),
+                          )}{' '}
+                          · {String(selectedShots[l.shotId]?.subject || '')}
+                          <small>
+                            {[
+                              selectedShots[l.shotId]?.coverage,
+                              selectedShots[l.shotId]?.camera,
+                              selectedShots[l.shotId]?.framing,
+                              selectedShots[l.shotId]?.lens,
+                              selectedShots[l.shotId]?.estimatedMinutes
+                                ? selectedShots[l.shotId].estimatedMinutes +
+                                  ' min'
+                                : 'Duration unknown',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </small>
                         </Link>
                         <Button
                           icon="up"
@@ -354,6 +411,17 @@ export default function FlowsPage() {
               )}
             </section>
           )}
+          {workflow === 'previous' && (
+            <Menu
+              label={
+                items.find((i) => i.id === previous)?.name ||
+                'Choose previous Flow'
+              }
+              value={previous}
+              onChange={setPrevious}
+              items={items.map((i) => ({ value: i.id, label: i.name }))}
+            />
+          )}
           {workflow === 'import' && (
             <p className="flow-muted">
               Review the workbook and map its time columns before adding events.
@@ -368,6 +436,12 @@ export default function FlowsPage() {
           onClose={() => setPicker(false)}
           onConfirm={(l) => {
             setLinks(l)
+            if (l[0])
+              void shotRequest<{
+                shots: Record<string, Record<string, unknown>>
+              }>(`/${l[0].listId}/export`)
+                .then((r) => setSelectedShots(r.shots))
+                .catch((e) => setError(e.message))
             setPicker(false)
           }}
         />

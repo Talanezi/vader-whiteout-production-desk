@@ -89,6 +89,13 @@ export function useFlowCollaboration(id: string) {
               if (state) p?.sendStateless('persistence-status')
             }
           },
+          onClose: ({ event }) => {
+            if (alive && event.code === 4400)
+              setError(
+                event.reason ||
+                  'These changes were rejected. Undo the last operation and reconnect.',
+              )
+          },
           onAuthenticationFailed: () => {
             if (alive)
               setError(

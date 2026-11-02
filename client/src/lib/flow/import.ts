@@ -89,7 +89,11 @@ export function readWorkbook(bytes: ArrayBuffer): SourceSheet[] {
           return {
             address,
             value: cell?.v ?? '',
-            formatted: cell?.w || String(cell?.v ?? ''),
+            formatted:
+              cell?.w ||
+              (cell?.f && cell.v == null
+                ? '[Uncalculated formula: ' + cell.f + ']'
+                : String(cell?.v ?? '')),
             formula: cell?.f,
             format: cell?.z,
             style: cell?.s,
@@ -103,13 +107,10 @@ export function readWorkbook(bytes: ArrayBuffer): SourceSheet[] {
 export const column = (index: number) => XLSX.utils.encode_col(index)
 export function suggest(sheet: SourceSheet): Mapping {
   const row = sheet.rows[0] || []
-  const find = (re: RegExp, fallback: string) =>
-    column(
-      Math.max(
-        0,
-        row.findIndex((c) => re.test(c.formatted)),
-      ),
-    ) || fallback
+  const find = (re: RegExp, fallback: string) => {
+    const index = row.findIndex((c) => re.test(c.formatted))
+    return index < 0 ? fallback : column(index)
+  }
   const action = find(/current action|action/i, 'C'),
     estimate = find(/estimate|duration/i, 'N')
   const departments: Record<string, string> = {}
@@ -152,7 +153,7 @@ export function mappedRows(
     day: Record<string, number> = {}
   const index = (col: string) => XLSX.utils.decode_col(col)
   const val = (row: SourceCell[], col: string) =>
-    col ? row[index(col)]?.formatted || '' : ''
+    col && col !== 'none' ? row[index(col)]?.formatted || '' : ''
   function time(value: string, col: string, mode: string) {
     if (!value.trim()) return null
     if (!date)

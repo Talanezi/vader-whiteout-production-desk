@@ -4,7 +4,7 @@ import { join } from 'path';
 import { createHash } from 'crypto';
 import { unicodeFontkit } from '../shotlists/pdf/unicode-font';
 import { wrapCell } from '../shotlists/pdf/spreadsheet';
-import { validateFlow } from './model';
+import { stableJSON, validateFlow } from './model';
 export type FlowPrint = {
   product: 'master' | 'department' | 'rundown';
   paper: 'letter' | 'a4' | 'tabloid' | 'a3';
@@ -32,6 +32,12 @@ export async function renderFlow(
     raw.departments.some((id) => !state.departments[id])
   )
     throw Error('Choose valid print settings.');
+  if (
+    ['actual', 'personnel', 'notes'].some(
+      (k) => typeof (raw as any)[k] !== 'boolean',
+    )
+  )
+    throw Error('Choose valid included fields.');
   const departments = (Object.values(state.departments) as any[])
     .filter((d) => !d.removedAt && raw.departments.includes(d.id))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
@@ -57,6 +63,10 @@ export async function renderFlow(
         : true,
   );
   if (!rows.length) throw Error('There are no events in this print scope.');
+  if (rows.length * Math.max(1, departments.length) > 60000)
+    throw Error(
+      'This output exceeds 60,000 table cells. Choose a smaller department scope.',
+    );
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(unicodeFontkit);
   const font = await pdf.embedFont(
@@ -79,7 +89,7 @@ export async function renderFlow(
       raw.product === 'rundown'
         ? usable - timeWidth
         : Math.min(220, usable * 0.27),
-    departmentWidth = 115;
+    departmentWidth = W >= 1100 ? 92 : 115;
   const count =
       raw.product === 'rundown'
         ? 0
@@ -90,20 +100,48 @@ export async function renderFlow(
     bands: any[][] = [];
   if (!count) bands.push([]);
   else if (!departments.length) throw Error('Choose at least one department.');
-  else
-    for (let i = 0; i < departments.length; i += count)
-      bands.push(departments.slice(i, i + count));
-  const format = (v: string) =>
-    v
-      ? new Intl.DateTimeFormat('en-US', {
-          timeZone: state.meta.zone,
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        }).format(new Date(v))
-      : 'Unscheduled';
+  else {
+    let band: any[] = [];
+    for (let i = 0; i < departments.length; ) {
+      let end = i + 1;
+      while (
+        departments[i].group &&
+        end < departments.length &&
+        departments[end].group === departments[i].group
+      )
+        end++;
+      const group = departments.slice(i, end);
+      for (let j = 0; j < group.length; j += count) {
+        const part = group.slice(j, j + count);
+        if (band.length && band.length + part.length > count) {
+          bands.push(band);
+          band = [];
+        }
+        band.push(...part);
+      }
+      i = end;
+    }
+    if (band.length) bands.push(band);
+  }
+  const format = (v: string) => {
+    if (!v) return 'Unscheduled';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: state.meta.zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(v));
+    const part = (key: string) =>
+      parts.find((p) => p.type === key)?.value || '';
+    const date = `${part('year')}-${part('month')}-${part('day')}`;
+    return (
+      `${part('hour')}:${part('minute')}` +
+      (date !== state.meta.date ? '\n' + date : '')
+    );
+  };
   const shotFor = (e: any) =>
     e.sourceListId === state.meta.listId && source
       ? source.shots[e.shotId]
@@ -113,7 +151,10 @@ export async function renderFlow(
       ? e.duration
       : shotFor(e) &&
           !shotFor(e).deleted &&
-          Number(shotFor(e).estimatedMinutes) > 0
+          shotFor(e).estimatedMinutes !== '' &&
+          shotFor(e).estimatedMinutes != null &&
+          Number.isFinite(Number(shotFor(e).estimatedMinutes)) &&
+          Number(shotFor(e).estimatedMinutes) >= 0
         ? Number(shotFor(e).estimatedMinutes)
         : null;
   const texts = rows.map((e) => {
@@ -170,10 +211,32 @@ export async function renderFlow(
       ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, size)),
     ),
   );
+  const titleLines = wrapCell(String(state.meta.name), usable - 150, font, 15);
+  const docHeader = 52 + titleLines.length * 19;
+  const bandHeadings = bands.map((ds, bi) =>
+    [
+      'Time',
+      'Current Action',
+      ...ds.map(
+        (d) =>
+          (d.group ? d.group + '\n' : '') +
+          d.name.replaceAll('/', ' / ') +
+          (raw.personnel && d.personnel ? '\n' + d.personnel : ''),
+      ),
+    ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, 8)),
+  );
+  const headerHeight = Math.max(
+    ...bandHeadings.map((c) => Math.max(...c.map((l) => l.length)) * 10.5 + 12),
+  );
+  const bodyHeight = H - docHeader - headerHeight - margin - 24;
+  if (bodyHeight < 60)
+    throw Error(
+      'These headings need more page space. Choose larger paper or shorter personnel headings.',
+    );
   const maxLines = rows.map((_, ri) =>
       Math.max(1, ...lines.flatMap((b) => b[ri].map((c) => c.length))),
     ),
-    capacity = Math.floor((H - 155) / leading) - 2;
+    capacity = Math.floor((bodyHeight - 14) / leading);
   // A common row fragmentation plan is shared by every department band.
   const fragments = rows.flatMap((e, ri) => {
     const out: {
@@ -196,7 +259,7 @@ export async function renderFlow(
     used = 0;
   for (const f of fragments) {
     const h = f.length * leading + 14;
-    if (current.length && used + h > H - 155) {
+    if (current.length && used + h > bodyHeight) {
       pages.push(current);
       current = [];
       used = 0;
@@ -205,8 +268,12 @@ export async function renderFlow(
     used += h;
   }
   if (current.length) pages.push(current);
+  if (pages.length * bands.length > 2000)
+    throw Error(
+      'This output exceeds the 2,000-page safety limit. Choose a smaller department scope.',
+    );
   const revision = createHash('sha256')
-      .update(JSON.stringify({ state, source }))
+      .update(stableJSON({ state, source }))
       .digest('hex')
       .slice(0, 10),
     ink = rgb(0.07, 0.12, 0.16),
@@ -216,35 +283,24 @@ export async function renderFlow(
       const page = pdf.addPage([W, H]);
       const draw = (text: string, x: number, y: number, fontSize = size) =>
         page.drawText(text, { x, y, size: fontSize, font, color: ink });
-      const title = wrapCell(String(state.meta.name), usable - 150, font, 17);
-      title.slice(0, 2).forEach((t, i) => draw(t, margin, H - 34 - i * 20, 17));
+      titleLines.forEach((t, i) => draw(t, margin, H - 30 - i * 19, 15));
       draw('WHITEOUT / FLOW OF THE DAY', W - margin - 150, H - 28, 8);
       draw(
         `${state.meta.date || 'Date unconfirmed'} · ${state.meta.zone} · ${raw.product === 'master' ? 'Master Departmental Flow' : raw.product === 'department' ? 'Department Focus' : 'Daily Rundown · condensed'}`,
         margin,
-        H - 76,
+        H - docHeader + 24,
         8,
       );
       draw(
         `Revision ${revision} · ${state.meta.status || 'draft'}`,
         margin,
-        H - 90,
+        H - docHeader + 10,
         8,
       );
-      let y = H - 105,
+      let y = H - docHeader,
         x = margin;
-      const headers = [
-        'Time',
-        'Current Action',
-        ...bands[bi].map(
-          (d) =>
-            d.name + (raw.personnel && d.personnel ? '\n' + d.personnel : ''),
-        ),
-      ];
-      const headingLines = headers.map((v, i) =>
-        wrapCell(v, widths[bi][i] - 12, font, 8),
-      );
-      const headH = Math.max(...headingLines.map((l) => l.length)) * 10.5 + 12;
+      const headingLines = bandHeadings[bi],
+        headH = headerHeight;
       page.drawRectangle({
         x: margin,
         y: y - headH,

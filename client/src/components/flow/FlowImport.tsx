@@ -1,5 +1,5 @@
+import * as Y from 'yjs'
 import { useMemo, useRef, useState } from 'react'
-import type * as Y from 'yjs'
 import { Overlay } from '../whiteout/Overlay'
 import { Button, IconButton } from '../whiteout/Button'
 import Menu from '../whiteout/Menu'
@@ -12,7 +12,7 @@ import {
   type SourceSheet,
   type Mapping,
 } from '../../lib/flow/import'
-import { flowFetch } from '../../lib/flow/api'
+import { uploadWorkbook } from '../../lib/flow/api'
 import { put, addEvent, departments, localParts } from '../../lib/flow/model'
 import { StudioGlyph } from '../storyboards/StudioControls'
 export default function FlowImport({
@@ -38,6 +38,7 @@ export default function FlowImport({
     [progress, setProgress] = useState(0),
     [reviewed, setReviewed] = useState(false),
     [matches, setMatches] = useState<Record<number, string>>({}),
+    [types, setTypes] = useState<Record<number, string>>({}),
     [sourceShots, setSourceShots] = useState<any[]>([])
   const sheet = sheets[sheetIndex]
   const rows = useMemo(
@@ -59,7 +60,7 @@ export default function FlowImport({
     setError('')
     try {
       if (!/\.xlsx$/i.test(f.name)) throw Error('Choose an .xlsx workbook.')
-      setProgress(0.2)
+      setProgress(0)
       const parsed = readWorkbook(await f.arrayBuffer())
       setProgress(1)
       setFile(f)
@@ -100,75 +101,125 @@ export default function FlowImport({
         onClose()
         return
       }
-      const form = new FormData()
-      form.append('file', file)
-      await flowFetch(`/${id}/sources`, { method: 'POST', body: form })
-      const existing = departments(doc),
-        ids: Record<string, string> = {}
-      doc.transact(() => {
-        Object.entries(mapping.departments).forEach(([col, name], i) => {
-          const found = existing.find(
-              (d) => d.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      const stable = async (key: string) => {
+        const hex = [
+          ...new Uint8Array(
+            await crypto.subtle.digest(
+              'SHA-256',
+              new TextEncoder().encode(hash + ':' + sheet.name + ':' + key),
             ),
-            key = found?.id || crypto.randomUUID()
-          ids[col] = key
-          if (!found)
-            put(doc, 'departments', key, {
-              name,
-              personnel:
-                sheet.rows[mapping.personnel - 1]?.[
-                  cols.findIndex((c) => c.value === col)
-                ]?.formatted || '',
-              order: (existing.length + i + 1) * 1024,
-            })
-        })
-        rows.forEach((r) => {
-          const linked = matches[r.row],
-            shot = sourceShots.find((s) => s.id === linked)
-          const event = addEvent(doc, {
-            type: linked ? 'shot' : (r.type as 'custom'),
-            description: linked ? '' : r.description,
-            start: r.start,
-            actualStart: r.actualStart,
-            duration: r.duration,
-            notes:
-              (r.provenance as any).sourceEstimate && !r.duration
-                ? 'Source estimate: ' + (r.provenance as any).sourceEstimate
-                : '',
-            fixed: r.type === 'milestone',
-            provenance: r.provenance,
-            ...(linked
-              ? {
-                  shotId: linked,
-                  sourceListId: String(doc.getMap('meta').get('listId')),
-                  reference: String(shot?.number || r.description),
-                }
-              : {}),
-          })
-          Object.entries(r.instructions).forEach(([col, text]) => {
-            if (text)
-              put(doc, 'instructions', event + ':' + ids[col], {
-                eventId: event,
-                departmentId: ids[col],
-                text,
+          ),
+        ]
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+      }
+      const eventIds = Object.fromEntries(
+          await Promise.all(
+            rows.map(async (r) => [r.row, await stable('row:' + r.row)]),
+          ),
+        ),
+        departmentIds = Object.fromEntries(
+          await Promise.all(
+            Object.keys(mapping.departments).map(async (col) => [
+              col,
+              await stable('department:' + col),
+            ]),
+          ),
+        )
+      const staged = new Y.Doc()
+      Y.applyUpdate(staged, Y.encodeStateAsUpdate(doc))
+      const vector = Y.encodeStateVector(doc)
+      try {
+        const existing = departments(staged),
+          ids: Record<string, string> = {}
+        staged.transact(() => {
+          Object.entries(mapping.departments).forEach(([col, name], i) => {
+            const found = existing.find(
+                (d) =>
+                  d.name.trim().toLowerCase() === name.trim().toLowerCase(),
+              ),
+              key = found?.id || departmentIds[col]
+            ids[col] = key
+            if (found)
+              put(staged, 'departments', key, {
+                personnel:
+                  sheet.rows[mapping.personnel - 1]?.[
+                    cols.findIndex((c) => c.value === col)
+                  ]?.formatted ||
+                  found.personnel ||
+                  '',
+              })
+            if (!found)
+              put(staged, 'departments', key, {
+                name,
+                personnel:
+                  sheet.rows[mapping.personnel - 1]?.[
+                    cols.findIndex((c) => c.value === col)
+                  ]?.formatted || '',
+                order: (existing.length + i + 1) * 1024,
               })
           })
+          rows.forEach((r) => {
+            const linked = matches[r.row],
+              shot = sourceShots.find((s) => s.id === linked)
+            const event = addEvent(staged, {
+              id: eventIds[r.row],
+              type: linked ? 'shot' : ((types[r.row] || r.type) as 'custom'),
+              description: linked ? '' : r.description,
+              start: r.start,
+              actualStart: r.actualStart,
+              duration: r.duration,
+              notes:
+                (r.provenance as any).sourceEstimate && r.duration == null
+                  ? 'Source estimate: ' + (r.provenance as any).sourceEstimate
+                  : '',
+              fixed: (types[r.row] || r.type) === 'milestone',
+              provenance: r.provenance,
+              ...(linked
+                ? {
+                    shotId: linked,
+                    sourceListId: String(doc.getMap('meta').get('listId')),
+                    reference: String(shot?.number || r.description),
+                  }
+                : {}),
+            })
+            Object.entries(r.instructions).forEach(([col, text]) => {
+              if (text)
+                put(staged, 'instructions', event + ':' + ids[col], {
+                  eventId: event,
+                  departmentId: ids[col],
+                  text,
+                })
+            })
+          })
+          put(staged, 'imports', batch, {
+            sha256: hash,
+            sheet: sheet.name,
+            mapping,
+            metadata: {
+              range: sheet.range,
+              merges: sheet.merges,
+              columns: sheet.columns,
+              rows: sheet.rowMetadata,
+            },
+            filename: file.name,
+            createdAt: new Date().toISOString(),
+            count: rows.length,
+          })
         })
-        put(doc, 'imports', batch, {
-          sha256: hash,
-          sheet: sheet.name,
-          mapping,
-          metadata: {
-            range: sheet.range,
-            merges: sheet.merges,
-            columns: sheet.columns,
-            rows: sheet.rowMetadata,
-          },
-          filename: file.name,
-          createdAt: new Date().toISOString(),
-          count: rows.length,
-        })
-      })
+
+        const delta = Y.encodeStateAsUpdate(staged, vector)
+        if (delta.byteLength > 2 * 1024 * 1024 - 1024)
+          throw Error(
+            'This mapped worksheet exceeds one safe collaborative import. Import a smaller worksheet; no Flow events have been added.',
+          )
+        setProgress(0)
+        await uploadWorkbook(id, file, setProgress)
+        if (!doc.getMap('imports').has(batch)) Y.applyUpdate(doc, delta)
+      } finally {
+        staged.destroy()
+      }
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -193,7 +244,7 @@ export default function FlowImport({
         }}
         items={[
           {
-            value: '',
+            value: key === 'planned' ? 'none' : '',
             label:
               key === 'planned' ? 'Do not assign planned times' : 'Not mapped',
           },
@@ -385,6 +436,35 @@ export default function FlowImport({
                     />
                   </label>
                 ))}
+                <Menu
+                  label="Map another column"
+                  items={cols
+                    .filter(
+                      (c) =>
+                        ![
+                          mapping?.action,
+                          mapping?.estimate,
+                          mapping?.planned,
+                          mapping?.secondary,
+                          ...Object.keys(mapping?.departments || {}),
+                        ].includes(c.value),
+                    )
+                    .map((c) => ({
+                      ...c,
+                      onSelect: () =>
+                        setMapping((m) =>
+                          m
+                            ? {
+                                ...m,
+                                departments: {
+                                  ...m.departments,
+                                  [c.value]: c.label,
+                                },
+                              }
+                            : m,
+                        ),
+                    }))}
+                />
               </fieldset>
             </aside>
             <main>
@@ -400,11 +480,23 @@ export default function FlowImport({
                             <td
                               key={c.address}
                               title={c.address}
-                              style={{
-                                background: (c.style as any)?.fgColor?.rgb
-                                  ? '#' + (c.style as any).fgColor.rgb
-                                  : undefined,
-                              }}
+                              style={(() => {
+                                const hex = (c.style as any)?.fgColor?.rgb as
+                                  | string
+                                  | undefined
+                                if (!hex) return {}
+                                const color = hex.slice(-6),
+                                  v = parseInt(color, 16),
+                                  light =
+                                    (v >> 16) * 0.2126 +
+                                      ((v >> 8) & 255) * 0.7152 +
+                                      (v & 255) * 0.0722 >
+                                    110
+                                return {
+                                  background: '#' + color,
+                                  color: light ? '#172b3a' : '#f4f8fb',
+                                }
+                              })()}
                             >
                               {c.formatted}
                             </td>
@@ -443,10 +535,20 @@ export default function FlowImport({
                           )}
                         </td>
                         <td>
-                          <input
-                            aria-label={`Event type for source row ${r.row}`}
-                            value={r.type}
-                            readOnly
+                          <Menu
+                            label={types[r.row] || r.type}
+                            value={types[r.row] || r.type}
+                            onChange={(v) =>
+                              setTypes((t) => ({ ...t, [r.row]: v }))
+                            }
+                            items={[
+                              { value: 'custom', label: 'Custom action' },
+                              { value: 'milestone', label: 'Shared milestone' },
+                              {
+                                value: 'department',
+                                label: 'Department activity',
+                              },
+                            ]}
                           />
                           {r.description || 'Department activity'}
                         </td>

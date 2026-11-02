@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSortable } from '@dnd-kit/react/sortable'
+import { useDraggable } from '@dnd-kit/react'
 import type * as Y from 'yjs'
 import { Link } from 'react-router-dom'
 import { SearchField } from '../whiteout/Workspace'
@@ -16,7 +16,6 @@ import type { FlowEvent } from '../../lib/flow/model'
 import { boardRequest } from '../../lib/storyboards/api'
 function RailShot({
   shot,
-  index,
   doc,
   scope,
   count,
@@ -31,13 +30,9 @@ function RailShot({
   onAdd: (s: Y.Map<unknown>) => void
   onSelect: () => void
 }) {
-  const s = useSortable({
+  const s = useDraggable({
     id: 'rail:' + str(shot, 'id'),
-    index,
-    group: 'flow-rail',
     type: scope,
-    accept: scope,
-    transition: { duration: 150 },
   })
   return (
     <article

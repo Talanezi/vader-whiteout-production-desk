@@ -36,3 +36,43 @@ export async function flowRequest<T>(
     )
   ).json()
 }
+
+/** Same private authenticated upload contract as M04, scoped to Flow originals. */
+export function uploadWorkbook(
+  id: string,
+  file: File,
+  onProgress: (n: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', flowBase + '/' + id + '/sources')
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (getAuthToken() || ''))
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total)
+    }
+    xhr.onerror = () =>
+      reject(
+        Error('Upload interrupted. The original is safe; retry the import.'),
+      )
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1)
+        resolve()
+      } else {
+        let data
+        try {
+          data = JSON.parse(xhr.responseText)
+        } catch {}
+        reject(
+          Error(
+            data?.message ||
+              'Could not preserve the private original. Retry the upload.',
+          ),
+        )
+      }
+    }
+    const form = new FormData()
+    form.append('file', file)
+    xhr.send(form)
+  })
+}

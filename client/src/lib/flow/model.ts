@@ -30,19 +30,32 @@ export function records<T>(d: Y.Doc, k: string): T[] {
 }
 export function put(
   d: Y.Doc,
-  k: string,
+  collection: string,
   id: string,
   value: Record<string, unknown>,
 ) {
   d.transact(() => {
-    let m = d.getMap<Y.Map<unknown>>(k).get(id)
+    let m = d.getMap<Y.Map<unknown>>(collection).get(id)
     if (!m) {
       m = new Y.Map()
-      d.getMap(k).set(id, m)
+      d.getMap(collection).set(id, m)
       m.set('id', id)
     }
     Object.entries(value).forEach(([k, v]) => {
-      if (v !== undefined) m!.set(k, v)
+      if (v === undefined) return
+      if (
+        typeof v === 'string' &&
+        (((k === 'description' || k === 'notes') && collection === 'events') ||
+          (k === 'text' && collection === 'instructions'))
+      ) {
+        const existing = m!.get(k)
+        if (existing instanceof Y.Text) {
+          if (existing.toString() !== v) {
+            existing.delete(0, existing.length)
+            existing.insert(0, v)
+          }
+        } else m!.set(k, new Y.Text(v))
+      } else m!.set(k, v)
     })
   })
 }
