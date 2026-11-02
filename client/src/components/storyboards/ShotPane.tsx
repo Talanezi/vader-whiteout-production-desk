@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import * as Y from 'yjs'
 import { useShotCollaboration } from '../../lib/useShotCollaboration'
 import { ordered, shots, scenes, str, fields } from '../../lib/shotDocument'
+import { change, type ShotField } from '../../lib/shotDocument'
+import { validateValue } from '../../lib/shotClipboard'
+import ShotChoice from '../shots/ShotChoice'
+import DotsLoader from '../whiteout/DotsLoader'
 import CollaborativeText from '../shots/CollaborativeText'
 import { SearchField } from '../whiteout/Workspace'
 import { LoadingRows, ErrorNotice } from '../whiteout/Feedback'
@@ -20,7 +24,8 @@ export default function ShotPane({
 }) {
   const c = useShotCollaboration(listId),
     [search, setSearch] = useState(''),
-    [expanded, setExpanded] = useState('')
+    [expanded, setExpanded] = useState(''),
+    [error, setError] = useState('')
   if (!c.synced)
     return c.error ? (
       <ErrorNotice>{c.error}</ErrorNotice>
@@ -49,11 +54,14 @@ export default function ShotPane({
         </Link>
         {!c.saved && (
           <span role="status">
-            {c.connected ? 'Syncing…' : 'Reconnecting…'}
+            <>
+              <DotsLoader small />
+              {c.connected ? 'Syncing…' : 'Reconnecting…'}
+            </>
           </span>
         )}
       </div>
-      {c.error && <ErrorNotice>{c.error}</ErrorNotice>}
+      {(c.error || error) && <ErrorNotice>{c.error || error}</ErrorNotice>}
       <SearchField
         label="Search linked shots"
         placeholder="Search shots..."
@@ -119,21 +127,55 @@ export default function ShotPane({
                       <dl>
                         {(
                           [
+                            'subject',
+                            'camera',
+                            'framing',
+                            'lens',
                             'angle',
                             'equipment',
                             'movement',
                             'notes',
-                            'focusNotes',
-                            'lightingNotes',
-                          ] as const
-                        )
-                          .filter((k) => str(s, k))
-                          .map((k) => (
-                            <div key={k}>
-                              <dt>{fields[k]}</dt>
-                              <dd>{str(s, k)}</dd>
-                            </div>
-                          ))}
+                          ] as ShotField[]
+                        ).map((field) => (
+                          <div key={field}>
+                            <dt>{fields[field]}</dt>
+                            <dd>
+                              {s.get(field) instanceof Y.Text && c.provider ? (
+                                <CollaborativeText
+                                  text={s.get(field) as Y.Text}
+                                  provider={c.provider}
+                                  undo={c.undo}
+                                  compact
+                                  label={`${fields[field]} ${str(s, 'number')}`}
+                                  onFocus={() => onSelect(id)}
+                                />
+                              ) : (
+                                <ShotChoice
+                                  doc={c.doc}
+                                  field={field}
+                                  label={`${fields[field]} ${str(s, 'number')}`}
+                                  value={str(s, field)}
+                                  onFocus={() => onSelect(id)}
+                                  onChange={(value) => {
+                                    try {
+                                      validateValue(field, value)
+                                      change(
+                                        c.doc,
+                                        s,
+                                        field,
+                                        value,
+                                        c.session?.user.id,
+                                      )
+                                      setError('')
+                                    } catch (e) {
+                                      setError((e as Error).message)
+                                    }
+                                  }}
+                                />
+                              )}
+                            </dd>
+                          </div>
+                        ))}
                         <Link
                           to={`/shotlists/${listId}?shot=${id}&scene=${str(s, 'sceneId')}`}
                         >

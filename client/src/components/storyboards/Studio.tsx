@@ -16,6 +16,13 @@ import DotsLoader from '../whiteout/DotsLoader'
 import InlineDelete from '../whiteout/InlineDelete'
 import Menu from '../whiteout/Menu'
 import { Button } from '../whiteout/Button'
+import {
+  strokeIntersects,
+  trimStroke,
+  recognizeShape,
+} from '../../lib/storyboards/creativeGeometry'
+import { compositionPixels } from '../../lib/storyboards/sampleComposition'
+import DrawCheckbox from '../whiteout/DrawCheckbox'
 import './studio.css'
 type Tool =
   | 'select'
@@ -133,6 +140,7 @@ export default function Studio({
   objects,
   onCommit,
   onRemove,
+  onBatch,
   annotating = false,
   visible = true,
   onUndo,
@@ -141,11 +149,13 @@ export default function Studio({
   canRedo = false,
   onZoomChange,
   nativeHeight = 562.5,
+  frame,
 }: {
   url?: string
   objects: Annotation[]
   onCommit: (a: Annotation, continuous?: boolean) => void
   onRemove: (id: string) => void
+  onBatch?: (remove: string[], add: Annotation[]) => void
   annotating?: boolean
   visible?: boolean
   onUndo?: () => void
@@ -154,6 +164,7 @@ export default function Studio({
   canRedo?: boolean
   onZoomChange?: (z: number) => void
   nativeHeight?: number
+  frame?: { height: number; fit: 'contain' | 'crop' }
 }) {
   const host = useRef<HTMLDivElement>(null),
     svg = useRef<SVGSVGElement>(null),
@@ -208,6 +219,51 @@ export default function Studio({
         }
       | undefined
     >(undefined)
+  const [inputMode, setInputMode] = useState(
+      () => localStorage.getItem('whiteout:studio-input') || 'auto',
+    ),
+    [assist, setAssist] = useState(
+      () => localStorage.getItem('whiteout:studio-shapes') !== 'false',
+    ),
+    [settings, setSettings] = useState(false),
+    [eraseMode, setEraseMode] = useState('whole'),
+    [radius, setRadius] = useState(18),
+    [cursor, setCursor] = useState<number[]>(),
+    [eraseView, setEraseView] = useState<{
+      remove: string[]
+      add: Annotation[]
+    }>(),
+    [sampling, setSampling] = useState(false),
+    [sampleColor, setSampleColor] = useState('#ffffff')
+  const lastPen = useRef(0),
+    hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+    recognized = useRef<Annotation | undefined>(undefined),
+    sampler = useRef<Awaited<ReturnType<typeof compositionPixels>> | undefined>(
+      undefined,
+    ),
+    erasing = useRef<
+      | {
+          last: number[]
+          remove: Set<string>
+          parts: Map<string, Annotation[]>
+          paths: Map<string, number[][]>
+        }
+      | undefined
+    >(undefined)
+  useEffect(() => () => clearTimeout(hold.current), [])
+  useEffect(() => {
+    if (!annotating) {
+      clearTimeout(hold.current)
+      erasing.current = undefined
+      setEraseView(undefined)
+      gesture.current = undefined
+      current.current = undefined
+      pointers.current.clear()
+      pinch.current = undefined
+      cancelPreview()
+      setDraft(undefined)
+    }
+  }, [annotating])
   const width = widths[tool] || 4,
     setWidth = (n: number) => setWidths((old) => ({ ...old, [tool]: n }))
   const penPath = useRef<Annotation | undefined>(undefined),
@@ -237,11 +293,30 @@ export default function Studio({
       setLegacyBounds([b.x, b.y, b.x + b.width, b.y + b.height])
     }
   }, [selected, objects, height])
-  const fit = Math.min(size.width / 1000, size.height / height) * 0.93,
-    scale = fit * zoom,
+  const frameHeight = frame?.height || height,
+    inner =
+      frame?.fit === 'crop'
+        ? Math.max(1, frameHeight / height)
+        : Math.min(1, frameHeight / height),
+    frameScale =
+      Math.min(size.width / 1000, size.height / frameHeight) * 0.93 * zoom,
+    scale = frameScale * inner,
+    inset = {
+      x: (1000 - 1000 * inner) / 2,
+      y: (frameHeight - height * inner) / 2,
+    },
     offset = {
-      x: (size.width - 1000 * scale) / 2 + pan.x,
-      y: (size.height - height * scale) / 2 + pan.y,
+      x: (size.width - 1000 * frameScale) / 2 + pan.x + inset.x * frameScale,
+      y:
+        (size.height - frameHeight * frameScale) / 2 +
+        pan.y +
+        inset.y * frameScale,
+    },
+    frameBox = {
+      x: -inset.x / inner,
+      y: -inset.y / inner,
+      width: 1000 / inner,
+      height: frameHeight / inner,
     }
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([e]) =>
@@ -310,12 +385,26 @@ export default function Studio({
       }
       const t = tools.find((x) => x[2].toLowerCase() === e.key.toLowerCase())
       if (t) {
+        clearTimeout(hold.current)
+        if (gesture.current) {
+          gesture.current = undefined
+          current.current = undefined
+          cancelPreview()
+          setDraft(undefined)
+          erasing.current = undefined
+          setEraseView(undefined)
+        }
         e.preventDefault()
         if (penPath.current) finishPen()
         setTool(t[0])
         setSelected('')
       }
       if (e.key === 'Escape') {
+        clearTimeout(hold.current)
+        setSampling(false)
+        sampler.current = undefined
+        erasing.current = undefined
+        setEraseView(undefined)
         cancelPreview()
         setSelected('')
         setText(undefined)
@@ -366,6 +455,19 @@ export default function Studio({
     // Legacy objects retain their original editable parameters and exact geometry algorithm.
     // All newly authored objects are explicitly tagged for the actual VectorCraft path.
     if (!a.engine) return a
+    if (a.engine.includes('fragment')) {
+      const points = a.points.map((p) => [p[0] * 1000, p[1] * height])
+      return {
+        ...a,
+        path: points.map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`).join(' '),
+        bounds: [
+          Math.min(...points.map((p) => p[0])),
+          Math.min(...points.map((p) => p[1])),
+          Math.max(...points.map((p) => p[0])),
+          Math.max(...points.map((p) => p[1])),
+        ],
+      }
+    }
     const op =
       a.type === 'pen' ? 'brush' : a.type === 'path' ? 'bezier' : a.type
     const geometry = engine.geometry({
@@ -410,9 +512,207 @@ export default function Studio({
         }
       })
   }
+  function world(p: number[], a: Annotation) {
+    const angle = ((a.rotation || 0) * Math.PI) / 180,
+      x = p[0] * (a.scale || 1),
+      y = p[1] * (a.scale || 1)
+    return [
+      a.x * 1000 + x * Math.cos(angle) - y * Math.sin(angle),
+      a.y * height + x * Math.sin(angle) + y * Math.cos(angle),
+      p[2] ?? 0.5,
+    ]
+  }
+  function trace(a: Annotation) {
+    if (['pen', 'highlight'].includes(a.type) || a.engine?.includes('fragment'))
+      return a.points.map((p) =>
+        world([p[0] * 1000, p[1] * height, p[2] ?? 0.5], a),
+      )
+    const group = svg.current?.querySelector<SVGGElement>(
+        `[data-object="${a.id}"]`,
+      ),
+      path = group?.querySelector<SVGPathElement>(':scope > path')
+    if (path) {
+      const length = path.getTotalLength(),
+        count = Math.max(2, Math.min(2048, Math.ceil(length / 2)))
+      return Array.from({ length: count + 1 }, (_, i) => {
+        const p = path.getPointAtLength((length * i) / count)
+        return world([p.x, p.y], a)
+      })
+    }
+    if (group) {
+      const b = group.getBBox()
+      return [
+        [b.x, b.y],
+        [b.x + b.width, b.y],
+        [b.x + b.width, b.y + b.height],
+        [b.x, b.y + b.height],
+        [b.x, b.y],
+      ].map((p) => world(p, a))
+    }
+    return []
+  }
+  function eraseTo(p: number[]) {
+    const state = erasing.current
+    if (!state) return
+    const sweep = [state.last, p],
+      r = eraseMode === 'partial' ? radius : Math.max(5 / scale, 3)
+    for (const original of objects) {
+      const paths = state.parts.get(original.id) || [original]
+      if (eraseMode === 'whole') {
+        if (state.remove.has(original.id)) continue
+        const points = state.paths.get(original.id) || trace(original)
+        state.paths.set(original.id, points)
+        if (
+          strokeIntersects(
+            points,
+            sweep,
+            r + (original.width * 1000 * (original.scale || 1)) / 2,
+          )
+        )
+          state.remove.add(original.id)
+      } else {
+        if (!['pen', 'highlight', 'path', 'line'].includes(original.type))
+          continue
+        const next: Annotation[] = []
+        let changed = false
+        for (const a of paths) {
+          const points = trace(a),
+            rr = r + (a.width * 1000 * (a.scale || 1)) / 2
+          if (!strokeIntersects(points, sweep, rr)) {
+            next.push(a)
+            continue
+          }
+          changed = true
+          const fragments = trimStroke(points, sweep, rr)
+          fragments.forEach((points, i) => {
+            const id = i === 0 ? a.id : crypto.randomUUID()
+            if (['pen', 'highlight'].includes(a.type))
+              next.push(
+                calculate({
+                  ...a,
+                  id,
+                  x: 0,
+                  y: 0,
+                  scale: 1,
+                  rotation: 0,
+                  points: points.map((p) => [
+                    p[0] / 1000,
+                    p[1] / height,
+                    p[2] ?? 0.5,
+                  ]),
+                  width: a.width * (a.scale || 1),
+                }),
+              )
+            else {
+              const path = points
+                  .map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`)
+                  .join(' '),
+                xs = points.map((p) => p[0]),
+                ys = points.map((p) => p[1])
+              next.push({
+                ...a,
+                id,
+                engine: 'vectorcraft-fragment-v1',
+                path,
+                filled: false,
+                x: 0,
+                y: 0,
+                scale: 1,
+                rotation: 0,
+                width: a.width * (a.scale || 1),
+                points: points.map((p) => [p[0] / 1000, p[1] / height, 0.5]),
+                bounds: [
+                  Math.min(...xs),
+                  Math.min(...ys),
+                  Math.max(...xs),
+                  Math.max(...ys),
+                ],
+              })
+            }
+          })
+        }
+        if (changed) {
+          state.remove.add(original.id)
+          state.parts.set(original.id, next)
+        }
+      }
+    }
+    state.last = p
+    setEraseView({
+      remove: [...state.remove],
+      add: eraseMode === 'partial' ? [...state.parts.values()].flat() : [],
+    })
+  }
+  function armHold(a: Annotation) {
+    clearTimeout(hold.current)
+    recognized.current = undefined
+    if (!assist || tool !== 'brush' || a.points.length < 5) return
+    hold.current = setTimeout(() => {
+      const candidate = recognizeShape(
+        a.points.map((p) => [p[0] * 1000, p[1] * height, p[2] ?? 0.5]),
+      )
+      if (!candidate) return
+      try {
+        const corrected = calculate({
+          ...a,
+          type: candidate.type,
+          points: candidate.points.map((p) => [
+            p[0] / 1000,
+            p[1] / height,
+            0.5,
+          ]),
+        })
+        recognized.current = corrected
+        setDraft(corrected)
+      } catch {}
+    }, 800)
+  }
+  async function pickColor() {
+    const System = (
+      window as unknown as {
+        EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> }
+      }
+    ).EyeDropper
+    if (System) {
+      try {
+        const result = await new System().open()
+        setColor(result.sRGBHex)
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
+      }
+    }
+    try {
+      const group = svg.current?.querySelector<SVGGElement>(
+        '.sb-studio-composition',
+      )
+      if (!group) return
+      sampler.current = await compositionPixels(group, height, frameBox)
+      setProperties(false)
+      setSampling(true)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
   function down(e: ReactPointerEvent<SVGSVGElement>) {
     if (e.button !== 0) return
     e.preventDefault()
+    if (sampling) {
+      const p = point(e)
+      if (
+        sampler.current &&
+        p[0] >= frameBox.x &&
+        p[0] <= frameBox.x + frameBox.width &&
+        p[1] >= frameBox.y &&
+        p[1] <= frameBox.y + frameBox.height
+      )
+        setColor(sampler.current.sample(p[0], p[1]))
+      setSampling(false)
+      return
+    }
+    clearTimeout(hold.current)
+    recognized.current = undefined
+    if (e.pointerType === 'pen') lastPen.current = Date.now()
     const penActive = [...pointers.current.values()].some(
       (p) => p.type === 'pen',
     )
@@ -428,13 +728,20 @@ export default function Studio({
       current.current = undefined
       setDraft(undefined)
     }
-    e.currentTarget.setPointerCapture(e.pointerId)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* A cancelled or synthetic pointer may already be inactive. */
+    }
     pointers.current.set(e.pointerId, {
       x: e.clientX,
       y: e.clientY,
       type: e.pointerType,
     })
     if (pointers.current.size === 2) {
+      clearTimeout(hold.current)
+      erasing.current = undefined
+      setEraseView(undefined)
       cancelPreview()
       const [a, b] = [...pointers.current.values()]
       pinch.current = {
@@ -457,7 +764,14 @@ export default function Studio({
       handle = (e.target as Element).closest(
         '[data-handle]',
       ) as SVGElement | null
-    if (!annotating || tool === 'hand' || e.altKey) {
+    if (
+      !annotating ||
+      tool === 'hand' ||
+      e.altKey ||
+      (e.pointerType === 'touch' &&
+        (inputMode === 'navigate' ||
+          (inputMode === 'auto' && lastPen.current > 0)))
+    ) {
       gesture.current = {
         kind: 'pan',
         start: p,
@@ -471,7 +785,19 @@ export default function Studio({
       return
     }
     if (tool === 'erase') {
-      if (object) onRemove(object.id)
+      erasing.current = {
+        last: p,
+        remove: new Set(),
+        parts: new Map(),
+        paths: new Map(),
+      }
+      gesture.current = {
+        kind: 'erase',
+        start: p,
+        client: [e.clientX, e.clientY],
+        pan,
+      }
+      eraseTo(p)
       return
     }
     if (tool === 'text' && object?.type === 'text') {
@@ -493,7 +819,13 @@ export default function Studio({
       } else setSelected('')
       return
     }
-    if (p[0] < 0 || p[0] > 1000 || p[1] < 0 || p[1] > height) return
+    if (
+      p[0] < frameBox.x ||
+      p[0] > frameBox.x + frameBox.width ||
+      p[1] < frameBox.y ||
+      p[1] > frameBox.y + frameBox.height
+    )
+      return
     setSelected('')
     const a: Annotation = {
       id: crypto.randomUUID(),
@@ -515,7 +847,7 @@ export default function Studio({
         [
           p[0] / 1000,
           p[1] / height,
-          e.pointerType === 'pen' ? e.pressure : 0.5,
+          e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5,
         ],
       ],
     }
@@ -570,6 +902,18 @@ export default function Studio({
     preview(a)
   }
   function move(e: ReactPointerEvent<SVGSVGElement>) {
+    if (sampling || tool === 'erase') {
+      const p = point(e)
+      setCursor(p)
+      if (sampling && sampler.current)
+        setSampleColor(sampler.current.sample(p[0], p[1]))
+    }
+    if (gesture.current?.kind === 'erase') {
+      const samples = e.nativeEvent.getCoalescedEvents?.() || []
+      for (const sample of samples.length ? samples : [e.nativeEvent])
+        eraseTo(point(sample))
+      return
+    }
     if (pointers.current.has(e.pointerId))
       pointers.current.set(e.pointerId, {
         x: e.clientX,
@@ -688,7 +1032,8 @@ export default function Studio({
     if (!a) return
     let points = a.points
     if (a.type === 'pen' || a.type === 'highlight') {
-      const samples = e.nativeEvent.getCoalescedEvents?.() || [e.nativeEvent]
+      const coalesced = e.nativeEvent.getCoalescedEvents?.() || []
+      const samples = coalesced.length ? coalesced : [e.nativeEvent]
       points = [
         ...points,
         ...samples.map((s) => {
@@ -696,7 +1041,7 @@ export default function Studio({
           return [
             q[0] / 1000,
             q[1] / height,
-            s.pointerType === 'pen' ? s.pressure : 0.5,
+            s.pointerType === 'pen' && s.pressure > 0 ? s.pressure : 0.5,
           ]
         }),
       ]
@@ -721,10 +1066,30 @@ export default function Studio({
         [x, y, 0.5],
       ]
     } else points = [points[0], [p[0] / 1000, p[1] / height, 0.5]]
-    preview({ ...a, points })
+    const next = { ...a, points }
+    preview(next)
+    armHold(next)
   }
   function finish(e: ReactPointerEvent<SVGSVGElement>, cancel = false) {
+    clearTimeout(hold.current)
     pointers.current.delete(e.pointerId)
+    if (gesture.current?.kind === 'erase') {
+      if (!cancel) eraseTo(point(e))
+      const state = erasing.current
+      erasing.current = undefined
+      gesture.current = undefined
+      setEraseView(undefined)
+      if (!cancel && state && state.remove.size) {
+        const remove = [...state.remove],
+          add = eraseMode === 'partial' ? [...state.parts.values()].flat() : []
+        if (onBatch) onBatch(remove, add)
+        else {
+          remove.forEach(onRemove)
+          add.forEach((a) => onCommit(a))
+        }
+      }
+      return
+    }
     if (pinch.current) {
       if (!pointers.current.size) pinch.current = undefined
       return
@@ -754,6 +1119,8 @@ export default function Studio({
       try {
         const value = a.engine ? a : calculate(a)
         onCommit(calculate(value))
+        if (recognized.current) onCommit(recognized.current)
+        recognized.current = undefined
         setSelected(value.id)
       } catch (err) {
         setError((err as Error).message)
@@ -775,7 +1142,10 @@ export default function Studio({
     if (content.trim()) onCommit({ ...text, text: content })
     setText(undefined)
   }
-  const display = objects.map((a) => (draft?.id === a.id ? draft : a))
+  const display = objects
+    .filter((a) => !eraseView?.remove.includes(a.id))
+    .map((a) => (draft?.id === a.id ? draft : a))
+  if (eraseView) display.push(...eraseView.add)
   if (draft && !display.some((a) => a.id === draft.id)) display.push(draft)
   const selectedObject = display.find((a) => a.id === selected),
     bounds =
@@ -849,6 +1219,16 @@ export default function Studio({
       <svg
         ref={svg}
         className="sb-studio-canvas"
+        style={{
+          cursor: sampling
+            ? 'crosshair'
+            : tool === 'erase'
+              ? 'none'
+              : undefined,
+        }}
+        onContextMenu={(e) => {
+          if (annotating) e.preventDefault()
+        }}
         aria-label={
           annotating ? 'Storyboard drawing canvas' : 'Storyboard artwork'
         }
@@ -859,7 +1239,7 @@ export default function Studio({
         onPointerUp={(e) => finish(e)}
         onPointerCancel={(e) => finish(e, true)}
         onLostPointerCapture={(e) => {
-          if (gesture.current) finish(e, true)
+          if (pointers.current.has(e.pointerId)) finish(e, true)
         }}
         onDoubleClick={(e) => {
           if (tool === 'pen' && penPath.current) {
@@ -879,11 +1259,11 @@ export default function Studio({
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
           <defs>
             <clipPath id="studio-frame">
-              <rect width="1000" height={height} />
+              <rect {...frameBox} />
             </clipPath>
           </defs>
-          <g clipPath="url(#studio-frame)">
-            <rect width="1000" height={height} fill="#fff" />
+          <g className="sb-studio-composition" clipPath="url(#studio-frame)">
+            <rect {...frameBox} fill="#fff" />
             {url && (
               <image
                 href={url}
@@ -906,6 +1286,36 @@ export default function Studio({
                 </g>
               ))}
           </g>
+          {annotating && cursor && (tool === 'erase' || sampling) && (
+            <g pointerEvents="none">
+              <circle
+                cx={cursor[0]}
+                cy={cursor[1]}
+                r={
+                  sampling
+                    ? 8 / scale
+                    : eraseMode === 'partial'
+                      ? radius
+                      : 6 / scale
+                }
+                fill={sampling ? sampleColor : 'rgba(130,210,250,.1)'}
+                stroke="#318bbc"
+                strokeWidth={1.5 / scale}
+              />
+              {sampling && (
+                <rect
+                  x={cursor[0] + 14 / scale}
+                  y={cursor[1] - 35 / scale}
+                  width={32 / scale}
+                  height={24 / scale}
+                  rx={4 / scale}
+                  fill={sampleColor}
+                  stroke="#fff"
+                  strokeWidth={2 / scale}
+                />
+              )}
+            </g>
+          )}
           {annotating && tool === 'select' && selectedObject && bounds && (
             <g
               data-edit-object={selectedObject.id}
@@ -1074,6 +1484,15 @@ export default function Studio({
               label={`${label} (${key})`}
               active={tool === id}
               onClick={() => {
+                clearTimeout(hold.current)
+                cancelPreview()
+                gesture.current = undefined
+                current.current = undefined
+                erasing.current = undefined
+                setEraseView(undefined)
+                setDraft(undefined)
+                setSampling(false)
+                if (penPath.current) finishPen()
                 setTool(id)
                 setProperties(false)
               }}
@@ -1113,7 +1532,9 @@ export default function Studio({
                 ? 'Object'
                 : tool === 'text'
                   ? 'Text'
-                  : 'Brush'}
+                  : tool === 'erase'
+                    ? 'Eraser'
+                    : 'Brush'}
             </span>
             <small>{Math.round(shownWidth)} px</small>
             <StudioGlyph name="settings" />
@@ -1147,63 +1568,155 @@ export default function Studio({
                   }}
                 />
               )}
-              <StudioColor
-                value={shownColor}
+              {tool === 'erase' ? (
+                <>
+                  <Menu
+                    ariaLabel="Eraser mode"
+                    label={eraseMode === 'partial' ? 'Partial' : 'Whole stroke'}
+                    value={eraseMode}
+                    items={[
+                      { value: 'partial', label: 'Partial' },
+                      { value: 'whole', label: 'Whole stroke' },
+                    ]}
+                    onChange={setEraseMode}
+                  />
+                  {eraseMode === 'partial' && (
+                    <>
+                      <label>
+                        Radius <output>{radius} px</output>
+                        <input
+                          aria-label="Eraser radius"
+                          type="range"
+                          min="3"
+                          max="80"
+                          value={radius}
+                          onChange={(e) => setRadius(Number(e.target.value))}
+                        />
+                      </label>
+                      <small>
+                        Trims strokes and paths; use Whole stroke for shapes and
+                        text.
+                      </small>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <StudioColor
+                    onSample={pickColor}
+                    value={shownColor}
+                    onChange={(v) => {
+                      if (tool === 'select' && active) style({ color: v })
+                      else setColor(v)
+                    }}
+                  />
+                  <label>
+                    {tool === 'text' ||
+                    (tool === 'select' && active?.type === 'text')
+                      ? 'Text size'
+                      : 'Width'}{' '}
+                    <output>{Math.round(shownWidth)} px</output>
+                    <input
+                      aria-label={
+                        tool === 'select' && active
+                          ? active.type === 'text'
+                            ? 'Object font size'
+                            : 'Object width'
+                          : tool === 'text'
+                            ? 'Text size'
+                            : 'Brush width'
+                      }
+                      type="range"
+                      min="1"
+                      max={
+                        tool === 'text' || active?.type === 'text' ? 100 : 48
+                      }
+                      value={shownWidth}
+                      onChange={(e) => {
+                        const n = Number(e.target.value)
+                        if (tool === 'select' && active)
+                          style(
+                            active.type === 'text'
+                              ? { fontSize: n }
+                              : { width: n / 1000 },
+                          )
+                        else setWidth(n)
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Opacity <output>{Math.round(shownOpacity * 100)}%</output>
+                    <input
+                      aria-label="Drawing opacity"
+                      type="range"
+                      min=".05"
+                      max="1"
+                      step=".05"
+                      value={shownOpacity}
+                      onChange={(e) => {
+                        const n = Number(e.target.value)
+                        if (tool === 'select' && active) style({ opacity: n })
+                        else setOpacity(n)
+                      }}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {annotating && (
+        <div className="sb-input-settings">
+          <StudioIcon
+            name="settings"
+            label="Studio input settings"
+            active={settings}
+            onClick={() => setSettings((v) => !v)}
+          />
+          {settings && (
+            <div className="sb-tool-properties">
+              <strong>Input</strong>
+              <Menu
+                ariaLabel="Drawing input"
+                label={
+                  inputMode === 'auto'
+                    ? 'Auto'
+                    : inputMode === 'touch'
+                      ? 'Touch Drawing'
+                      : 'Navigation Only'
+                }
+                value={inputMode}
                 onChange={(v) => {
-                  if (tool === 'select' && active) style({ color: v })
-                  else setColor(v)
+                  setInputMode(v)
+                  localStorage.setItem('whiteout:studio-input', v)
                 }}
+                items={[
+                  { value: 'auto', label: 'Auto' },
+                  { value: 'touch', label: 'Touch Drawing' },
+                  { value: 'navigate', label: 'Navigation Only' },
+                ]}
               />
-              <label>
-                {tool === 'text' ||
-                (tool === 'select' && active?.type === 'text')
-                  ? 'Text size'
-                  : 'Width'}{' '}
-                <output>{Math.round(shownWidth)} px</output>
-                <input
-                  aria-label={
-                    tool === 'select' && active
-                      ? active.type === 'text'
-                        ? 'Object font size'
-                        : 'Object width'
-                      : tool === 'text'
-                        ? 'Text size'
-                        : 'Brush width'
-                  }
-                  type="range"
-                  min="1"
-                  max={tool === 'text' || active?.type === 'text' ? 100 : 48}
-                  value={shownWidth}
+              <label className="sb-assist-toggle">
+                <DrawCheckbox
+                  checked={assist}
                   onChange={(e) => {
-                    const n = Number(e.target.value)
-                    if (tool === 'select' && active)
-                      style(
-                        active.type === 'text'
-                          ? { fontSize: n }
-                          : { width: n / 1000 },
-                      )
-                    else setWidth(n)
+                    setAssist(e.target.checked)
+                    localStorage.setItem(
+                      'whiteout:studio-shapes',
+                      String(e.target.checked),
+                    )
                   }}
                 />
-              </label>
-              <label>
-                Opacity <output>{Math.round(shownOpacity * 100)}%</output>
-                <input
-                  aria-label="Drawing opacity"
-                  type="range"
-                  min=".05"
-                  max="1"
-                  step=".05"
-                  value={shownOpacity}
-                  onChange={(e) => {
-                    const n = Number(e.target.value)
-                    if (tool === 'select' && active) style({ opacity: n })
-                    else setOpacity(n)
-                  }}
-                />
+                Shape Assistance
               </label>
             </div>
           )}
+        </div>
+      )}
+      {sampling && (
+        <div className="sb-sampling-status" role="status">
+          Sample artwork · Escape to cancel
         </div>
       )}
       {annotating && tool === 'select' && active && (

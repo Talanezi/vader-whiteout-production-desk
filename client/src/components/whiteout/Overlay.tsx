@@ -2,8 +2,7 @@ import { useLayoutEffect, useRef, useId, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, IconButton } from './Button'
 import Icon from './Icon'
-let scrollLocks = 0
-let originalOverflow = ''
+import useDocumentScrollLock from '../../lib/useDocumentScrollLock'
 type Props = {
   title: string
   description?: string
@@ -25,6 +24,7 @@ export function Overlay({
   kind = 'dialog',
   className = '',
 }: Props) {
+  useDocumentScrollLock()
   const ref = useRef<HTMLDialogElement>(null),
     menuEscape = useRef(false),
     titleId = useId(),
@@ -34,13 +34,8 @@ export function Overlay({
       dialog = ref.current!
     dialog.showModal()
     dialog.querySelector<HTMLElement>('[data-initial-focus]')?.focus()
-    if (scrollLocks++ === 0) {
-      originalOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-    }
     return () => {
       dialog.close()
-      if (--scrollLocks === 0) document.body.style.overflow = originalOverflow
       if (
         previous?.isConnected &&
         (!previous.closest('dialog') || previous.closest('dialog')?.open)

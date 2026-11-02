@@ -13,15 +13,17 @@ export type LinkedSnapshot = {
 }
 export default function ShotPicker({
   initial = [],
+  connectedListId,
   onConfirm,
   onClose,
 }: {
   initial?: ShotLink[]
+  connectedListId?: string
   onConfirm: (links: ShotLink[]) => void
   onClose: () => void
 }) {
   const [lists, setLists] = useState<ShotListMetadata[]>([]),
-    [listId, setListId] = useState(initial[0]?.listId || ''),
+    [listId, setListId] = useState(connectedListId || initial[0]?.listId || ''),
     [data, setData] = useState<LinkedSnapshot>(),
     [search, setSearch] = useState(''),
     [selected, setSelected] = useState(initial),
@@ -49,6 +51,7 @@ export default function ShotPicker({
   const shots = Object.entries(data?.shots || {})
     .filter(
       ([, s]) =>
+        !s.deleted &&
         !s.deletedAt &&
         (!scene || s.sceneId === scene) &&
         [s.number, s.coverage, data?.scenes[String(s.sceneId)]?.number]
@@ -81,7 +84,7 @@ export default function ShotPicker({
       className="sb-shot-picker"
       footer={
         <>
-          <span>{selected.length} selected</span>
+          <span className="sb-picker-count">{selected.length} selected</span>
           <Button disabled={!selected.length} onClick={() => setSelected([])}>
             Clear selection
           </Button>
@@ -98,8 +101,10 @@ export default function ShotPicker({
           label={lists.find((l) => l.id === listId)?.name || 'Choose Shot List'}
           items={lists.map((l) => ({ value: l.id, label: l.name }))}
           value={listId}
+          disabled={!!connectedListId}
           onChange={(id) => {
             setListId(id)
+            setSelected((old) => old.filter((l) => l.listId === id))
             setScene('')
           }}
         />

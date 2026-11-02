@@ -6,9 +6,11 @@ export default function InlineDelete({
   initialConfirm = false,
   triggerLabel,
   onStart,
+  onCancel,
 }: {
   triggerLabel?: string
   onStart?: () => void
+  onCancel?: () => void
   initialConfirm?: boolean
   label: string
   onConfirm: () => Promise<void>
@@ -22,6 +24,7 @@ export default function InlineDelete({
   const close = () => {
     setState('idle')
     trigger.current?.focus()
+    onCancel?.()
   }
   useEffect(() => {
     if (state === 'confirm')

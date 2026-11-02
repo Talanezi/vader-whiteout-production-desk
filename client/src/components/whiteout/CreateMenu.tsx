@@ -117,6 +117,7 @@ export default function CreateMenu() {
                 ...pop.style,
                 '--create-start-width': `${pop.trigger.current?.getBoundingClientRect().width || 180}px`,
                 '--create-start-height': '38px',
+                '--create-open-height': '144px',
                 '--create-shift-x': `${(pop.trigger.current?.getBoundingClientRect().left || 0) - Number(pop.style.left || 0)}px`,
                 '--create-shift-y': `${(pop.trigger.current?.getBoundingClientRect().top || 0) - Number(pop.style.top || 0)}px`,
               } as import('react').CSSProperties

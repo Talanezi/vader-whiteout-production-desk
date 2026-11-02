@@ -6,7 +6,7 @@ import { shotApiBase, type ShotSession } from '../shotApi'
 import { boardRequest } from './api'
 const createStoryboardUndo = (doc: Y.Doc) =>
   new Y.UndoManager(
-    ['panels', 'annotations', 'comments'].map((k) => doc.getMap(k)),
+    ['panels', 'annotations', 'comments', 'revisions'].map((k) => doc.getMap(k)),
     { captureTimeout: 350 },
   )
 

@@ -170,7 +170,7 @@
     border-radius: 22px;
   }
   to {
-    height: 100px;
+    height: var(--create-open-height, 100px);
     transform: translate(0, 0);
     border-radius: 18px;
   }
@@ -193,7 +193,7 @@
 }
 .pd-create-panel {
   box-sizing: border-box;
-  height: 100px;
+  height: var(--create-open-height, 100px);
   padding: 5px;
   animation: pd-create-open 340ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
 }
@@ -1800,7 +1800,7 @@
 }
 @keyframes pd-create-close {
   from {
-    height: 100px;
+    height: var(--create-open-height, 100px);
     transform: translate(0, 0);
     border-radius: 18px;
   }

@@ -1,5 +1,8 @@
 import { useEffect, useState, type ButtonHTMLAttributes } from 'react'
 export const glyphs: Record<string, string> = {
+  send: 'M3 3l19 9-19 9 4-9zM7 12h15',
+  reply: 'M10 5l-7 7 7 7M3 12h10c5 0 7 2 8 6',
+  pipette: 'M14 3l7 7-3 3-2-2-8 8-5 2 2-5 8-8-2-2z',
   select: 'M5 3l13 9-6 1-3 6z',
   brush: 'M14 4l6 6M4 20c0-5 5-3 6-6l8-11 3 3-11 8c-3 1-1 6-6 6z',
   pen: 'M4 20l4-12 9-5 4 4-5 9-12 4zM4 20l9-9M11 9l4 4',
@@ -75,9 +78,11 @@ export function StudioIcon({
 export function StudioColor({
   value,
   onChange,
+  onSample,
 }: {
   value: string
   onChange: (color: string) => void
+  onSample?: () => void
 }) {
   const [hex, setHex] = useState(value),
     [recent, setRecent] = useState<string[]>(() => {
@@ -139,6 +144,9 @@ export function StudioColor({
             if (/^#[0-9a-f]{6}$/i.test(e.target.value)) choose(e.target.value)
           }}
         />
+        {onSample && (
+          <StudioIcon name="pipette" label="Sample color" onClick={onSample} />
+        )}
       </label>
       <div
         className="sb-color-spectrum"

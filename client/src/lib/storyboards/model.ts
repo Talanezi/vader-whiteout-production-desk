@@ -45,10 +45,14 @@ export type ArtworkRevision = {
   uploaderName?: string
   uploader: number
   createdAt: string
+  checkpoint?: string
+  restoredFrom?: string
+  frame?: { height: number; fit: 'contain' | 'crop' }
 }
 export type Panel = {
   id: string
   label: string
+  title?: string
   notes: string
   order: number
   activeRevision?: string

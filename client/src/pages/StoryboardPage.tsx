@@ -1,3 +1,6 @@
+import InlineDelete from '../components/whiteout/InlineDelete'
+import { waitForStoryboardSaved } from '../lib/storyboards/waitForSaved'
+import { panelIdentity } from '../lib/storyboards/panelIdentity'
 import ViewSwitcher from '../components/storyboards/ViewSwitcher'
 import { downloadOriginal } from '../components/storyboards/OriginalViewer'
 import ShotPane from '../components/storyboards/ShotPane'
@@ -5,7 +8,7 @@ import { DragDropProvider, DragOverlay } from '@dnd-kit/react'
 import { isSortable } from '@dnd-kit/react/sortable'
 import { shotSensors } from '../components/shots/ShotDrag'
 import SortablePanel from '../components/storyboards/SortablePanel'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/whiteout/Button'
 import { PageHeader, SearchField } from '../components/whiteout/Workspace'
@@ -69,6 +72,25 @@ export default function StoryboardPage() {
     [ratio, setRatio] = useState(
       () => Number(localStorage.getItem('whiteout:storyboard:split')) || 40,
     )
+  const splitRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (mode !== 'split') return
+    const element = splitRef.current
+    if (!element) return
+    const measure = () => {
+      const top = element.getBoundingClientRect().top
+      const value = `${Math.max(160, window.innerHeight - top - 24)}px`
+      if (element.style.height !== value) element.style.height = value
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    if (element.parentElement) observer.observe(element.parentElement)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [mode, c.synced])
   const dragOrder = useRef<string[]>([]),
     [dragging, setDragging] = useState(''),
     name = String(
@@ -80,11 +102,18 @@ export default function StoryboardPage() {
       'revisions',
     ),
     current = all.find((p) => p.id === selected),
-    origin = String(
-      c.doc.getMap('meta').get('originatingList') ||
-        all.flatMap((p) => p.links)[0]?.listId ||
-        '',
+    origin = c.doc.getMap('meta').has('originatingList') ? String(c.doc.getMap('meta').get('originatingList') || '') : String(all.flatMap(p=>p.links)[0]?.listId || '')
+  const [inlineDeleting, setInlineDeleting] = useState(''),
+    [disconnecting, setDisconnecting] = useState(false),
+    [duplicateState, setDuplicateState] = useState<
+      'idle' | 'pending' | 'success'
+    >('idle'),
+    [duplicateId, setDuplicateId] = useState('')
+  const duplicatePending = useRef(false),
+    duplicateTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
     )
+  useEffect(() => () => clearTimeout(duplicateTimer.current), [])
   const assetRequest = useRef(0)
   useEffect(() => {
     assetRequest.current++
@@ -145,7 +174,12 @@ export default function StoryboardPage() {
     .filter(
       (p) =>
         (!search ||
-          [p.label, p.notes]
+          [
+            panelIdentity(p, all.indexOf(p), linkedData),
+            p.label,
+            p.title,
+            p.notes,
+          ]
             .join(' ')
             .toLowerCase()
             .includes(search.toLowerCase())) &&
@@ -293,14 +327,15 @@ export default function StoryboardPage() {
         }
     })
   }
-  function remove() {
+  function remove(chosen: Panel[] = deleting || []) {
     const active = new Set(panels(c.doc).map((p) => p.id)),
-      records = (deleting || []).filter((p) => active.has(p.id)),
+      records = chosen.filter((p) => active.has(p.id)),
       stamp = new Date().toISOString()
     c.doc.transact(() =>
       records.forEach((p) => put(c.doc, 'panels', p.id, { deletedAt: stamp })),
     )
     setDeleting(undefined)
+    setInlineDeleting('')
     setMulti(new Set())
     setSelected('')
     if (!records.length) return
@@ -324,6 +359,72 @@ export default function StoryboardPage() {
         },
       },
     )
+  }
+  async function duplicatePanels(records: Panel[]) {
+    if (duplicatePending.current) return
+    duplicatePending.current = true
+    setDuplicateState('pending')
+    try {
+      c.doc.transact(() => records.forEach(duplicate))
+      await waitForStoryboardSaved(c.doc, c.provider)
+      setDuplicateState('success')
+      setDuplicateId(records.length === 1 ? records[0].id : '')
+      clearTimeout(duplicateTimer.current)
+      duplicateTimer.current = setTimeout(() => {
+        setDuplicateState('idle')
+        setDuplicateId('')
+      }, 1800)
+    } catch (e) {
+      setDuplicateState('idle')
+      notify((e as Error).message, { state: 'error' })
+    } finally {
+      duplicatePending.current = false
+    }
+  }
+  function disconnect() {
+    const listId = origin,
+      links = all.map((p) => ({
+        id: p.id,
+        links: p.links.filter((l) => l.listId === listId),
+      }))
+    c.doc.transact(() => {
+      c.doc.getMap('meta').set('originatingList', null)
+      all.forEach((p) =>
+        put(c.doc, 'panels', p.id, {
+          links: p.links.filter((l) => l.listId !== listId),
+        }),
+      )
+    })
+    setShot('')
+    setSelected('')
+    setDisconnecting(false)
+    notify('Shot List disconnected.', {
+      action: {
+        label: 'Restore',
+        run: () => {
+          if (c.doc.getMap('meta').get('originatingList')) {
+            notify(
+              'Disconnect the new Shot List before restoring this connection.',
+              { state: 'error' },
+            )
+            return
+          }
+          c.doc.transact(() => {
+            c.doc.getMap('meta').set('originatingList', listId)
+            links.forEach((p) => {
+              const current = panels(c.doc).find((v) => v.id === p.id)
+              if (current)
+                put(c.doc, 'panels', p.id, {
+                  links: [
+                    ...current.links.filter((l) => l.listId !== listId),
+                    ...p.links,
+                  ],
+                })
+            })
+          })
+        },
+      },
+    })
   }
   if (c.error === 'UNAUTHORIZED') return <SessionState />
   if (!c.synced)
@@ -390,39 +491,62 @@ export default function StoryboardPage() {
                       })
                     }
                   />
-                  <Menu
-                    compact
-                    label={`Actions for ${p.label || `panel ${i + 1}`}`}
-                    items={[
-                      {
-                        value: 'draw-after',
-                        label: 'Draw panel after',
-                        icon: 'edit',
-                        onSelect: () => addPanel(p.id),
-                      },
-                      {
-                        value: 'replace',
-                        label: 'Replace artwork',
-                        onSelect: () => setReplace(p),
-                      },
-                      {
-                        value: 'duplicate',
-                        label: 'Duplicate',
-                        onSelect: () => duplicate(p),
-                      },
-                      {
-                        value: 'link',
-                        label: 'Link / unlink shots',
-                        onSelect: () => setPicker(p),
-                      },
-                      {
-                        value: 'delete',
-                        label: 'Delete',
-                        danger: true,
-                        onSelect: () => setDeleting([p]),
-                      },
-                    ]}
-                  />
+                  {inlineDeleting === p.id ? (
+                    <InlineDelete
+                      key={p.id}
+                      initialConfirm
+                      label={panelIdentity(p, i, linkedData)}
+                      onCancel={() => setInlineDeleting('')}
+                      onConfirm={async () => {
+                        remove([p])
+                        await waitForStoryboardSaved(c.doc, c.provider)
+                      }}
+                    />
+                  ) : (
+                    <Menu
+                      compact
+                      label={`Actions for ${p.label || `panel ${i + 1}`}`}
+                      items={[
+                        {
+                          value: 'draw-after',
+                          label: 'Draw panel after',
+                          icon: 'edit',
+                          onSelect: () => addPanel(p.id),
+                        },
+                        {
+                          value: 'replace',
+                          label: 'Replace artwork',
+                          icon: 'import',
+                          onSelect: () => setReplace(p),
+                        },
+                        {
+                          value: 'duplicate',
+                          label: 'Duplicate',
+                          icon: 'copy',
+                          onSelect: () => void duplicatePanels([p]),
+                        },
+                        {
+                          value: 'link',
+                          label: 'Link / unlink shots',
+                          icon: 'share',
+                          onSelect: () => setPicker(p),
+                        },
+                        {
+                          value: 'delete',
+                          label: 'Delete',
+                          danger: true,
+                          icon: 'trash',
+                          onSelect: () => setInlineDeleting(p.id),
+                        },
+                      ]}
+                    />
+                  )}
+                  {duplicateId === p.id && (
+                    <span className="sb-card-duplicated">
+                      <Icon name="check" />
+                      Duplicated
+                    </span>
+                  )}
                 </div>
                 <button
                   className="sb-card-art"
@@ -436,13 +560,15 @@ export default function StoryboardPage() {
                     assetId={
                       revisions.find((r) => r.id === p.activeRevision)?.assetId
                     }
+                    frame={
+                      revisions.find((r) => r.id === p.activeRevision)?.frame
+                    }
                     drawingHeight={
                       revisions.find((r) => r.id === p.activeRevision)
                         ?.height || 562.5
                     }
                     drawing={
-                      revisions.find((r) => r.id === p.activeRevision)?.kind ===
-                      'native'
+                      !!p.activeRevision
                         ? values<Annotation & { revisionId: string }>(
                             c.doc,
                             'annotations',
@@ -453,7 +579,9 @@ export default function StoryboardPage() {
                   />
                 </button>
                 <footer>
-                  <strong>{p.label || `Panel ${i + 1}`}</strong>
+                  <strong>
+                    {panelIdentity(p, all.indexOf(p), linkedData)}
+                  </strong>
                   {(() => {
                     const r = revisions.find((r) => r.id === p.activeRevision)
                     return r?.source &&
@@ -659,6 +787,30 @@ export default function StoryboardPage() {
             }}
           />
           <div className="sb-toolbar-actions">
+            {origin && (
+              <Menu
+                compact
+                icon="share"
+                label="Connected Shot List"
+                items={[
+                  {
+                    value: 'open',
+                    label: 'Open Shot List',
+                    icon: 'shots',
+                    onSelect: () => {
+                      window.location.hash = `/shotlists/${origin}`
+                    },
+                  },
+                  {
+                    value: 'disconnect',
+                    label: 'Disconnect Shot List',
+                    icon: 'close',
+                    onSelect: () => setDisconnecting(true),
+                  },
+                ]}
+              />
+            )}
+
             <Menu
               compact
               icon="sort"
@@ -727,22 +879,36 @@ export default function StoryboardPage() {
         </div>
       </div>
       {multi.size > 0 && (
-        <div className="sb-bulk">
+        <div className="pd-shot-selection sb-selected-actions">
           <span>{multi.size} selected</span>
-          <Button
-            onClick={() =>
-              all.filter((p) => multi.has(p.id)).forEach(duplicate)
-            }
-          >
-            Duplicate
+          <Button variant="quiet" onClick={() => setMulti(new Set())}>
+            Clear selection
           </Button>
-          <Button onClick={() => setMulti(new Set())}>Clear selection</Button>
-          <Button
-            variant="danger"
-            onClick={() => setDeleting(all.filter((p) => multi.has(p.id)))}
-          >
-            Delete selected
-          </Button>
+          <div>
+            <Button
+              aria-label="Duplicate selected"
+              icon="copy"
+              state={duplicateState}
+              pendingLabel="Duplicating…"
+              successLabel="Duplicated"
+              className={`pd-selection-feedback ${duplicateState === 'success' ? 'is-duplicated' : ''}`}
+              onClick={() =>
+                void duplicatePanels(all.filter((p) => multi.has(p.id)))
+              }
+            >
+              Duplicate selected
+            </Button>
+            <InlineDelete
+              triggerLabel="Delete selected"
+              label={`${deleting?.length || multi.size} selected panels`}
+              onStart={() => setDeleting(all.filter((p) => multi.has(p.id)))}
+              onCancel={() => setDeleting(undefined)}
+              onConfirm={async () => {
+                remove()
+                await waitForStoryboardSaved(c.doc, c.provider)
+              }}
+            />
+          </div>
         </div>
       )}
       {!all.length ? (
@@ -791,6 +957,7 @@ export default function StoryboardPage() {
             </Button>
           </div>
           <div
+            ref={splitRef}
             className="sb-split"
             data-mobile-pane={mobileSplit}
             style={{ gridTemplateColumns: `${ratio}% 8px minmax(0,1fr)` }}
@@ -929,6 +1096,7 @@ export default function StoryboardPage() {
           replacePanel={replace}
           existingSource={extract}
           initialFiles={dropped}
+          onWaitForSaved={() => waitForStoryboardSaved(c.doc, c.provider)}
           onImported={refreshAssets}
           onClose={() => {
             setDropped(undefined)
@@ -967,10 +1135,15 @@ export default function StoryboardPage() {
       )}
       {picker && (
         <ShotPicker
+          connectedListId={origin || undefined}
           initial={picker.links}
           onClose={() => setPicker(undefined)}
           onConfirm={(links) => {
-            put(c.doc, 'panels', picker.id, { links })
+            c.doc.transact(() => {
+              if (links.length && !origin)
+                c.doc.getMap('meta').set('originatingList', links[0].listId)
+              put(c.doc, 'panels', picker.id, { links })
+            })
             setPicker(undefined)
           }}
         />
@@ -1001,22 +1174,26 @@ export default function StoryboardPage() {
           onClose={() => setPdfOpen(false)}
         />
       )}
-      {deleting && (
+      {disconnecting && (
         <Overlay
-          title={`Delete ${deleting.length} panel${deleting.length === 1 ? '' : 's'}?`}
-          onClose={() => setDeleting(undefined)}
+          title="Disconnect Shot List?"
+          onClose={() => setDisconnecting(false)}
           footer={
             <>
-              <Button onClick={() => setDeleting(undefined)}>Cancel</Button>
-              <Button variant="danger" onClick={remove}>
-                Delete panels
+              <Button onClick={() => setDisconnecting(false)}>Cancel</Button>
+              <Button icon="close" onClick={disconnect}>
+                Disconnect
               </Button>
             </>
           }
         >
           <p>
-            Artwork and shot records remain preserved. Restore is available in
-            the notification.
+            This removes{' '}
+            {all.reduce(
+              (n, p) => n + p.links.filter((l) => l.listId === origin).length,
+              0,
+            )}{' '}
+            panel links. Artwork, comments and the Shot List remain.
           </p>
         </Overlay>
       )}

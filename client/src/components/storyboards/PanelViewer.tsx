@@ -1,3 +1,4 @@
+import useDocumentScrollLock from '../../lib/useDocumentScrollLock'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type * as Y from 'yjs'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
@@ -21,7 +22,8 @@ import { shotRequest } from '../../lib/shotApi'
 import Studio from './Studio'
 import { StoryboardIllustration } from './StoryboardIdentity'
 import { StudioIcon } from './StudioControls'
-import PanelDiscussion from './PanelDiscussion'
+import PanelInspector from './PanelInspector'
+import { panelIdentity } from '../../lib/storyboards/panelIdentity'
 import ShotPicker, { type LinkedSnapshot } from './ShotPicker'
 export default function PanelViewer({
   documentId,
@@ -48,6 +50,7 @@ export default function PanelViewer({
   onReplace: () => void
   present?: boolean
 }) {
+  useDocumentScrollLock()
   const [closing, setClosing] = useState(false),
     closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const requestClose = () => {
@@ -166,7 +169,11 @@ export default function PanelViewer({
     }
   }, [JSON.stringify(panel.links)])
   function link(links: ShotLink[]) {
-    put(doc, 'panels', panel.id, { links })
+    doc.transact(() => {
+      if (links.length && !doc.getMap('meta').get('originatingList'))
+        doc.getMap('meta').set('originatingList', links[0].listId)
+      put(doc, 'panels', panel.id, { links })
+    })
     setPicker(false)
   }
   return (
@@ -201,7 +208,7 @@ export default function PanelViewer({
       <div className="sb-viewer-frame">
         <header>
           <StudioIcon name="previous" label="Back" onClick={requestClose} />
-          <h2>{panel.label || `Panel ${index + 1}`}</h2>
+          <h2>{panelIdentity(panel, index, snapshots)}</h2>
           <span>
             {index + 1} / {all.length}
           </span>
@@ -232,15 +239,6 @@ export default function PanelViewer({
                 Studio
               </Button>
               <StudioIcon
-                name="layers"
-                label="Artwork history"
-                active={history}
-                onClick={() => {
-                  setHistory((v) => !v)
-                  setInspector(true)
-                }}
-              />
-              <StudioIcon
                 name="settings"
                 label={inspector ? 'Hide details' : 'Details'}
                 active={inspector}
@@ -248,29 +246,64 @@ export default function PanelViewer({
               />
             </>
           )}
-          {!present && revision?.kind === 'native' && (
+          {!present && (
             <Menu
-              label={
-                (revision.height || 562.5) === 562.5
-                  ? '16:9 frame'
-                  : revision.height === 750
-                    ? '4:3 frame'
-                    : revision.height === 1000
-                      ? 'Square frame'
-                      : 'Scope frame'
-              }
-              icon="columns"
               ariaLabel="Drawing frame"
-              disabled={objects.length > 0}
-              value={String(revision.height || 562.5)}
+              icon="columns"
+              label={
+                revision?.frame?.height === 562.5
+                  ? '16:9 frame'
+                  : revision?.frame?.height === 750
+                    ? '4:3 frame'
+                    : revision?.frame?.height === 1000
+                      ? 'Square frame'
+                      : revision?.frame?.height === 418.41
+                        ? 'Scope frame'
+                        : 'Original frame'
+              }
+              value={String(revision?.frame?.height || 'original')}
               items={[
+                { value: 'original', label: 'Original' },
                 { value: '562.5', label: 'Widescreen · 16:9' },
                 { value: '750', label: 'Classic · 4:3' },
                 { value: '1000', label: 'Square · 1:1' },
                 { value: '418.41', label: 'Scope · 2.39:1' },
               ]}
+              disabled={!revision || !!viewRevision}
               onChange={(v) =>
-                put(doc, 'revisions', revision.id, { height: Number(v) })
+                revision &&
+                put(doc, 'revisions', revision.id, {
+                  frame:
+                    v === 'original'
+                      ? null
+                      : {
+                          height: Number(v),
+                          fit: revision.frame?.fit || 'contain',
+                        },
+                })
+              }
+            />
+          )}
+          {!present && (
+            <Menu
+              ariaLabel="Artwork fit"
+              compact
+              label={
+                revision?.frame?.fit === 'crop'
+                  ? 'Crop to frame'
+                  : 'Fit artwork'
+              }
+              value={revision?.frame?.fit || 'contain'}
+              disabled={!revision?.frame || !!viewRevision}
+              items={[
+                { value: 'contain', label: 'Fit with padding' },
+                { value: 'crop', label: 'Crop to frame' },
+              ]}
+              onChange={(v) =>
+                revision?.frame &&
+                put(doc, 'revisions', revision.id, {
+                  frame: { ...revision.frame, fit: v },
+                })
               }
             />
           )}
@@ -289,20 +322,13 @@ export default function PanelViewer({
             }}
           />
           {present && (
-            <>
-              <Button onClick={() => setShowNotes((v) => !v)}>
-                Notes & shots
-              </Button>
-            </>
-          )}
-          <label>
-            <DrawCheckbox
-              aria-label="Show annotations"
-              checked={show}
-              onChange={(e) => setShow(e.target.checked)}
+            <StudioIcon
+              name="settings"
+              label="Notes & shots"
+              active={showNotes}
+              onClick={() => setShowNotes((v) => !v)}
             />
-            Annotations
-          </label>
+          )}
         </header>
         <div className="sb-viewer-body">
           <div className="sb-viewer-art">
@@ -321,7 +347,7 @@ export default function PanelViewer({
                 url={media.url}
                 nativeHeight={revision?.height || 562.5}
                 objects={objects}
-                visible={show || revision?.kind === 'native'}
+                frame={revision?.frame || undefined}
                 annotating={
                   annotating &&
                   !present &&
@@ -335,6 +361,19 @@ export default function PanelViewer({
                       revisionId: revision.id,
                     })
                   if (!continuous) undo.stopCapturing()
+                }}
+                onBatch={(remove, add) => {
+                  undo.stopCapturing()
+                  doc.transact(() => {
+                    remove.forEach((id) => doc.getMap('annotations').delete(id))
+                    add.forEach((a) =>
+                      put(doc, 'annotations', a.id, {
+                        ...a,
+                        revisionId: revision!.id,
+                      }),
+                    )
+                  })
+                  undo.stopCapturing()
                 }}
                 onZoomChange={setViewerZoom}
                 onRemove={(id) => {
@@ -387,132 +426,34 @@ export default function PanelViewer({
             )}
           </div>
           {((!present && inspector) || (present && showNotes)) && (
-            <aside className="sb-panel-inspector">
-              {!present && (
-                <label className="pd-field">
-                  Original label
-                  <input
-                    value={panel.label}
-                    onChange={(e) =>
-                      put(doc, 'panels', panel.id, { label: e.target.value })
-                    }
-                  />
-                </label>
-              )}
-              <h3>Linked shots</h3>
-              {panel.links.map((l) => {
-                const s = snapshots[l.listId]?.shots[l.shotId]
-                return (
-                  <div className="sb-linked-shot" key={l.listId + l.shotId}>
-                    {s && !s.deletedAt ? (
-                      <>
-                        <Link
-                          to={`/shotlists/${l.listId}?shot=${l.shotId}&scene=${s.sceneId}`}
-                        >
-                          {String(s.number)} · {l.shotId.slice(0, 8)}
-                        </Link>
-                        <p>{String(s.coverage || '')}</p>
-                        <small>
-                          {[
-                            'camera',
-                            'framing',
-                            'lens',
-                            'angle',
-                            'equipment',
-                            'movement',
-                          ]
-                            .map((k) => s[k])
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </small>
-                      </>
-                    ) : (
-                      <span>
-                        Linked shot unavailable · {l.shotId.slice(0, 8)}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-              {!present && (
-                <Button onClick={() => setPicker(true)}>Link shots</Button>
-              )}
-              <h3>Visual notes</h3>
-              {present ? (
-                <p>{panel.notes}</p>
-              ) : noteText ? (
-                <div className="sb-visual-notes">
-                  <CollaborativeText
-                    key={panel.id}
-                    text={noteText}
-                    provider={provider}
-                    undo={undo}
-                    label="Visual notes"
-                  />
-                </div>
-              ) : null}
-              {!present && (
-                <>
-                  <Button onClick={onReplace}>Replace artwork</Button>
-                  {history && (
-                    <section>
-                      <h3>Artwork history</h3>
-                      {revisions.map((r, i) => (
-                        <div key={r.id}>
-                          <Button onClick={() => setViewRevision(r.id)}>
-                            {r.uploaderName || `User ${r.uploader}`} · Revision{' '}
-                            {revisions.length - i} ·{' '}
-                            {new Date(r.createdAt).toLocaleDateString()}
-                          </Button>
-                          {r.id !== panel.activeRevision && (
-                            <>
-                              <Button
-                                onClick={() => {
-                                  put(doc, 'panels', panel.id, {
-                                    activeRevision: r.id,
-                                  })
-                                  setViewRevision('')
-                                }}
-                              >
-                                Restore
-                              </Button>
-                              <Button
-                                disabled={!panel.activeRevision}
-                                onClick={() => {
-                                  doc.transact(() =>
-                                    values<Annotation & { revisionId: string }>(
-                                      doc,
-                                      'annotations',
-                                    )
-                                      .filter((a) => a.revisionId === r.id)
-                                      .forEach((a) => {
-                                        const id = crypto.randomUUID()
-                                        put(doc, 'annotations', id, {
-                                          ...a,
-                                          id,
-                                          revisionId: panel.activeRevision,
-                                        })
-                                      }),
-                                  )
-                                }}
-                              >
-                                Copy annotations to active artwork
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </section>
-                  )}
-                  <PanelDiscussion doc={doc} panelId={panel.id} user={user} />
-                </>
-              )}
-            </aside>
+            <PanelInspector
+              documentId={documentId}
+              doc={doc}
+              panel={panel}
+              index={index}
+              user={user}
+              provider={provider}
+              undo={undo}
+              snapshots={snapshots}
+              revisions={revisions}
+              viewRevision={viewRevision}
+              onPreview={setViewRevision}
+              onLink={() => setPicker(true)}
+              onReplace={onReplace}
+              present={present}
+            />
           )}
         </div>
       </div>
       {picker && (
         <ShotPicker
+          connectedListId={
+            String(
+              doc.getMap('meta').get('originatingList') ||
+                panel.links[0]?.listId ||
+                '',
+            ) || undefined
+          }
           initial={panel.links}
           onClose={() => setPicker(false)}
           onConfirm={link}

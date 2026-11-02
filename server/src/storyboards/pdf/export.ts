@@ -132,31 +132,50 @@ export async function renderStoryboard(
           Math.min(2000, Number(panel.nativeHeight) || 562.5),
         ),
       };
-      const scale = Math.min(
+      const sourceHeight = (1000 * dimensions.height) / dimensions.width;
+      const frameHeight = panel.frame
+        ? Number(panel.frame.height)
+        : sourceHeight;
+      if (
+        !Number.isFinite(frameHeight) ||
+        frameHeight < 100 ||
+        frameHeight > 2000 ||
+        (panel.frame && !['contain', 'crop'].includes(panel.frame.fit))
+      )
+        throw new BadRequestException('Invalid artwork frame.');
+      const framePixels = (dimensions.width * frameHeight) / 1000,
+        scale = Math.min(
           cellWidth / dimensions.width,
-          areaHeight / dimensions.height,
+          areaHeight / framePixels,
         ),
-        w = dimensions.width * scale,
-        h = dimensions.height * scale,
-        ix = x + (cellWidth - w) / 2,
-        iy = top - 20 - h;
-      if (image) page.drawImage(image, { x: ix, y: iy, width: w, height: h });
-      else
-        page.drawRectangle({
-          x: ix,
-          y: iy,
-          width: w,
-          height: h,
-          color: rgb(1, 1, 1),
-          borderColor: rgb(0.85, 0.87, 0.88),
-          borderWidth: 0.3,
-        });
+        fit =
+          panel.frame?.fit === 'crop'
+            ? Math.max(1, framePixels / dimensions.height)
+            : Math.min(1, framePixels / dimensions.height),
+        frameW = dimensions.width * scale,
+        frameH = framePixels * scale,
+        fx = x + (cellWidth - frameW) / 2,
+        fy = top - 20 - frameH,
+        w = dimensions.width * scale * fit,
+        h = dimensions.height * scale * fit,
+        ix = fx + (frameW - w) / 2,
+        iy = fy + (frameH - h) / 2;
+      page.drawRectangle({
+        x: fx,
+        y: fy,
+        width: frameW,
+        height: frameH,
+        color: rgb(1, 1, 1),
+        borderColor: rgb(0.85, 0.87, 0.88),
+        borderWidth: 0.3,
+      });
       page.pushOperators(
         pushGraphicsState(),
-        rectangle(ix, iy, w, h),
+        rectangle(fx, fy, frameW, frameH),
         clip(),
         endPath(),
       );
+      if (image) page.drawImage(image, { x: ix, y: iy, width: w, height: h });
       if (options.annotations || panel.native)
         for (const a of annotations.filter(
           (a) => a.revisionId === panel.activeRevision,

@@ -43,6 +43,7 @@ export default function ArtworkImport({
   replacePanel,
   existingSource,
   initialFiles,
+  onWaitForSaved,
 }: {
   documentId: string
   doc: Y.Doc
@@ -52,10 +53,12 @@ export default function ArtworkImport({
   onImported: () => void
   replacePanel?: Panel
   initialFiles?: File[]
+  onWaitForSaved?: () => Promise<void>
   existingSource?: MediaAsset
 }) {
   const [items, setItems] = useState<Item[]>([]),
     [busy, setBusy] = useState(false),
+    [doneState, setDoneState] = useState<'idle' | 'success' | 'error'>('idle'),
     [error, setError] = useState(''),
     [mode, setMode] = useState('crops'),
     [selectedCrop, setSelectedCrop] = useState(''),
@@ -315,10 +318,14 @@ export default function ArtworkImport({
       if (alive.current) setItems((old) => [...old])
     }
   }
-  function commit(
+  async function commit(
     entries: { assetId: string; label: string; source?: Source }[],
   ) {
-    if (completed.current || doc.getMap('imports').has(batch.current)) return
+    if (completed.current) return
+    if (doc.getMap('imports').has(batch.current)) {
+      await complete()
+      return
+    }
     const active = panels(doc),
       used = new Set<string>()
     const matches = entries.map((entry) => {
@@ -398,9 +405,30 @@ export default function ArtworkImport({
         at: new Date().toISOString(),
       })
     })
-    completed.current = true
-    onImported()
-    onClose()
+    await complete()
+  }
+  async function complete() {
+    setBusy(true)
+    setDoneState('idle')
+    try {
+      await onWaitForSaved?.()
+      if (!alive.current) return
+      completed.current = true
+      setDoneState('success')
+      onImported()
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180,
+        ),
+      )
+      if (alive.current) onClose()
+    } catch (e) {
+      setDoneState('error')
+      throw e
+    } finally {
+      if (alive.current) setBusy(false)
+    }
   }
   async function confirmImages() {
     const entries = []
@@ -417,7 +445,7 @@ export default function ArtworkImport({
     }
     if (replacePanel && entries.length !== 1)
       throw Error('Choose exactly one replacement image.')
-    commit(entries)
+    await commit(entries)
   }
   async function confirmPdf() {
     if (!pdf || !source || !preview) return
@@ -427,7 +455,7 @@ export default function ArtworkImport({
       if (mode === 'original') {
         if (replacePanel)
           throw Error('Choose a page or crop as replacement artwork.')
-        commit([])
+        await commit([])
         return
       }
       const entries = []
@@ -489,7 +517,7 @@ export default function ArtworkImport({
             orderedExtraction.findIndex((e) => e.crop.id === a.orderKey) -
             orderedExtraction.findIndex((e) => e.crop.id === b.orderKey),
         )
-      commit(entries.map(({ orderKey, ...entry }) => entry))
+      await commit(entries.map(({ orderKey, ...entry }) => entry))
     } catch (e) {
       setError(
         e instanceof Error
@@ -505,17 +533,23 @@ export default function ArtworkImport({
       title={replacePanel ? 'Replace artwork' : 'Import artwork'}
       onClose={onClose}
       busy={busy}
-      className="sb-import sb-import-studio"
+      className={`sb-import sb-import-studio ${!pdf ? 'sb-upload-mode' : ''} ${items.length ? 'has-files' : ''}`}
       footer={
         <>
-          <Button disabled={busy} onClick={onClose}>
-            Close
-          </Button>
           {pdf ? (
             <Button
               variant="primary"
-              state={busy ? 'pending' : 'idle'}
+              state={
+                doneState === 'success'
+                  ? 'success'
+                  : busy
+                    ? 'pending'
+                    : doneState
+              }
               pendingLabel="Saving panels…"
+              successLabel="Done"
+              errorLabel="Retry saving"
+              icon="check"
               disabled={
                 mode === 'crops' && (!extraction.length || processingPages)
               }
@@ -526,8 +560,17 @@ export default function ArtworkImport({
           ) : (
             <Button
               variant="primary"
-              state={busy ? 'pending' : 'idle'}
+              state={
+                doneState === 'success'
+                  ? 'success'
+                  : busy
+                    ? 'pending'
+                    : doneState
+              }
               pendingLabel="Saving panels…"
+              successLabel="Done"
+              errorLabel="Retry saving"
+              icon="check"
               disabled={!items.length || items.some((i) => !i.asset)}
               onClick={() =>
                 items.every((item) => item.asset)

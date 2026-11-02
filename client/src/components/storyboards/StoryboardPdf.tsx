@@ -124,7 +124,13 @@ export default function StoryboardPdf({
       <div className="sb-print-layout">
         <div className="sb-print-settings">
           <Menu
-            label={scope==='all'?'Entire storyboard':scope==='scenes'?'Selected scenes':'Selected panels'}
+            label={
+              scope === 'all'
+                ? 'Entire storyboard'
+                : scope === 'scenes'
+                  ? 'Selected scenes'
+                  : 'Selected panels'
+            }
             value={scope}
             onChange={setScope}
             items={[

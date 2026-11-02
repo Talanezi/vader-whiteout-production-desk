@@ -107,6 +107,7 @@ export class StoryboardsController {
         assetId: revisions[p.activeRevision]?.assetId,
         native: revisions[p.activeRevision]?.kind === 'native',
         nativeHeight: revisions[p.activeRevision]?.height || 562.5,
+        frame: revisions[p.activeRevision]?.frame,
       })),
       spec,
       async (assetId) => (await this.media.read(id, assetId)).bytes,
