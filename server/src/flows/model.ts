@@ -1,7 +1,18 @@
-import {resolveSchedule} from './scheduling';
+import { resolveSchedule } from './scheduling';
 import * as Y from 'yjs';
 import { BadRequestException } from '@nestjs/common';
-export const DEFAULT_DEPARTMENTS = ['Camera','Grip & Electric','Talent','Sound','Costume','Hair & Makeup','Props','Stunts','Director/Choreography','Production'];
+export const DEFAULT_DEPARTMENTS = [
+  'Camera',
+  'Grip & Electric',
+  'Talent',
+  'Sound',
+  'Costume',
+  'Hair & Makeup',
+  'Props',
+  'Stunts',
+  'Director/Choreography',
+  'Production',
+];
 export const collections = [
   'meta',
   'departments',
@@ -31,30 +42,44 @@ export function setRecord(
   return m;
 }
 export function capture(d: Y.Doc): any {
-  return Object.fromEntries(collections.map((k) => [k, d.getMap(k).toJSON()]));
+  return Object.fromEntries(
+    collections.map((k) => [k, d.getMap(k).toJSON()]),
+  );
 }
 export function validateMeta(m: any) {
+  if (
+    m.filmingStart != null &&
+    (!Number.isFinite(m.filmingStart) || Math.abs(m.filmingStart) > 10080)
+  )
+    throw new BadRequestException('Choose a valid filming start.');
   if (typeof m.name !== 'string' || m.name.length > 180 || !m.name.trim())
-    throw new BadRequestException('Enter a Flow title up to 180 characters.');
+    throw new BadRequestException(
+      'Enter a Flow title up to 180 characters.',
+    );
   if (typeof m.zone !== 'string' || !m.zone.trim())
     throw new BadRequestException('Choose a named production timezone.');
   try {
     new Intl.DateTimeFormat('en', { timeZone: m.zone }).format();
   } catch {
-    throw new BadRequestException('Choose a valid named production timezone.');
+    throw new BadRequestException(
+      'Choose a valid named production timezone.',
+    );
   }
   if (
     m.date &&
     (!/^\d{4}-\d{2}-\d{2}$/.test(m.date) ||
       !Number.isFinite(Date.parse(m.date + 'T12:00:00Z')) ||
-      new Date(m.date + 'T12:00:00Z').toISOString().slice(0, 10) !== m.date)
+      new Date(m.date + 'T12:00:00Z').toISOString().slice(0, 10) !==
+        m.date)
   )
     throw new BadRequestException('Choose a valid production date.');
 }
 export function validateFlow(s: any) {
   validateMeta(s.meta);
   if (JSON.stringify(s).length > 12 * 1024 * 1024)
-    throw new BadRequestException('Flow exceeds the 12 MB document limit.');
+    throw new BadRequestException(
+      'Flow exceeds the 12 MB document limit.',
+    );
   for (const k of collections) {
     if (!s[k] || typeof s[k] !== 'object')
       throw new BadRequestException('Invalid Flow state.');
@@ -79,11 +104,29 @@ export function validateFlow(s: any) {
       !Number.isFinite(e.order)
     )
       throw new BadRequestException('Invalid event.');
-    if(e.clockStart!=null&&(!Number.isFinite(e.clockStart)||Math.abs(e.clockStart)>10080)) throw new BadRequestException('Clock time is outside the seven-day schedule.');
-    if(e.offsetMinutes!=null&&(!Number.isFinite(e.offsetMinutes)||Math.abs(e.offsetMinutes)>10080)) throw new BadRequestException('Invalid relative offset.');
-    if(e.timing&&!['sequence','anchor','relative','unscheduled'].includes(e.timing)) throw new BadRequestException('Invalid timing relationship.');
+    if (
+      e.clockStart != null &&
+      (!Number.isFinite(e.clockStart) || Math.abs(e.clockStart) > 10080)
+    )
+      throw new BadRequestException(
+        'Clock time is outside the seven-day schedule.',
+      );
+    if (
+      e.offsetMinutes != null &&
+      (!Number.isFinite(e.offsetMinutes) ||
+        Math.abs(e.offsetMinutes) > 10080)
+    )
+      throw new BadRequestException('Invalid relative offset.');
+    if (
+      e.timing &&
+      !['sequence', 'anchor', 'relative', 'unscheduled'].includes(e.timing)
+    )
+      throw new BadRequestException('Invalid timing relationship.');
     for (const k of ['description', 'notes', 'reference'])
-      if (e[k] != null && (typeof e[k] !== 'string' || e[k].length > 30000))
+      if (
+        e[k] != null &&
+        (typeof e[k] !== 'string' || e[k].length > 30000)
+      )
         throw new BadRequestException(
           'Event text is limited to 30,000 characters.',
         );
@@ -95,7 +138,9 @@ export function validateFlow(s: any) {
         throw new BadRequestException('Invalid event time.');
     if (
       e.duration != null &&
-      (!Number.isFinite(e.duration) || e.duration < 0 || e.duration > 10080)
+      (!Number.isFinite(e.duration) ||
+        e.duration < 0 ||
+        e.duration > 10080)
     )
       throw new BadRequestException(
         'Duration must be between zero and seven days.',
@@ -107,12 +152,28 @@ export function validateFlow(s: any) {
     )
       throw new BadRequestException('Actual completion precedes start.');
   }
-  try{resolveSchedule(s,null);}catch(e){throw new BadRequestException((e as Error).message)}
+  try {
+    resolveSchedule(s, null);
+  } catch (e) {
+    throw new BadRequestException((e as Error).message);
+  }
   for (const i of Object.values(s.instructions) as any[]) {
     if (
-      (i.clockStart!=null&&(!Number.isFinite(i.clockStart)||Math.abs(i.clockStart)>10080)) ||
-      (i.offsetMinutes!=null&&(!Number.isFinite(i.offsetMinutes)||Math.abs(i.offsetMinutes)>10080)) ||
-      (i.duration!=null&&(!Number.isFinite(i.duration)||i.duration<0||i.duration>10080)) ||
+      (i.clockStart != null &&
+        (!Number.isFinite(i.clockStart) ||
+          Math.abs(i.clockStart) > 10080)) ||
+      (i.offsetMinutes != null &&
+        (!Number.isFinite(i.offsetMinutes) ||
+          Math.abs(i.offsetMinutes) > 10080)) ||
+      (i.duration != null &&
+        (!Number.isFinite(i.duration) ||
+          i.duration < 0 ||
+          i.duration > 10080)) ||
+      (i.timing &&
+        !['associated', 'relative', 'anchor', 'unscheduled'].includes(
+          i.timing,
+        )) ||
+      (i.relativeEdge && !['start', 'end'].includes(i.relativeEdge)) ||
       !s.events[i.eventId] ||
       !s.departments[i.departmentId] ||
       typeof i.text !== 'string' ||

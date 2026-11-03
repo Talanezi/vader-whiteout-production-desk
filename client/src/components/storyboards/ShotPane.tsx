@@ -2,7 +2,15 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import * as Y from 'yjs'
 import { useShotCollaboration } from '../../lib/useShotCollaboration'
-import { ordered, shots, scenes, str, fields } from '../../lib/shotDocument'
+import {
+  ordered,
+  shots,
+  scenes,
+  str,
+  fields,
+  displayShot,
+  hasShotNumberConflict,
+} from '../../lib/shotDocument'
 import { change, type ShotField } from '../../lib/shotDocument'
 import { validateValue } from '../../lib/shotClipboard'
 import ShotChoice from '../shots/ShotChoice'
@@ -42,8 +50,9 @@ export default function ShotPane({
     .sort(
       (a, b) =>
         Number(scenes(c.doc).get(str(a, 'sceneId'))?.get('order') || 0) -
-          Number(scenes(c.doc).get(str(b, 'sceneId'))?.get('order') || 0) ||
-        Number(a.get('order')) - Number(b.get('order')),
+          Number(
+            scenes(c.doc).get(str(b, 'sceneId'))?.get('order') || 0,
+          ) || Number(a.get('order')) - Number(b.get('order')),
     )
   return (
     <section className="sb-shot-pane" aria-label="Linked Shot List">
@@ -91,14 +100,23 @@ export default function ShotPane({
                   <td>
                     <button
                       className="sb-shot-select"
-                      aria-label={`Shot ${str(s, 'number')} · Scene ${str(scenes(c.doc).get(str(s, 'sceneId')), 'number')} · ${id.slice(0, 8)}`}
+                      aria-label={`Shot ${str(s, 'number')} · Scene ${str(
+                        scenes(c.doc).get(str(s, 'sceneId')),
+                        'number',
+                      )} · ${id.slice(0, 8)}`}
                       onClick={() => onSelect(id)}
                       aria-pressed={selected.includes(id)}
                     >
-                      {str(s, 'number')}
+                      {displayShot(c.doc, s)}
+                      {hasShotNumberConflict(c.doc, s) && (
+                        <small>Code conflict · {id.slice(0, 8)}</small>
+                      )}
                       <small>
                         Scene{' '}
-                        {str(scenes(c.doc).get(str(s, 'sceneId')), 'number')}
+                        {str(
+                          scenes(c.doc).get(str(s, 'sceneId')),
+                          'number',
+                        )}
                       </small>
                     </button>
                   </td>
@@ -138,20 +156,27 @@ export default function ShotPane({
                           <div key={field}>
                             <dt>{fields[field]}</dt>
                             <dd>
-                              {s.get(field) instanceof Y.Text && c.provider ? (
+                              {s.get(field) instanceof Y.Text &&
+                              c.provider ? (
                                 <CollaborativeText
                                   text={s.get(field) as Y.Text}
                                   provider={c.provider}
                                   undo={c.undo}
                                   compact
-                                  label={`${fields[field]} ${str(s, 'number')}`}
+                                  label={`${fields[field]} ${str(
+                                    s,
+                                    'number',
+                                  )}`}
                                   onFocus={() => onSelect(id)}
                                 />
                               ) : (
                                 <ShotChoice
                                   doc={c.doc}
                                   field={field}
-                                  label={`${fields[field]} ${str(s, 'number')}`}
+                                  label={`${fields[field]} ${str(
+                                    s,
+                                    'number',
+                                  )}`}
                                   value={str(s, field)}
                                   onFocus={() => onSelect(id)}
                                   onChange={(value) => {
@@ -175,7 +200,10 @@ export default function ShotPane({
                           </div>
                         ))}
                         <Link
-                          to={`/shotlists/${listId}?shot=${id}&scene=${str(s, 'sceneId')}`}
+                          to={`/shotlists/${listId}?shot=${id}&scene=${str(
+                            s,
+                            'sceneId',
+                          )}`}
                         >
                           Open shot editor
                         </Link>

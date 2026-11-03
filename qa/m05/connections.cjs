@@ -3,8 +3,12 @@ const fs = require('fs'),
   crypto = require('crypto'),
   pw = require('/Users/thameralanezi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),
   { join, until } = require('../m04/collaboration.cjs'),
-  state = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),
-  fixture = JSON.parse(fs.readFileSync('/tmp/m05/fixture.json')),
+  state = JSON.parse(
+    fs.readFileSync('/tmp/m032/runtime/local-state.json'),
+  ),
+  fixture = JSON.parse(
+    fs.readFileSync('/tmp/m05/corrections/fixture.json'),
+  ),
   headers = {
     Authorization: 'Bearer ' + state.tokens['101'],
     'Content-Type': 'application/json',
@@ -21,7 +25,7 @@ async function api(p, b) {
 }
 ;(async () => {
   const source = await api('/shotlists/' + fixture.listId + '/export'),
-    listName = 'M05 connection fixture'
+    listName = 'M05 connection fixture ' + Date.now()
   await api('/shotlists/' + fixture.listId + '/manage', {
     action: 'rename',
     name: listName,
@@ -45,10 +49,18 @@ async function api(p, b) {
     await p
       .getByRole('button', { name: 'Connect Shot List', exact: true })
       .click()
-    await p.locator('.sb-toolstrip button[aria-haspopup=menu]').first().click()
-    await p.getByRole('menuitemradio', { name: listName, exact: true }).click()
     await p
-      .getByRole('button', { name: 'Connect without scheduling', exact: true })
+      .locator('.sb-toolstrip button[aria-haspopup=menu]')
+      .first()
+      .click()
+    await p
+      .getByRole('menuitemradio', { name: listName, exact: true })
+      .click()
+    await p
+      .getByRole('button', {
+        name: 'Connect without scheduling',
+        exact: true,
+      })
       .click()
     await p.getByText('Saved', { exact: true }).waitFor()
     let snapshot = await api('/flows/' + flow.id + '/snapshot')
@@ -56,7 +68,7 @@ async function api(p, b) {
     assert.equal(Object.keys(snapshot.state.events).length, 0)
     const rail = p
         .locator('.flow-rail-shot')
-        .filter({ hasText: '19-1' })
+        .filter({ hasText: '09-A' })
         .first(),
       grip = await rail.locator('.flow-grip').boundingBox(),
       target = await p.locator('.flow-grid-scroll').boundingBox()
@@ -73,7 +85,7 @@ async function api(p, b) {
     const event = Object.values(snapshot.state.events)[0]
     assert.equal(event.shotId, fixture.shotIds[0])
     await p.locator('.flow-shot-ref').click()
-    await p.getByRole('button', { name: 'Lens', exact: true }).click()
+    await p.getByRole('button', { name: 'lens', exact: true }).click()
     await p.getByRole('option', { name: '50mm', exact: true }).click()
     await p.getByText('Saved', { exact: true }).waitFor()
     const updated = await api('/shotlists/' + fixture.listId + '/export')
@@ -81,27 +93,39 @@ async function api(p, b) {
     await p.screenshot({
       path: '/tmp/m05/screenshots/chromium/20-source-technical-edit.png',
     })
-    await p.getByRole('button', { name: /^Close 19-1$/ }).click()
+    await p.getByRole('button', { name: /^Close 09-A$/ }).click()
     client.doc.getMap('shots').get(fixture.shotIds[0]).set('deleted', true)
-    await p.getByText('Source unavailable · relink', { exact: true }).waitFor()
+    await p
+      .getByText('Source unavailable · relink', { exact: true })
+      .first()
+      .waitFor()
     await p.screenshot({
       path: '/tmp/m05/screenshots/chromium/21-missing-source.png',
     })
     await p.locator('.flow-shot-ref').click()
-    await p.getByRole('button', { name: 'Relink shot', exact: true }).click()
-    await p.getByRole('checkbox', { name: new RegExp('^Select 19-2,') }).check()
+    await p
+      .getByRole('button', { name: 'Relink shot', exact: true })
+      .click()
+    await p
+      .getByRole('checkbox', { name: new RegExp('^Select 09-B,') })
+      .check()
     await p
       .getByRole('button', { name: 'Use selected shots', exact: true })
       .click()
     await p.getByText('Saved', { exact: true }).waitFor()
     snapshot = await api('/flows/' + flow.id + '/snapshot')
-    assert.equal(snapshot.state.events[event.id].shotId, fixture.shotIds[1])
+    assert.equal(
+      snapshot.state.events[event.id].shotId,
+      fixture.shotIds[1],
+    )
     assert.equal(Object.keys(snapshot.state.events).length, 1)
-    await p.getByRole('button', { name: /^Close 19-2$/ }).click()
+    await p.getByRole('button', { name: /^Close 09-B$/ }).click()
     await p
       .getByRole('button', { name: 'Shot List connection', exact: true })
       .click()
-    await p.getByRole('menuitem', { name: 'Disconnect', exact: true }).click()
+    await p
+      .getByRole('menuitem', { name: 'Disconnect', exact: true })
+      .click()
     await p.screenshot({
       path: '/tmp/m05/screenshots/chromium/22-disconnect-confirm.png',
     })
@@ -113,7 +137,7 @@ async function api(p, b) {
     snapshot = await api('/flows/' + flow.id + '/snapshot')
     assert.equal(snapshot.state.meta.listId, '')
     assert.equal(Object.keys(snapshot.state.events).length, 1)
-    assert.equal(snapshot.state.events[event.id].reference, '19-2')
+    assert.equal(snapshot.state.events[event.id].reference, '09-B')
     console.log(
       'Blank Flow connects without creating occurrences; real empty-grid rail drop; authorized M03 Lens write; live deleted-source state; single-UUID relink preserves occurrence; disconnect preserves rows and accurate historical labels passed.',
     )

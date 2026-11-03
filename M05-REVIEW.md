@@ -129,3 +129,21 @@ existing private media are checked without writing test content.
 Source push alone is not publication. Follow RELEASING.md: main source release/Railway,
 additive migration, fresh production /productiondesk/ bundle, scoped website commit/push,
 Pages asset-hash verification and authenticated live smoke. Do not begin M06.
+
+
+## Final owner corrective contract
+
+The subsequent comprehensive correction is tracked in
+[CORRECTIVE-ACCEPTANCE.md](qa/m05/CORRECTIVE-ACCEPTANCE.md), including every
+Section 41 requirement, precise verification boundaries, and runnable evidence.
+The implementation replaces the initial timezone/report/status-led presentation
+with the owner-approved set-local production-day model, direct department editing,
+shared authoritative estimates and compact continuous Print Studio. The original
+measured PDF engine, Shot Lists architecture, Storyboards drawing engine and private
+original artwork are preserved. No new package or destructive migration is needed.
+
+The source branch is `ui/m05-final-corrections`, based on `9dfcf415`. Scheduler's
+paired trusted-membership correction is `4d44206`. Final source/site revisions,
+Railway status, served bundle verification and read-only production hashes are
+recorded in the release evidence after publication and in the final owner report.
+No owner acceptance is claimed.

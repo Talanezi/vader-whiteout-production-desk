@@ -1,4 +1,4 @@
-import {zipFiles,safeFilename} from './zip';
+import { zipFiles, safeFilename } from './zip';
 import {
   BadRequestException,
   Body,
@@ -71,7 +71,7 @@ export function checkWorkbook(b: Buffer) {
 @UseGuards(SchedulerAuthGuard)
 @Controller('api/flows')
 export class FlowsController {
-  private packBusy=false;
+  private packBusy = false;
   constructor(
     private readonly flows: FlowsService,
     private readonly storage: StoryboardStorage,
@@ -135,30 +135,87 @@ export class FlowsController {
       );
       return new StreamableFile(bytes, {
         type: 'application/pdf',
-        disposition: `attachment; filename="whiteout-flow-${key.slice(0, 10)}.pdf"`,
+        disposition: `attachment; filename="whiteout-flow-${key.slice(
+          0,
+          10,
+        )}.pdf"`,
       });
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
   }
   @Post(':id/department-pack')
-  @Header('Cache-Control','private, no-store')
-  async pack(@Req() r:{user:Collaborator;aborted?:boolean},@Param('id') id:string,@Body() b:FlowPrint) {
-    if(this.packBusy)throw new BadRequestException('A department pack is already being prepared. Try again shortly.');
-    this.packBusy=true;
+  @Header('Cache-Control', 'private, no-store')
+  async pack(
+    @Req()
+    r: {
+      user: Collaborator;
+      aborted?: boolean;
+      res?: { on: Function; off: Function; writableEnded?: boolean };
+    },
+    @Param('id') id: string,
+    @Body() b: FlowPrint,
+  ) {
+    if (this.packBusy)
+      throw new BadRequestException(
+        'A department pack is already being prepared. Try again shortly.',
+      );
+    this.packBusy = true;
+    let cancelled = false;
+    const closed = () => {
+      if (!r.res?.writableEnded) cancelled = true;
+    };
+    r.res?.on('close', closed);
     try {
-      const {state,source}=await this.flows.resolved(id,r.user), ids=b?.departments;
-      if(!Array.isArray(ids)||!ids.length||ids.length>32||new Set(ids).size!==ids.length)throw Error('Choose between one and 32 departments.');
-      const files:{name:string;bytes:Buffer}[]=[];let total=0;
-      for(const [i,dep] of ids.entries()) {
-        if(r.aborted)throw Error('Download cancelled.');
-        if(!state.departments[dep]||state.departments[dep].removedAt)throw Error('A selected department is unavailable.');
-        const bytes=await renderFlow(state,source,{...b,product:'department',departments:[dep]});
-        total+=bytes.length;if(total>32*1024*1024)throw Error('This pack exceeds 32 MB. Choose fewer departments.');
-        files.push({name:safeFilename(state.meta.name)+' - '+(state.meta.date||'Date TBD')+' - '+safeFilename(state.departments[dep].name)+' - '+(i+1)+'.pdf',bytes});
+      const { state, source } = await this.flows.resolved(id, r.user),
+        ids = b?.departments;
+      if (
+        !Array.isArray(ids) ||
+        !ids.length ||
+        ids.length > 32 ||
+        new Set(ids).size !== ids.length
+      )
+        throw Error('Choose between one and 32 departments.');
+      const files: { name: string; bytes: Buffer }[] = [];
+      let total = 0;
+      for (const [i, dep] of ids.entries()) {
+        if (r.aborted || cancelled) throw Error('Download cancelled.');
+        if (!state.departments[dep] || state.departments[dep].removedAt)
+          throw Error('A selected department is unavailable.');
+        const bytes = await renderFlow(state, source, {
+          ...b,
+          product: 'department',
+          departments: [dep],
+        });
+        if (r.aborted || cancelled) throw Error('Download cancelled.');
+        total += bytes.length;
+        if (total > 32 * 1024 * 1024)
+          throw Error(
+            'This pack exceeds 32 MB. Choose fewer departments.',
+          );
+        files.push({
+          name:
+            safeFilename(state.meta.name) +
+            ' - ' +
+            (state.meta.date || 'Date TBD') +
+            ' - ' +
+            safeFilename(state.departments[dep].name) +
+            ' - ' +
+            (i + 1) +
+            '.pdf',
+          bytes,
+        });
       }
-      return new StreamableFile(zipFiles(files),{type:'application/zip',disposition:'attachment; filename="department-pack.zip"'});
-    }catch(e){throw new BadRequestException((e as Error).message)}finally{this.packBusy=false}
+      return new StreamableFile(zipFiles(files), {
+        type: 'application/zip',
+        disposition: 'attachment; filename="department-pack.zip"',
+      });
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    } finally {
+      r.res?.off('close', closed);
+      this.packBusy = false;
+    }
   }
   @Get(':id/prints/:key')
   @Header('Cache-Control', 'private, no-store')
@@ -167,9 +224,12 @@ export class FlowsController {
     @Param('id') id: string,
     @Param('key') key: string,
   ) {
-    return new StreamableFile(await this.flows.printArtifact(id, key, r.user), {
-      type: 'application/pdf',
-    });
+    return new StreamableFile(
+      await this.flows.printArtifact(id, key, r.user),
+      {
+        type: 'application/pdf',
+      },
+    );
   }
   @Post(':id/sources')
   @UseInterceptors(
@@ -219,10 +279,13 @@ export class FlowsController {
       'SELECT storage_key,filename FROM flow_sources WHERE document_id=$1 AND sha256=$2',
       [id, hash],
     );
-    if (!row) throw new BadRequestException('Original workbook unavailable.');
+    if (!row)
+      throw new BadRequestException('Original workbook unavailable.');
     return new StreamableFile(await this.storage.get(row.storage_key), {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(
+        row.filename,
+      )}`,
     });
   }
 }

@@ -1,7 +1,7 @@
 import CreationChoices from '../components/whiteout/CreationChoices'
 import DatePicker from '../components/whiteout/DatePicker'
 import SelectedShots from '../components/flow/SelectedShots'
-import {sourceLabel} from '../../../server/src/flows/scheduling'
+import { sourceLabel } from '../../../server/src/flows/scheduling'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { PageHeader, SearchField } from '../components/whiteout/Workspace'
@@ -47,6 +47,7 @@ export default function FlowsPage() {
     [refresh, setRefresh] = useState(0),
     [name, setName] = useState(''),
     [date, setDate] = useState(''),
+    [dateValid, setDateValid] = useState(true),
     [workflow, setWorkflow] = useState('shots'),
     [links, setLinks] = useState<ShotLink[]>([]),
     [selectedShots, setSelectedShots] = useState<
@@ -55,7 +56,7 @@ export default function FlowsPage() {
     [picker, setPicker] = useState(false),
     [pending, setPending] = useState(false),
     [remove, setRemove] = useState<Item>(),
-    [copy,setCopy]=useState<Item>(),
+    [copy, setCopy] = useState<Item>(),
     [rename, setRename] = useState<Item>()
   const creating = location.pathname.endsWith('/new')
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function FlowsPage() {
       const r = await flowRequest<{ id: string }>(`/${id}/manage`, {
         action,
         name: title,
-        ...(action==='duplicate'?{date}:{}),
+        ...(action === 'duplicate' ? { date } : {}),
       })
       if (action === 'archive')
         toast('Flow deleted.', {
@@ -111,8 +112,12 @@ export default function FlowsPage() {
         name,
         date,
         clockVersion: 2,
+        departmentTemplate: workflow === 'import' ? 'import' : 'standard',
         ...(workflow === 'shots'
-          ? { listId: links[0]?.listId, shotIds: links.map((l) => l.shotId) }
+          ? {
+              listId: links[0]?.listId,
+              shotIds: links.map((l) => l.shotId),
+            }
           : {}),
       })
       navigate(`/flows/${r.id}${workflow === 'import' ? '?import=1' : ''}`)
@@ -129,10 +134,11 @@ export default function FlowsPage() {
       sort === 'title'
         ? a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
         : sort === 'modified'
-          ? b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
-          : (a.date || '9999').localeCompare(b.date || '9999') ||
-            a.name.localeCompare(b.name) ||
-            a.id.localeCompare(b.id),
+        ? b.updatedAt.localeCompare(a.updatedAt) ||
+          a.id.localeCompare(b.id)
+        : (a.date || '9999').localeCompare(b.date || '9999') ||
+          a.name.localeCompare(b.name) ||
+          a.id.localeCompare(b.id),
     )
   return (
     <div className="pd-page flow-index">
@@ -175,7 +181,7 @@ export default function FlowsPage() {
               <tr>
                 <th>Document</th>
                 <th>Shoot date</th>
-                                <th>Events</th>
+                <th>Events</th>
                 <th>Last updated</th>
                 <th>
                   <span className="pd-sr-only">Actions</span>
@@ -185,14 +191,21 @@ export default function FlowsPage() {
             <tbody>
               {filtered.map((i) => (
                 <DocumentRow key={i.id} to={`/flows/${i.id}`}>
-                  <td><div className="pd-document-title">
-                    <Link className="pd-document-link" to={`/flows/${i.id}`}>
-                      {i.name}
-                    </Link>
-                    {i.listId && (
-                      <small>{i.listName || 'Shot List unavailable'}</small>
-                    )}
-                  </div></td>
+                  <td>
+                    <div className="pd-document-title">
+                      <Link
+                        className="pd-document-link"
+                        to={`/flows/${i.id}`}
+                      >
+                        {i.name}
+                      </Link>
+                      {i.listId && (
+                        <small>
+                          {i.listName || 'Shot List unavailable'}
+                        </small>
+                      )}
+                    </div>
+                  </td>
                   <td>{i.date || 'Unscheduled'}</td>
                   <td>{i.eventCount}</td>
                   <td>
@@ -220,7 +233,11 @@ export default function FlowsPage() {
                         {
                           value: 'duplicate',
                           label: 'Duplicate for another day',
-                          onSelect: () => {setName(i.name+' — Copy');setDate('');setCopy(i)},
+                          onSelect: () => {
+                            setName(i.name + ' — Copy')
+                            setDate('')
+                            setCopy(i)
+                          },
                         },
                         {
                           value: 'archive',
@@ -262,13 +279,40 @@ export default function FlowsPage() {
               variant="primary"
               state={pending ? 'pending' : 'idle'}
               onClick={() => void create()}
-              disabled={!name.trim() || (workflow === 'shots' && !links.length)}
+              disabled={
+                !dateValid ||
+                !name.trim() ||
+                (workflow === 'shots' && !links.length)
+              }
             >
               Create Flow
             </Button>
           }
         >
-          <CreationChoices value={workflow} onChange={setWorkflow} choices={[{id:'shots',icon:'shots',label:'From Shot List',description:'Plan with your production shots'},{id:'import',icon:'import',label:'Import Excel',description:'Bring an existing schedule'},{id:'blank',icon:'file',label:'Start blank',description:'Build the day as you go'}]}/>
+          <CreationChoices
+            value={workflow}
+            onChange={setWorkflow}
+            choices={[
+              {
+                id: 'shots',
+                icon: 'shots',
+                label: 'From Shot List',
+                description: 'Plan with your production shots',
+              },
+              {
+                id: 'import',
+                icon: 'import',
+                label: 'Import Excel',
+                description: 'Bring an existing schedule',
+              },
+              {
+                id: 'blank',
+                icon: 'file',
+                label: 'Start blank',
+                description: 'Build the day as you go',
+              },
+            ]}
+          />
           <div className="flow-form">
             <label>
               Title
@@ -279,7 +323,12 @@ export default function FlowsPage() {
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
-            <DatePicker label="Shoot date" value={date} onChange={setDate}/>
+            <DatePicker
+              onValidityChange={setDateValid}
+              label="Shoot date"
+              value={date}
+              onChange={setDate}
+            />
           </div>
           {workflow === 'shots' && (
             <section className="flow-creation-shots">
@@ -288,12 +337,19 @@ export default function FlowsPage() {
                   ? `${links.length} shots selected`
                   : 'Choose Shot List and shots'}
               </Button>
-              {links.length>0&&<SelectedShots links={links} data={selectedShots} onChange={setLinks}/>}
+              {links.length > 0 && (
+                <SelectedShots
+                  links={links}
+                  data={selectedShots}
+                  onChange={setLinks}
+                />
+              )}
             </section>
           )}
           {workflow === 'import' && (
             <p className="flow-muted">
-              Review the workbook and map its time columns before adding events.
+              Review the workbook and map its time columns before adding
+              events.
             </p>
           )}
           {error && <ErrorNotice>{error}</ErrorNotice>}
@@ -302,22 +358,63 @@ export default function FlowsPage() {
       {picker && (
         <ShotPicker
           flowContext
-          preselectAvailable={links.length===0}
+          preselectAvailable={links.length === 0}
           initial={links}
           onClose={() => setPicker(false)}
           onConfirm={(l) => {
             setLinks(l)
             if (l[0])
               void shotRequest<{
-                shots: Record<string, Record<string, unknown>>;scenes:Record<string,Record<string,unknown>>
+                shots: Record<string, Record<string, unknown>>
+                scenes: Record<string, Record<string, unknown>>
               }>(`/${l[0].listId}/export`)
-                .then((r) => setSelectedShots(Object.fromEntries(Object.entries(r.shots).map(([id,shot])=>[id,{...shot,number:sourceLabel(shot,r)}]))))
+                .then((r) =>
+                  setSelectedShots(
+                    Object.fromEntries(
+                      Object.entries(r.shots).map(([id, shot]) => [
+                        id,
+                        { ...shot, number: sourceLabel(shot, r) },
+                      ]),
+                    ),
+                  ),
+                )
                 .catch((e) => setError(e.message))
             setPicker(false)
           }}
         />
       )}
-      {copy&&<Overlay title="Duplicate Flow" onClose={()=>setCopy(undefined)} footer={<Button variant="primary" disabled={!name.trim()||pending} onClick={()=>void manage(copy.id,'duplicate',name)}>Create copy</Button>}><div className="flow-form"><label>Title<input value={name} onChange={e=>setName(e.target.value)} maxLength={180}/></label><DatePicker label="Shoot date" value={date} onChange={setDate}/></div></Overlay>}
+      {copy && (
+        <Overlay
+          title="Duplicate Flow"
+          onClose={() => setCopy(undefined)}
+          footer={
+            <Button
+              variant="primary"
+              disabled={!dateValid || !name.trim() || pending}
+              onClick={() => void manage(copy.id, 'duplicate', name)}
+            >
+              Create copy
+            </Button>
+          }
+        >
+          <div className="flow-form">
+            <label>
+              Title
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={180}
+              />
+            </label>
+            <DatePicker
+              onValidityChange={setDateValid}
+              label="Shoot date"
+              value={date}
+              onChange={setDate}
+            />
+          </div>
+        </Overlay>
+      )}
       {rename && (
         <Overlay
           title="Rename Flow"
@@ -356,7 +453,8 @@ export default function FlowsPage() {
           }
         >
           <p>
-            The Flow can be restored. Its connected Shot List remains unchanged.
+            The Flow can be restored. Its connected Shot List remains
+            unchanged.
           </p>
         </Overlay>
       )}

@@ -105,11 +105,20 @@ export default function StoryboardsPage() {
         id: requestId.current,
         name: name.trim(),
         ...(workflow === 'shots'
-          ? { listId: links[0]?.listId, shotIds: links.map((l) => l.shotId) }
+          ? {
+              listId: links[0]?.listId,
+              shotIds: links.map((l) => l.shotId),
+            }
           : {}),
       })
       navigate(
-        `/storyboards/${board.id}${workflow === 'import' ? '?import=1' : workflow === 'blank' ? '?draw=1' : ''}`,
+        `/storyboards/${board.id}${
+          workflow === 'import'
+            ? '?import=1'
+            : workflow === 'blank'
+            ? '?draw=1'
+            : ''
+        }`,
       )
     } catch (e) {
       setError((e as Error).message)
@@ -322,7 +331,19 @@ export default function StoryboardsPage() {
           </label>
           {creating && (
             <div className="sb-creation-options">
-              <CreationChoices value={workflow} onChange={setWorkflow} choices={[{id:'import',label:'Import artwork',icon:'import'},{id:'shots',label:'From Shot List',icon:'shots'},{id:'blank',label:'Start drawing',icon:'edit'}]}/>
+              <CreationChoices
+                value={workflow}
+                onChange={setWorkflow}
+                choices={[
+                  {
+                    id: 'import',
+                    label: 'Import artwork',
+                    icon: 'import',
+                  },
+                  { id: 'shots', label: 'From Shot List', icon: 'shots' },
+                  { id: 'blank', label: 'Start drawing', icon: 'edit' },
+                ]}
+              />
               {workflow === 'shots' && (
                 <Button onClick={() => setPicker(true)}>
                   Choose shots{links.length ? ` · ${links.length}` : ''}
@@ -366,8 +387,8 @@ export default function StoryboardsPage() {
           }
         >
           <p>
-            You can restore this storyboard from the notification. Linked shots
-            stay in place.
+            You can restore this storyboard from the notification. Linked
+            shots stay in place.
           </p>
         </Overlay>
       )}

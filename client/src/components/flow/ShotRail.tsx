@@ -33,7 +33,7 @@ function RailShot({
   const s = useDraggable({
     id: 'rail:' + str(shot, 'id'),
     type: scope,
-    disabled: count>0,
+    disabled: count > 0,
   })
   return (
     <article
@@ -41,13 +41,15 @@ function RailShot({
       className="flow-rail-shot"
       data-dragging={s.isDragging || undefined}
     >
-      <button
-        ref={s.handleRef as never}
-        className="flow-grip"
-        aria-label={`Schedule ${displayShot(doc, shot)}`}
-      >
-        ⠿
-      </button>
+      {!count && (
+        <button
+          ref={s.handleRef as never}
+          className="flow-grip"
+          aria-label={`Schedule ${displayShot(doc, shot)}`}
+        >
+          ⠿
+        </button>
+      )}
       <button className="flow-rail-select" onClick={onSelect}>
         <strong>
           {displayShot(doc, shot)}
@@ -73,7 +75,13 @@ function RailShot({
           </small>
         )}
       </button>
-      {!count&&<IconButton name="plus" label={`Schedule ${displayShot(doc,shot)}`} onClick={()=>onAdd(shot)}/>}
+      {!count && (
+        <IconButton
+          name="plus"
+          label={`Schedule ${displayShot(doc, shot)}`}
+          onClick={() => onAdd(shot)}
+        />
+      )}
     </article>
   )
 }
@@ -87,7 +95,9 @@ export default function ShotRail({
   onConnect,
   onDisconnect,
   onSelect,
+  onAttention,
 }: {
+  onAttention: (event: FlowEvent) => void
   source?: Y.Doc
   listId: string
   events: FlowEvent[]
@@ -108,7 +118,9 @@ export default function ShotRail({
     setArt([])
     if (selected && listId)
       void boardRequest<{ items: typeof art }>(
-        `/shotlinks?listId=${encodeURIComponent(listId)}&shotId=${encodeURIComponent(selected)}`,
+        `/shotlinks?listId=${encodeURIComponent(
+          listId,
+        )}&shotId=${encodeURIComponent(selected)}`,
       )
         .then((r) => setArt(r.items))
         .catch(() => {})
@@ -125,19 +137,26 @@ export default function ShotRail({
         )
         .sort(
           (a, b) =>
-            Number(scenes(source).get(str(a, 'sceneId'))?.get('order') || 0) -
+            Number(
+              scenes(source).get(str(a, 'sceneId'))?.get('order') || 0,
+            ) -
               Number(
                 scenes(source).get(str(b, 'sceneId'))?.get('order') || 0,
               ) || Number(a.get('order')) - Number(b.get('order')),
         )
     : []
   const count = (id: string) =>
-    events.filter((e) => e.sourceListId === listId && e.shotId === id).length
+    events.filter((e) => e.sourceListId === listId && e.shotId === id)
+      .length
   return (
     <aside className="flow-shot-rail" aria-label="Connected Shot Rail">
       <header>
         <h2>Shot Rail</h2>
-        <IconButton name="close" label="Close Shot Rail" onClick={onClose} />
+        <IconButton
+          name="close"
+          label="Close Shot Rail"
+          onClick={onClose}
+        />
       </header>
       {!listId ? (
         <div className="flow-rail-empty">
@@ -151,7 +170,8 @@ export default function ShotRail({
           <div className="flow-rail-source">
             <Link to={`/shotlists/${listId}`}>
               {String(
-                source?.getMap('meta').get('name') || 'Connected Shot List',
+                source?.getMap('meta').get('name') ||
+                  'Connected Shot List',
               )}
             </Link>
             <Menu
@@ -197,13 +217,61 @@ export default function ShotRail({
                 : []),
             ]}
           />
-          <div className="flow-rail-scroll">            {events.some(e=>!e.start||e.effectiveDuration==null)&&<section><h3>Needs attention</h3>{events.filter(e=>e.type==='shot'&&(!e.start||e.effectiveDuration==null)).map(e=><button className="flow-rail-issue" key={e.id} onClick={()=>{const s=source&&shots(source).get(e.shotId||'');if(s)onSelect(s)}}>{e.label||e.reference||'Source unavailable'}<small>{e.effectiveDuration==null?'Estimate needed':'Set the first shooting time'}</small></button>)}</section>}
-
+          <div className="flow-rail-scroll">
+            {' '}
+            {events.some((e) => e.type === 'shot' && !e.start) &&
+              !events.some((e) => e.type === 'shot' && e.start) && (
+                <button
+                  className="flow-rail-issue"
+                  onClick={() =>
+                    onAttention(events.find((e) => e.type === 'shot')!)
+                  }
+                >
+                  Set the first shooting time
+                  <small>
+                    The shooting sequence will calculate from real
+                    estimates.
+                  </small>
+                </button>
+              )}
+            {events.some(
+              (e) =>
+                e.type === 'shot' &&
+                (e.sourceMissing || e.effectiveDuration == null),
+            ) && (
+              <section>
+                <h3>Needs attention</h3>
+                {events
+                  .filter(
+                    (e) =>
+                      e.type === 'shot' &&
+                      (e.sourceMissing || e.effectiveDuration == null),
+                  )
+                  .map((e) => (
+                    <button
+                      className="flow-rail-issue"
+                      key={e.id}
+                      onClick={() => onAttention(e)}
+                    >
+                      {e.label || e.reference || 'Shot'}
+                      <small>
+                        {e.sourceMissing
+                          ? 'Source unavailable · relink'
+                          : 'Estimate needed'}
+                      </small>
+                    </button>
+                  ))}
+              </section>
+            )}
             {[false, true].map((scheduled) => (
               <details key={String(scheduled)} open={!scheduled}>
-                <summary>{scheduled ? 'Scheduled' : 'Needs scheduling'}</summary>
+                <summary>
+                  {scheduled ? 'Scheduled' : 'Needs scheduling'}
+                </summary>
                 {rows
-                  .filter((s) => Boolean(count(str(s, 'id'))) === scheduled)
+                  .filter(
+                    (s) => Boolean(count(str(s, 'id'))) === scheduled,
+                  )
                   .map((s, i) => (
                     <RailShot
                       key={str(s, 'id')}
@@ -222,7 +290,9 @@ export default function ShotRail({
               </details>
             ))}
             {!rows.length && (
-              <p className="flow-muted">No available shots match this view.</p>
+              <p className="flow-muted">
+                No available shots match this view.
+              </p>
             )}
             {art.length > 0 && (
               <section>

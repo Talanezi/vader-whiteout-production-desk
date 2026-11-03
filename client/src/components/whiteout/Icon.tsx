@@ -10,6 +10,7 @@ export type IconName =
   | 'columns'
   | 'file'
   | 'people'
+  | 'minus'
   | 'plus'
   | 'search'
   | 'close'
@@ -47,6 +48,7 @@ const paths: Record<IconName, string> = {
   file: 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',
   people:
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M18 8a3 3 0 0 1 0 6 M22 21v-2a4 4 0 0 0-3-3.9',
+  minus: 'M5 12h14',
   plus: 'M12 5v14 M5 12h14',
   search: 'M21 21l-5-5 M18 10a8 8 0 1 0-16 0 8 8 0 0 0 16 0',
   close: 'M6 6l12 12 M6 18 18 6',

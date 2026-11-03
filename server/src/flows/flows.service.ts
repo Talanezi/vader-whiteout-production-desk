@@ -12,7 +12,10 @@ import * as Y from 'yjs';
 import { Hocuspocus } from '@hocuspocus/server';
 import { WebSocketServer } from 'ws';
 import type { Server as HttpServer } from 'http';
-import { ShotlistsService, Collaborator } from '../shotlists/shotlists.service';
+import {
+  ShotlistsService,
+  Collaborator,
+} from '../shotlists/shotlists.service';
 import { AuthService } from '../auth/auth.service';
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -32,7 +35,7 @@ import {
 @Injectable()
 export class FlowsService implements OnModuleDestroy {
   private collab?: Hocuspocus;
-  private historyClock = new Map<string,{at:number,hash:string}>();
+  private historyClock = new Map<string, { at: number; hash: string }>();
   private sockets?: WebSocketServer;
   private recheck?: ReturnType<typeof setInterval>;
   private queues = new Map<string, Promise<void>>();
@@ -49,7 +52,8 @@ export class FlowsService implements OnModuleDestroy {
     return () =>
       setImmediate(() => {
         release();
-        if (this.messageQueues.get(id) === tail) this.messageQueues.delete(id);
+        if (this.messageQueues.get(id) === tail)
+          this.messageQueues.delete(id);
       });
   }
   private lease?: ReturnType<DataSource['createQueryRunner']>;
@@ -86,10 +90,11 @@ export class FlowsService implements OnModuleDestroy {
           return {
             ...row,
             ...meta,
-            listName: names.find((x: any) => x.id === meta.listId)?.name || '',
-            eventCount: [...d.getMap<Y.Map<unknown>>('events').values()].filter(
-              (e) => !e.get('deletedAt'),
-            ).length,
+            listName:
+              names.find((x: any) => x.id === meta.listId)?.name || '',
+            eventCount: [
+              ...d.getMap<Y.Map<unknown>>('events').values(),
+            ].filter((e) => !e.get('deletedAt')).length,
           };
         } finally {
           d.destroy();
@@ -120,7 +125,10 @@ export class FlowsService implements OnModuleDestroy {
         author: user.name,
       }).forEach(([k, v]) => d.getMap('meta').set(k, v));
       validateMeta(d.getMap('meta').toJSON());
-      DEFAULT_DEPARTMENTS.forEach((name, i) =>
+      (p.departmentTemplate === 'import'
+        ? []
+        : DEFAULT_DEPARTMENTS
+      ).forEach((name, i) =>
         setRecord(d, 'departments', randomUUID(), {
           name,
           order: (i + 1) * 1024,
@@ -135,14 +143,17 @@ export class FlowsService implements OnModuleDestroy {
         d.getMap('meta').set('listId', p.listId);
         if (
           p.start != null &&
-          (typeof p.start !== 'string' || !Number.isFinite(Date.parse(p.start)))
+          (typeof p.start !== 'string' ||
+            !Number.isFinite(Date.parse(p.start)))
         )
           throw new BadRequestException('Choose a valid filming start.');
         let cursor: string | null = p.start || null;
         for (const [i, id] of p.shotIds.entries()) {
           const shot: any = source.shots[id];
           if (!shot || shot.deleted || shot.deletedAt)
-            throw new BadRequestException('A selected shot is unavailable.');
+            throw new BadRequestException(
+              'A selected shot is unavailable.',
+            );
           const eventId = randomUUID();
           setRecord(d, 'events', eventId, {
             type: 'shot',
@@ -158,7 +169,9 @@ export class FlowsService implements OnModuleDestroy {
             status: 'planned',
             fixed: false,
           });
-          for (const dep of d.getMap<Y.Map<unknown>>('departments').values()) {
+          for (const dep of d
+            .getMap<Y.Map<unknown>>('departments')
+            .values()) {
             const departmentId = String(dep.get('id'));
             setRecord(d, 'instructions', eventId + ':' + departmentId, {
               eventId,
@@ -173,7 +186,9 @@ export class FlowsService implements OnModuleDestroy {
             n != null &&
             Number.isFinite(Number(n)) &&
             Number(n) >= 0
-              ? new Date(Date.parse(cursor) + Number(n) * 60000).toISOString()
+              ? new Date(
+                  Date.parse(cursor) + Number(n) * 60000,
+                ).toISOString()
               : null;
         }
       }
@@ -200,7 +215,9 @@ export class FlowsService implements OnModuleDestroy {
         id: user.userID,
         name: user.name,
         role: user.role,
-        color: ['#87d8ff', '#d9b8ff', '#a4d6b3', '#f5c48b'][user.userID % 4],
+        color: ['#87d8ff', '#d9b8ff', '#a4d6b3', '#f5c48b'][
+          user.userID % 4
+        ],
       },
     };
   }
@@ -253,8 +270,14 @@ export class FlowsService implements OnModuleDestroy {
     }
     return this.withDocument(id, user, async (d) => {
       if (p.action === 'rename') {
-        if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 180)
-          throw new BadRequestException('Enter a title up to 180 characters.');
+        if (
+          typeof p.name !== 'string' ||
+          !p.name.trim() ||
+          p.name.length > 180
+        )
+          throw new BadRequestException(
+            'Enter a title up to 180 characters.',
+          );
         d.getMap('meta').set('name', p.name.trim());
         await this.persist(id, d);
         return { id };
@@ -265,7 +288,10 @@ export class FlowsService implements OnModuleDestroy {
         try {
           const state = capture(d),
             departmentIds = new Map(
-              Object.keys(state.departments).map((id) => [id, randomUUID()]),
+              Object.keys(state.departments).map((id) => [
+                id,
+                randomUUID(),
+              ]),
             ),
             eventIds = new Map(
               Object.keys(state.events).map((id) => [id, randomUUID()]),
@@ -284,6 +310,13 @@ export class FlowsService implements OnModuleDestroy {
           meta.set('date', p.date || '');
           if (p.zone) meta.set('zone', p.zone);
           meta.set('status', 'draft');
+          for (const key of [
+            'issuedAt',
+            'publishedAt',
+            'issuedBy',
+            'publishedBy',
+          ])
+            meta.delete(key);
           meta.set('author', user.name);
           validateMeta(meta.toJSON());
           for (const [old, newId] of departmentIds) {
@@ -294,6 +327,12 @@ export class FlowsService implements OnModuleDestroy {
             const { id: _, ...v } = state.events[old];
             setRecord(copy, 'events', newId, {
               ...v,
+              ...(v.dependsOn
+                ? { dependsOn: eventIds.get(v.dependsOn) }
+                : {}),
+              ...(v.departmentId
+                ? { departmentId: departmentIds.get(v.departmentId) }
+                : {}),
               start: null,
               actualStart: null,
               actualEnd: null,
@@ -304,14 +343,26 @@ export class FlowsService implements OnModuleDestroy {
             const eventId = eventIds.get(i.eventId),
               departmentId = departmentIds.get(i.departmentId);
             if (eventId && departmentId)
-              setRecord(copy, 'instructions', eventId + ':' + departmentId, {
-                eventId,
-                departmentId,
-                text: i.text,
-              });
+              setRecord(
+                copy,
+                'instructions',
+                eventId + ':' + departmentId,
+                {
+                  ...i,
+                  id: eventId + ':' + departmentId,
+                  eventId,
+                  departmentId,
+                  text: i.text,
+                },
+              );
           }
           for (const [key, value] of Object.entries(state.imports))
-            setRecord(copy, 'imports', key, value as Record<string, unknown>);
+            setRecord(
+              copy,
+              'imports',
+              key,
+              value as Record<string, unknown>,
+            );
           await this.db.transaction(async (manager) => {
             await manager.query(
               'INSERT INTO flow_documents(id,name,creator_id,state) VALUES($1,$2,$3,$4)',
@@ -377,13 +428,29 @@ export class FlowsService implements OnModuleDestroy {
       throw new BadRequestException('Invalid Flow action.');
     });
   }
-  private async autoCheckpoint(id:string,d:Y.Doc) {
-    const clock=this.historyClock.get(id), hash=stableJSON(capture(d));
-    if(!clock){this.historyClock.set(id,{at:Date.now(),hash});return;}
-    if(Date.now()-clock.at<300000||clock.hash===hash)return;
-    this.historyClock.set(id,{at:Date.now(),hash});
-    const author=String(d.getMap('meta').get('author')||'Production team');
-    try {await this.checkpoint(id,{name:author} as Collaborator,d,'Automatic checkpoint');} catch(e){this.historyClock.set(id,clock);throw e;}
+  private async autoCheckpoint(id: string, d: Y.Doc) {
+    const clock = this.historyClock.get(id),
+      hash = stableJSON(capture(d));
+    if (!clock) {
+      this.historyClock.set(id, { at: Date.now(), hash });
+      return;
+    }
+    if (Date.now() - clock.at < 300000 || clock.hash === hash) return;
+    this.historyClock.set(id, { at: Date.now(), hash });
+    const author = String(
+      d.getMap('meta').get('author') || 'Production team',
+    );
+    try {
+      await this.checkpoint(
+        id,
+        { name: author } as Collaborator,
+        d,
+        'Automatic checkpoint',
+      );
+    } catch (e) {
+      this.historyClock.set(id, clock);
+      throw e;
+    }
   }
   private async checkpoint(
     id: string,
@@ -391,8 +458,19 @@ export class FlowsService implements OnModuleDestroy {
     d: Y.Doc,
     summary: string,
   ) {
-    const [previous]=await this.db.query('SELECT state FROM flow_revisions WHERE document_id=$1 ORDER BY created_at DESC LIMIT 1',[id]);
-    if(previous){const old=new Y.Doc();try{Y.applyUpdate(old,previous.state);if(stableJSON(capture(old))===stableJSON(capture(d)))return;}finally{old.destroy();}}
+    const [previous] = await this.db.query(
+      'SELECT state FROM flow_revisions WHERE document_id=$1 ORDER BY created_at DESC LIMIT 1',
+      [id],
+    );
+    if (previous) {
+      const old = new Y.Doc();
+      try {
+        Y.applyUpdate(old, previous.state);
+        if (stableJSON(capture(old)) === stableJSON(capture(d))) return;
+      } finally {
+        old.destroy();
+      }
+    }
     await this.db.query(
       'INSERT INTO flow_revisions(id,document_id,state,author,summary) VALUES($1,$2,$3,$4,$5)',
       [
@@ -422,7 +500,7 @@ export class FlowsService implements OnModuleDestroy {
     }
     return {
       items: await this.db.query(
-        'SELECT id,author,summary,created_at AS \"createdAt\" FROM flow_revisions WHERE document_id=$1 ORDER BY created_at DESC,id',
+        'SELECT id,author,summary,created_at AS "createdAt" FROM flow_revisions WHERE document_id=$1 ORDER BY created_at DESC,id',
         [id],
       ),
     };
@@ -445,7 +523,11 @@ export class FlowsService implements OnModuleDestroy {
         id,
         key,
         JSON.stringify(settings),
-        JSON.stringify({title:state.state?.meta?.name,date:state.state?.meta?.date,revision:key}),
+        JSON.stringify({
+          title: state.state?.meta?.name,
+          date: state.state?.meta?.date,
+          revision: key,
+        }),
         Buffer.alloc(0),
         user.userID,
       ],
@@ -458,7 +540,10 @@ export class FlowsService implements OnModuleDestroy {
       'SELECT pdf FROM flow_prints WHERE document_id=$1 AND digest=$2',
       [id, key],
     );
-    if (!r || !r.pdf.length) throw new BadRequestException('This temporary export has expired. Generate a fresh preview.');
+    if (!r || !r.pdf.length)
+      throw new BadRequestException(
+        'This temporary export has expired. Generate a fresh preview.',
+      );
     return r.pdf as Buffer;
   }
   private async persist(
@@ -471,10 +556,9 @@ export class FlowsService implements OnModuleDestroy {
       .then(async () => {
         validateFlow(capture(d));
         const state = Buffer.from(Y.encodeStateAsUpdate(d)),
-          name = String(d.getMap('meta').get('name') || 'Untitled Flow').slice(
-            0,
-            180,
-          ),
+          name = String(
+            d.getMap('meta').get('name') || 'Untitled Flow',
+          ).slice(0, 180),
           hash = digest(d);
         afterCapture?.();
         await this.db.query(
@@ -526,7 +610,9 @@ export class FlowsService implements OnModuleDestroy {
         const release = await this.messageTurn(documentName);
         try {
           if (Date.now() - context.checkedAt > 30000) {
-            const user = await this.auth.verifySchedulerToken(context.token);
+            const user = await this.auth.verifySchedulerToken(
+              context.token,
+            );
             if (user.userID !== context.user.userID)
               throw new Error('Session changed');
             context.user = user;
@@ -573,7 +659,10 @@ export class FlowsService implements OnModuleDestroy {
           );
           if (!row) throw new Error('Unavailable');
           Y.applyUpdate(document, row.state);
-          this.historyClock.set(documentName,{at:Date.now(),hash:stableJSON(capture(document))});
+          this.historyClock.set(documentName, {
+            at: Date.now(),
+            hash: stableJSON(capture(document)),
+          });
           return document;
         } catch (error) {
           throw collaborationError(error, 4403);
@@ -593,12 +682,20 @@ export class FlowsService implements OnModuleDestroy {
           throw collaborationError(error, 1013);
         }
       },
-      onStateless: async ({ payload, documentName, document, connection }) => {
+      onStateless: async ({
+        payload,
+        documentName,
+        document,
+        connection,
+      }) => {
         try {
           if (payload !== 'persistence-status') return;
           await this.persist(documentName, document);
           connection.sendStateless(
-            JSON.stringify({ type: 'persisted', digest: digest(document) }),
+            JSON.stringify({
+              type: 'persisted',
+              digest: digest(document),
+            }),
           );
         } catch (error) {
           throw collaborationError(error, 1013);
@@ -607,16 +704,22 @@ export class FlowsService implements OnModuleDestroy {
     });
     this.recheck = setInterval(() => {
       for (const doc of this.collab!.documents.values()) {
-        if(doc.getConnectionsCount()>0) void this.autoCheckpoint(doc.name,doc).catch(()=>{});
+        if (doc.getConnectionsCount() > 0)
+          void this.autoCheckpoint(doc.name, doc).catch(() => {});
         for (const c of doc.getConnections())
           void (async () => {
-            const user = await this.auth.verifySchedulerToken(c.context.token);
+            const user = await this.auth.verifySchedulerToken(
+              c.context.token,
+            );
             if (user.userID !== c.context.user.userID) throw new Error();
             await this.authorize(doc.name, user);
             c.context.user = user;
             c.context.checkedAt = Date.now();
           })().catch(() =>
-            c.close({ code: 4403, reason: 'Session or membership revoked' }),
+            c.close({
+              code: 4403,
+              reason: 'Session or membership revoked',
+            }),
           );
       }
     }, 30000);
@@ -635,7 +738,9 @@ export class FlowsService implements OnModuleDestroy {
       const url = new URL(request.url || '/', 'http://localhost');
       if (url.pathname !== '/api/flows/collaboration') return;
       if (url.search || !origins.has(request.headers.origin || '')) {
-        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        socket.write(
+          'HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n',
+        );
         socket.destroy();
         return;
       }

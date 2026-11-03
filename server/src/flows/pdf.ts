@@ -1,4 +1,4 @@
-import {resolveSchedule,clockText,sourceLabel} from './scheduling';
+import { resolveSchedule, clockText, sourceLabel } from './scheduling';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -41,21 +41,27 @@ export async function renderFlow(
     throw Error('Choose valid included fields.');
   const departments = (Object.values(state.departments) as any[])
     .filter((d) => !d.removedAt && raw.departments.includes(d.id))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        raw.departments.indexOf(a.id) - raw.departments.indexOf(b.id),
+    );
   if (raw.product === 'department' && departments.length !== 1)
     throw Error('Choose one department for Department Focus.');
-  const resolved = resolveSchedule(state,source), events = resolved.events;
+  const resolved = resolveSchedule(state, source),
+    events = resolved.events;
   const rows = events.filter((e) =>
     raw.product === 'rundown'
       ? e.type !== 'department'
       : raw.product === 'department'
-        ? e.type !== 'department' || e.departmentId===departments[0]?.id ||
-          departments.some((d) =>
-            String(state.instructions[e.id + ':' + d.id]?.text || '').trim(),
-          )
-        : true,
+      ? e.type !== 'department' ||
+        e.departmentId === departments[0]?.id ||
+        departments.some((d) =>
+          String(state.instructions[e.id + ':' + d.id]?.text || '').trim(),
+        )
+      : true,
   );
-  if (!rows.length) throw Error('There are no events in this print scope.');
+  if (!rows.length)
+    throw Error('There are no events in this print scope.');
   if (rows.length * Math.max(1, departments.length) > 60000)
     throw Error(
       'This output exceeds 60,000 table cells. Choose a smaller department scope.',
@@ -88,11 +94,14 @@ export async function renderFlow(
         ? 0
         : Math.max(
             1,
-            Math.floor((usable - timeWidth - actionWidth) / departmentWidth),
+            Math.floor(
+              (usable - timeWidth - actionWidth) / departmentWidth,
+            ),
           ),
     bands: any[][] = [];
   if (!count) bands.push([]);
-  else if (!departments.length) throw Error('Choose at least one department.');
+  else if (!departments.length)
+    throw Error('Choose at least one department.');
   else {
     let band: any[] = [];
     for (let i = 0; i < departments.length; ) {
@@ -116,7 +125,8 @@ export async function renderFlow(
     }
     if (band.length) bands.push(band);
   }
-  const format = (e:any) => clockText(e.minute)+(e.minute>=1440?'\nNext day':'');
+  const format = (e: any) =>
+    clockText(e.minute) + (e.minute >= 1440 ? '\nNext day' : '');
   const shotFor = (e: any) =>
     e.sourceListId === state.meta.listId && source
       ? source.shots[e.shotId]
@@ -125,13 +135,13 @@ export async function renderFlow(
     e.duration != null
       ? e.duration
       : shotFor(e) &&
-          !shotFor(e).deleted &&
-          shotFor(e).estimatedMinutes !== '' &&
-          shotFor(e).estimatedMinutes != null &&
-          Number.isFinite(Number(shotFor(e).estimatedMinutes)) &&
-          Number(shotFor(e).estimatedMinutes) >= 0
-        ? Number(shotFor(e).estimatedMinutes)
-        : null;
+        !shotFor(e).deleted &&
+        shotFor(e).estimatedMinutes !== '' &&
+        shotFor(e).estimatedMinutes != null &&
+        Number.isFinite(Number(shotFor(e).estimatedMinutes)) &&
+        Number(shotFor(e).estimatedMinutes) >= 0
+      ? Number(shotFor(e).estimatedMinutes)
+      : null;
   const texts = rows.map((e) => {
     const shot = shotFor(e),
       valid = shot && !shot.deleted && !shot.deletedAt;
@@ -140,21 +150,38 @@ export async function renderFlow(
       [
         e.type === 'shot'
           ? valid
-            ? sourceLabel(shot,source) + ' ' + String(shot.subject || '')
+            ? sourceLabel(shot, source) +
+              (shot.labelConflict
+                ? ' · code conflict [' + String(e.shotId).slice(0, 8) + ']'
+                : '') +
+              ' ' +
+              String(shot.subject || '')
             : String(e.reference || 'Shot') + ' · source unavailable'
           : '',
         e.category,
         e.description,
         valid ? String(shot.coverage || '') : '',
-        dur(e) != null
-          ? `${dur(e)} min`
-          : '',
+        dur(e) != null ? `${dur(e)} min` : '',
         raw.notes ? e.notes : '',
       ]
         .filter(Boolean)
         .join('\n'),
       ...departments.map((d) =>
-        (() => {const i=resolved.instructions.find((i:any)=>i.eventId===e.id&&i.departmentId===d.id);return [i?.minute!=null?clockText(i.minute)+(i.minute>=1440?' · Next day':'')+(i.duration!=null?' · '+i.duration+' min':''):'',i?.text||''].filter(Boolean).join('\n')})(),
+        (() => {
+          const i = resolved.instructions.find(
+            (i: any) => i.eventId === e.id && i.departmentId === d.id,
+          );
+          return [
+            i?.minute != null
+              ? clockText(i.minute) +
+                (i.minute >= 1440 ? ' · Next day' : '') +
+                (i.duration != null ? ' · ' + i.duration + ' min' : '')
+              : '',
+            i?.text || '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+        })(),
       ),
     ];
   });
@@ -179,7 +206,9 @@ export async function renderFlow(
       [
         text[0],
         text[1],
-        ...ds.map((d) => text[2 + departments.findIndex((x) => x.id === d.id)]),
+        ...ds.map(
+          (d) => text[2 + departments.findIndex((x) => x.id === d.id)],
+        ),
       ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, size)),
     ),
   );
@@ -198,7 +227,9 @@ export async function renderFlow(
     ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, 8)),
   );
   const headerHeight = Math.max(
-    ...bandHeadings.map((c) => Math.max(...c.map((l) => l.length)) * 10.5 + 12),
+    ...bandHeadings.map(
+      (c) => Math.max(...c.map((l) => l.length)) * 10.5 + 12,
+    ),
   );
   const bodyHeight = H - docHeader - headerHeight - margin - 24;
   if (bodyHeight < 60)
@@ -226,7 +257,7 @@ export async function renderFlow(
       });
     return out;
   });
-  const pages: (typeof fragments)[] = [];
+  const pages: typeof fragments[] = [];
   let current: typeof fragments = [],
     used = 0;
   for (const f of fragments) {
@@ -256,7 +287,20 @@ export async function renderFlow(
       const draw = (text: string, x: number, y: number, fontSize = size) =>
         page.drawText(text, { x, y, size: fontSize, font, color: ink });
       titleLines.forEach((t, i) => draw(t, margin, H - 30 - i * 19, 15));
-      draw(state.meta.date ? new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(new Date(state.meta.date+'T12:00:00Z')) : 'Shoot date not set',margin,H-docHeader+12,9);
+      draw(
+        state.meta.date
+          ? new Intl.DateTimeFormat('en-US', {
+              timeZone: 'UTC',
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }).format(new Date(state.meta.date + 'T12:00:00Z'))
+          : 'Shoot date not set',
+        margin,
+        H - docHeader + 12,
+        9,
+      );
       let y = H - docHeader,
         x = margin;
       const headingLines = bandHeadings[bi],
@@ -290,7 +334,11 @@ export async function renderFlow(
             color:
               raw.style === 'mono'
                 ? rgb(0.94, 0.94, 0.94)
-                : /lunch|break/i.test(e.description||e.category||'') ? rgb(0.97,0.94,0.88) : /wrap/i.test(e.description||e.category||'') ? rgb(0.9,0.93,0.92) : rgb(0.89, 0.95, 0.97),
+                : /lunch|break/i.test(e.description || e.category || '')
+                ? rgb(0.97, 0.94, 0.88)
+                : /wrap/i.test(e.description || e.category || '')
+                ? rgb(0.9, 0.93, 0.92)
+                : rgb(0.89, 0.95, 0.97),
           });
         x = margin;
         lines[bi][f.ri].forEach((ls, i) => {
@@ -313,7 +361,7 @@ export async function renderFlow(
           color: rule,
         });
       }
-      draw(String(vi * bands.length + bi + 1),W-margin-12,20,8);
+      draw(String(vi * bands.length + bi + 1), W - margin - 12, 20, 8);
     }
   pdf.setTitle(String(state.meta.name));
   pdf.setSubject('Production-day schedule');

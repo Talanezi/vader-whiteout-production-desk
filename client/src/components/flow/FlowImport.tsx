@@ -84,7 +84,8 @@ export default function FlowImport({
     setBusy(true)
     setError('')
     try {
-      if (!/\.xlsx$/i.test(f.name)) throw Error('Choose an .xlsx workbook.')
+      if (!/\.xlsx$/i.test(f.name))
+        throw Error('Choose an .xlsx workbook.')
       setProgress(0)
       const parsed = readWorkbook(await f.arrayBuffer())
       setProgress(1)
@@ -119,7 +120,10 @@ export default function FlowImport({
     try {
       const hash = [
           ...new Uint8Array(
-            await crypto.subtle.digest('SHA-256', await file.arrayBuffer()),
+            await crypto.subtle.digest(
+              'SHA-256',
+              await file.arrayBuffer(),
+            ),
           ),
         ]
           .map((b) => b.toString(16).padStart(2, '0'))
@@ -142,7 +146,10 @@ export default function FlowImport({
         ]
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
-        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(
+          13,
+          16,
+        )}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
       }
       const eventIds = Object.fromEntries(
           await Promise.all(
@@ -167,7 +174,8 @@ export default function FlowImport({
           Object.entries(mapping.departments).forEach(([col, name], i) => {
             const found = existing.find(
                 (d) =>
-                  d.name.trim().toLowerCase() === name.trim().toLowerCase(),
+                  d.name.trim().toLowerCase() ===
+                  name.trim().toLowerCase(),
               ),
               key = found?.id || departmentIds[col]
             ids[col] = key
@@ -198,16 +206,22 @@ export default function FlowImport({
               shot = sourceShots.find((s) => s.id === linked)
             const event = addEvent(staged, {
               id: eventIds[r.row],
-              type: linked ? 'shot' : ((types[r.row] || r.type) as 'custom'),
+              type: linked
+                ? 'shot'
+                : ((types[r.row] || r.type) as 'custom'),
               description: linked ? '' : r.description,
               start: r.start,
-              clockStart:r.start?(Date.parse(r.start)-Date.parse(date+'T00:00:00Z'))/60000:null,
-              timing:r.start?'anchor':'unscheduled',
+              clockStart: r.start
+                ? (Date.parse(r.start) - Date.parse(date + 'T00:00:00Z')) /
+                  60000
+                : null,
+              timing: r.start ? 'anchor' : 'unscheduled',
               actualStart: r.actualStart,
               duration: r.duration,
               notes:
                 (r.provenance as any).sourceEstimate && r.duration == null
-                  ? 'Source estimate: ' + (r.provenance as any).sourceEstimate
+                  ? 'Source estimate: ' +
+                    (r.provenance as any).sourceEstimate
                   : '',
               fixed: (types[r.row] || r.type) === 'milestone',
               provenance: r.provenance,
@@ -270,7 +284,8 @@ export default function FlowImport({
       {label}
       <Menu
         label={
-          cols.find((c) => c.value === mapping?.[key])?.label || 'Choose column'
+          cols.find((c) => c.value === mapping?.[key])?.label ||
+          'Choose column'
         }
         value={mapping?.[key] || ''}
         onChange={(v) => {
@@ -281,7 +296,9 @@ export default function FlowImport({
           {
             value: key === 'planned' ? 'none' : '',
             label:
-              key === 'planned' ? 'Do not assign planned times' : 'Not mapped',
+              key === 'planned'
+                ? 'Do not assign planned times'
+                : 'Not mapped',
           },
           ...cols,
         ]}
@@ -321,7 +338,9 @@ export default function FlowImport({
         accept=".xlsx"
         hidden
         ref={input}
-        onChange={(e) => e.target.files?.[0] && void choose(e.target.files[0])}
+        onChange={(e) =>
+          e.target.files?.[0] && void choose(e.target.files[0])
+        }
       />
       {!file ? (
         <div
@@ -329,7 +348,8 @@ export default function FlowImport({
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()
-            if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0])
+            if (e.dataTransfer.files[0])
+              void choose(e.dataTransfer.files[0])
           }}
         >
           <StudioGlyph name="layers" />
@@ -373,8 +393,8 @@ export default function FlowImport({
                 }))}
               />
               <p className="flow-warning">
-                The source time columns are unlabeled. Choose their meanings and
-                clock interpretation explicitly.
+                The source time columns are unlabeled. Choose their
+                meanings and clock interpretation explicitly.
               </p>
               {mappingField('planned', 'Planned time')}
               {mappingField('secondary', 'Secondary time')}
@@ -398,35 +418,38 @@ export default function FlowImport({
                   ]}
                 />
               </label>
-              {(['plannedClock', 'secondaryClock'] as const).map((k, i) => (
-                <label key={k}>
-                  {i ? 'Secondary' : 'Planned'} clock
-                  <Menu
-                    label={
-                      {
-                        '24': '24-hour source',
-                        '12-sequence': '12-hour sequence · advance at rollover',
-                        '12-afternoon': '1–6 interpreted as afternoon',
-                      }[mapping?.[k] || '24'] || ''
-                    }
-                    value={mapping?.[k] || '24'}
-                    onChange={(v) =>
-                      setMapping((m) => (m ? { ...m, [k]: v } : m))
-                    }
-                    items={[
-                      { value: '24', label: '24-hour source' },
-                      {
-                        value: '12-sequence',
-                        label: '12-hour sequence · advance at rollover',
-                      },
-                      {
-                        value: '12-afternoon',
-                        label: '1–6 interpreted as afternoon',
-                      },
-                    ]}
-                  />
-                </label>
-              ))}
+              {(['plannedClock', 'secondaryClock'] as const).map(
+                (k, i) => (
+                  <label key={k}>
+                    {i ? 'Secondary' : 'Planned'} clock
+                    <Menu
+                      label={
+                        {
+                          '24': '24-hour source',
+                          '12-sequence':
+                            '12-hour sequence · advance at rollover',
+                          '12-afternoon': '1–6 interpreted as afternoon',
+                        }[mapping?.[k] || '24'] || ''
+                      }
+                      value={mapping?.[k] || '24'}
+                      onChange={(v) =>
+                        setMapping((m) => (m ? { ...m, [k]: v } : m))
+                      }
+                      items={[
+                        { value: '24', label: '24-hour source' },
+                        {
+                          value: '12-sequence',
+                          label: '12-hour sequence · advance at rollover',
+                        },
+                        {
+                          value: '12-afternoon',
+                          label: '1–6 interpreted as afternoon',
+                        },
+                      ]}
+                    />
+                  </label>
+                ),
+              )}
               {mappingField('action', 'Current Action')}
               {mappingField('estimate', 'Estimate (minutes)')}
               {(['header', 'personnel', 'first'] as const).map((k) => (
@@ -434,8 +457,8 @@ export default function FlowImport({
                   {k === 'first'
                     ? 'First event row'
                     : k === 'header'
-                      ? 'Header row'
-                      : 'Personnel row'}
+                    ? 'Header row'
+                    : 'Personnel row'}
                   <input
                     type="number"
                     min={1}
@@ -444,7 +467,10 @@ export default function FlowImport({
                     onChange={(e) =>
                       setMapping((m) =>
                         m
-                          ? { ...m, [k]: Math.max(1, Number(e.target.value)) }
+                          ? {
+                              ...m,
+                              [k]: Math.max(1, Number(e.target.value)),
+                            }
                           : m,
                       )
                     }
@@ -453,41 +479,43 @@ export default function FlowImport({
               ))}
               <fieldset>
                 <legend>Department columns</legend>
-                {Object.entries(mapping?.departments || {}).map(([c, name]) => (
-                  <label key={c}>
-                    {c}
-                    <IconButton
-                      name="close"
-                      label={`Unmap department column ${c}`}
-                      onClick={() =>
-                        setMapping((m) => {
-                          if (!m) return m
-                          const departments = { ...m.departments }
-                          delete departments[c]
-                          return { ...m, departments }
-                        })
-                      }
-                    />
-                    <input
-                      aria-label={`Department in column ${c}`}
-                      value={name}
-                      maxLength={100}
-                      onChange={(e) =>
-                        setMapping((m) =>
-                          m
-                            ? {
-                                ...m,
-                                departments: {
-                                  ...m.departments,
-                                  [c]: e.target.value,
-                                },
-                              }
-                            : m,
-                        )
-                      }
-                    />
-                  </label>
-                ))}
+                {Object.entries(mapping?.departments || {}).map(
+                  ([c, name]) => (
+                    <label key={c}>
+                      {c}
+                      <IconButton
+                        name="close"
+                        label={`Unmap department column ${c}`}
+                        onClick={() =>
+                          setMapping((m) => {
+                            if (!m) return m
+                            const departments = { ...m.departments }
+                            delete departments[c]
+                            return { ...m, departments }
+                          })
+                        }
+                      />
+                      <input
+                        aria-label={`Department in column ${c}`}
+                        value={name}
+                        maxLength={100}
+                        onChange={(e) =>
+                          setMapping((m) =>
+                            m
+                              ? {
+                                  ...m,
+                                  departments: {
+                                    ...m.departments,
+                                    [c]: e.target.value,
+                                  },
+                                }
+                              : m,
+                          )
+                        }
+                      />
+                    </label>
+                  ),
+                )}
                 <Menu
                   label="Map another column"
                   items={cols
@@ -533,9 +561,8 @@ export default function FlowImport({
                               key={c.address}
                               title={c.address}
                               style={(() => {
-                                const hex = (c.style as any)?.fgColor?.rgb as
-                                  | string
-                                  | undefined
+                                const hex = (c.style as any)?.fgColor
+                                  ?.rgb as string | undefined
                                 if (!hex) return {}
                                 const color = hex.slice(-6),
                                   v = parseInt(color, 16),
@@ -589,7 +616,13 @@ export default function FlowImport({
                       <tr key={r.row}>
                         <td>{r.row}</td>
                         <td>
-                          {r.start ? clockText((Date.parse(r.start)-Date.parse(date+'T00:00:00Z'))/60000) : 'TBD'}
+                          {r.start
+                            ? clockText(
+                                (Date.parse(r.start) -
+                                  Date.parse(date + 'T00:00:00Z')) /
+                                  60000,
+                              )
+                            : 'TBD'}
                           {r.actualStart && (
                             <small>
                               Actual {localParts(r.actualStart, zone)}
@@ -608,7 +641,10 @@ export default function FlowImport({
                             }
                             items={[
                               { value: 'custom', label: 'Custom action' },
-                              { value: 'milestone', label: 'Shared milestone' },
+                              {
+                                value: 'milestone',
+                                label: 'Shared milestone',
+                              },
                               {
                                 value: 'department',
                                 label: 'Department activity',
@@ -622,7 +658,8 @@ export default function FlowImport({
                             .filter(([, t]) => t)
                             .map(([c, t]) => (
                               <p key={c}>
-                                <strong>{mapping?.departments[c]}</strong> {t}
+                                <strong>{mapping?.departments[c]}</strong>{' '}
+                                {t}
                               </p>
                             ))}
                         </td>
@@ -630,8 +667,9 @@ export default function FlowImport({
                           {sourceShots.length > 0 && (
                             <Menu
                               label={
-                                sourceShots.find((s) => s.id === matches[r.row])
-                                  ?.number || 'Keep manual'
+                                sourceShots.find(
+                                  (s) => s.id === matches[r.row],
+                                )?.number || 'Keep manual'
                               }
                               value={matches[r.row] || ''}
                               onChange={(v) =>
@@ -641,7 +679,9 @@ export default function FlowImport({
                                 { value: '', label: 'Keep manual' },
                                 ...sourceShots.map((s) => ({
                                   value: s.id,
-                                  label: `${s.number} · ${String(s.subject || '')} · ${s.id.slice(0, 6)}`,
+                                  label: `${s.number} · ${String(
+                                    s.subject || '',
+                                  )} · ${s.id.slice(0, 6)}`,
                                 })),
                               ]}
                             />

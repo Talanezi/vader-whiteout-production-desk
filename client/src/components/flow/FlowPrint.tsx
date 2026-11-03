@@ -1,3 +1,4 @@
+import PrintDepartments from './PrintDepartments'
 import DatePicker from '../whiteout/DatePicker'
 import { useEffect, useState } from 'react'
 import { Overlay } from '../whiteout/Overlay'
@@ -18,9 +19,9 @@ export default function FlowPrint({
   date,
   onDateChange,
 }: {
-  title:string
-  date:string
-  onDateChange:(date:string)=>void
+  title: string
+  date: string
+  onDateChange: (date: string) => void
   id: string
   departments: Department[]
   onClose: () => void
@@ -30,11 +31,12 @@ export default function FlowPrint({
     [orientation, setOrientation] = useState('landscape'),
     [style, setStyle] = useState('color'),
     [scope, setScope] = useState(departments.map((d) => d.id)),
-    [pack,setPack]=useState(false),
-    [packBusy,setPackBusy]=useState(false),
-    [packScope,setPackScope]=useState(departments.map(d=>d.id)),
-    [packQuery,setPackQuery]=useState(''),
-    [packAbort,setPackAbort]=useState<AbortController>(),
+    [pack, setPack] = useState(false),
+    [packBusy, setPackBusy] = useState(false),
+    [packError, setPackError] = useState(''),
+    [packScope, setPackScope] = useState(departments.map((d) => d.id)),
+    [packQuery, setPackQuery] = useState(''),
+    [packAbort, setPackAbort] = useState<AbortController>(),
     [personnel, setPersonnel] = useState(true),
     [notes, setNotes] = useState(true),
     [bytes, setBytes] = useState<Uint8Array>(),
@@ -50,7 +52,7 @@ export default function FlowPrint({
     orientation,
     style,
     departments: scope,
-    actual:false,
+    actual: false,
     personnel,
     notes,
   })
@@ -107,7 +109,13 @@ export default function FlowPrint({
     >
       <div className="flow-print-layout">
         <aside>
-          {!date&&<DatePicker label="Assign Shoot date" value={date} onChange={onDateChange}/>}
+          {!date && (
+            <DatePicker
+              label="Assign Shoot date"
+              value={date}
+              onChange={onDateChange}
+            />
+          )}
           <label>
             Print product
             <Menu
@@ -165,7 +173,9 @@ export default function FlowPrint({
             <label>
               Orientation
               <Menu
-                label={orientation === 'landscape' ? 'Landscape' : 'Portrait'}
+                label={
+                  orientation === 'landscape' ? 'Landscape' : 'Portrait'
+                }
                 value={orientation}
                 onChange={setOrientation}
                 items={[
@@ -179,7 +189,9 @@ export default function FlowPrint({
             Style
             <Menu
               label={
-                style === 'color' ? 'Editorial Color' : 'Production Monochrome'
+                style === 'color'
+                  ? 'Editorial Color'
+                  : 'Production Monochrome'
               }
               value={style}
               onChange={setStyle}
@@ -189,25 +201,30 @@ export default function FlowPrint({
               ]}
             />
           </label>
-          {product==='department'&&<label>Department<Combobox label="Choose department" custom={false} clearable={false} value={scope[0]||''} onChange={v=>setScope([v])} options={departments.map(d=>({value:d.id,label:d.name}))}/></label>}
+          {product === 'department' && (
+            <label>
+              Department
+              <Combobox
+                label="Choose department"
+                custom={false}
+                clearable={false}
+                value={scope[0] || ''}
+                onChange={(v) => setScope([v])}
+                options={departments.map((d) => ({
+                  value: d.id,
+                  label: d.name,
+                }))}
+              />
+            </label>
+          )}
           {product === 'master' && (
             <fieldset>
               <legend>Departments</legend>
-              {departments.map((d) => (
-                <label className="flow-check" key={d.id}>
-                  <DrawCheckbox
-                    checked={scope.includes(d.id)}
-                    onChange={(e) =>
-                      setScope(
-                        e.target.checked
-                            ? [...scope, d.id]
-                            : scope.filter((k) => k !== d.id),
-                      )
-                    }
-                  />
-                  {d.name}
-                </label>
-              ))}
+              <PrintDepartments
+                departments={departments}
+                scope={scope}
+                onChange={setScope}
+              />
             </fieldset>
           )}
           <fieldset>
@@ -227,10 +244,12 @@ export default function FlowPrint({
               </label>
             ))}
           </fieldset>
-          <Button icon="download" onClick={()=>setPack(true)}>Download department pack</Button>
+          <Button icon="download" onClick={() => setPack(true)}>
+            Download department pack
+          </Button>
           <p className="flow-muted">
-            This PDF preserves the previewed revision and print settings. Later
-            edits do not change this download.
+            This PDF preserves the previewed revision and print settings.
+            Later edits do not change this download.
           </p>
           <Button
             icon="retry"
@@ -249,7 +268,10 @@ export default function FlowPrint({
           ) : error ? (
             <div className="flow-print-loading">
               <ErrorNotice>{error}</ErrorNotice>
-              <Button icon="retry" onClick={() => setRefresh((n) => n + 1)}>
+              <Button
+                icon="retry"
+                onClick={() => setRefresh((n) => n + 1)}
+              >
                 Retry preview
               </Button>
             </div>
@@ -267,17 +289,122 @@ export default function FlowPrint({
                   <a
                     className="pd-button pd-button-primary"
                     href={url}
-                    download={title+' - '+(date||'Date TBD')+'.pdf'}
+                    download={
+                      title + ' - ' + (date || 'Date TBD') + '.pdf'
+                    }
                   >
                     Download PDF
                   </a>
-
                 </>
               )}
           </div>
         </main>
       </div>
-      {pack&&<Overlay title="Department pack" onClose={()=>{packAbort?.abort();setPack(false)}} className="flow-pack-dialog" footer={<><Button disabled={packBusy||!packScope.length} variant="primary" state={packBusy?'pending':'idle'} pendingLabel="Preparing pack…" onClick={()=>{const controller=new AbortController();setPackAbort(controller);setPackBusy(true);setError('');void flowFetch(`/${id}/department-pack`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...JSON.parse(config),departments:packScope}),signal:controller.signal}).then(r=>r.blob()).then(blob=>{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=title+' - '+(date||'Date TBD')+' - Department pack.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);setPack(false)}).catch(e=>{if(e.name!=='AbortError')setError(e.message)}).finally(()=>setPackBusy(false))}}>Download ZIP</Button>{packBusy&&<Button onClick={()=>packAbort?.abort()}>Cancel download</Button>}</>}><input aria-label="Search departments" placeholder="Search departments…" value={packQuery} onChange={e=>setPackQuery(e.target.value)}/><label className="flow-check"><DrawCheckbox checked={packScope.length===departments.length} indeterminate={packScope.length>0&&packScope.length<departments.length} onChange={e=>setPackScope(e.target.checked?departments.map(d=>d.id):[])}/>All departments</label>{departments.filter(d=>d.name.toLowerCase().includes(packQuery.toLowerCase())).map(d=><label className="flow-check" key={d.id}><DrawCheckbox checked={packScope.includes(d.id)} onChange={e=>setPackScope(v=>e.target.checked?[...v,d.id]:v.filter(x=>x!==d.id))}/>{d.name}</label>)}</Overlay>}
+      {pack && (
+        <Overlay
+          title="Department pack"
+          onClose={() => {
+            packAbort?.abort()
+            setPack(false)
+          }}
+          className="flow-pack-dialog"
+          footer={
+            <>
+              <Button
+                disabled={packBusy || !packScope.length}
+                variant="primary"
+                state={packBusy ? 'pending' : 'idle'}
+                pendingLabel="Preparing pack…"
+                onClick={() => {
+                  const controller = new AbortController()
+                  setPackAbort(controller)
+                  setPackBusy(true)
+                  setPackError('')
+                  void flowFetch(`/${id}/department-pack`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      ...JSON.parse(config),
+                      departments: packScope,
+                    }),
+                    signal: controller.signal,
+                  })
+                    .then((r) => r.blob())
+                    .then((blob) => {
+                      const u = URL.createObjectURL(blob),
+                        a = document.createElement('a')
+                      a.href = u
+                      a.download =
+                        title +
+                        ' - ' +
+                        (date || 'Date TBD') +
+                        ' - Department pack.zip'
+                      a.click()
+                      setTimeout(() => URL.revokeObjectURL(u), 1000)
+                      setPack(false)
+                    })
+                    .catch((e) => {
+                      if (e.name !== 'AbortError') setPackError(e.message)
+                    })
+                    .finally(() => setPackBusy(false))
+                }}
+              >
+                Download ZIP
+              </Button>
+              {packBusy && (
+                <Button onClick={() => packAbort?.abort()}>
+                  Cancel download
+                </Button>
+              )}
+            </>
+          }
+        >
+          {packError && <ErrorNotice>{packError}</ErrorNotice>}
+          <p className="flow-muted">
+            All department files use one captured schedule.
+          </p>
+          <input
+            aria-label="Search departments"
+            placeholder="Search departments…"
+            value={packQuery}
+            onChange={(e) => setPackQuery(e.target.value)}
+          />
+          <label className="flow-check">
+            <DrawCheckbox
+              checked={packScope.length === departments.length}
+              indeterminate={
+                packScope.length > 0 &&
+                packScope.length < departments.length
+              }
+              onChange={(e) =>
+                setPackScope(
+                  e.target.checked ? departments.map((d) => d.id) : [],
+                )
+              }
+            />
+            All departments
+          </label>
+          {departments
+            .filter((d) =>
+              d.name.toLowerCase().includes(packQuery.toLowerCase()),
+            )
+            .map((d) => (
+              <label className="flow-check" key={d.id}>
+                <DrawCheckbox
+                  checked={packScope.includes(d.id)}
+                  onChange={(e) =>
+                    setPackScope((v) =>
+                      e.target.checked
+                        ? [...v, d.id]
+                        : v.filter((x) => x !== d.id),
+                    )
+                  }
+                />
+                {d.name}
+              </label>
+            ))}
+        </Overlay>
+      )}
     </Overlay>
   )
 }

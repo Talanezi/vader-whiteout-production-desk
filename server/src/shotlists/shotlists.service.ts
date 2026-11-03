@@ -1,5 +1,5 @@
-import {sourceLabel} from '../flows/scheduling';
-import {assertProductionMember} from '../auth/production-member';
+import { sourceLabel } from '../flows/scheduling';
+import { assertProductionMember } from '../auth/production-member';
 import { collaborationError } from '../collaboration-error';
 import {
   BadRequestException,
@@ -12,7 +12,11 @@ import { randomUUID, createHash } from 'crypto';
 import { Server, Hocuspocus } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { AuthService } from '../auth/auth.service';
-import { snapshot, metadata, type PrintOptions } from './pdf/shotlist-report';
+import {
+  snapshot,
+  metadata,
+  type PrintOptions,
+} from './pdf/shotlist-report';
 import type { TablePrintSpec } from './pdf/table-print';
 import { renderSpreadsheet } from './pdf/spreadsheet';
 import type { Server as HttpServer } from 'http';
@@ -46,7 +50,9 @@ export class ShotlistsService implements OnModuleDestroy {
     private readonly auth: AuthService,
   ) {}
 
-  assertProductionMember(user: Collaborator) {assertProductionMember(user);}
+  assertProductionMember(user: Collaborator) {
+    assertProductionMember(user);
+  }
   async authorize(id: string, user: Collaborator) {
     this.assertProductionMember(user);
     if (!uuid.test(id))
@@ -62,7 +68,10 @@ export class ShotlistsService implements OnModuleDestroy {
       const state = new Y.Doc();
       try {
         Y.applyUpdate(state, row.state);
-        this.archiveStates.set(id, !!state.getMap('meta').get('archivedAt'));
+        this.archiveStates.set(
+          id,
+          !!state.getMap('meta').get('archivedAt'),
+        );
       } finally {
         state.destroy();
       }
@@ -77,24 +86,34 @@ export class ShotlistsService implements OnModuleDestroy {
     );
     return {
       items: rows
-        .map(({ state, ...row }: { state: Buffer; [key: string]: unknown }) => {
-          const doc = new Y.Doc();
-          try {
-            Y.applyUpdate(doc, state);
-            return doc.getMap('meta').get('archivedAt')
-              ? null
-              : { ...row, ...metadata(snapshot(doc)) };
-          } finally {
-            doc.destroy();
-          }
-        })
+        .map(
+          ({
+            state,
+            ...row
+          }: {
+            state: Buffer;
+            [key: string]: unknown;
+          }) => {
+            const doc = new Y.Doc();
+            try {
+              Y.applyUpdate(doc, state);
+              return doc.getMap('meta').get('archivedAt')
+                ? null
+                : { ...row, ...metadata(snapshot(doc)) };
+            } finally {
+              doc.destroy();
+            }
+          },
+        )
         .filter(Boolean),
     };
   }
   async create(user: Collaborator, name: unknown, firstDate?: unknown) {
     this.assertProductionMember(user);
     if (typeof name !== 'string' || !name.trim() || name.length > 180)
-      throw new BadRequestException('Enter a name of up to 180 characters.');
+      throw new BadRequestException(
+        'Enter a name of up to 180 characters.',
+      );
     if (
       firstDate !== undefined &&
       firstDate !== '' &&
@@ -123,7 +142,12 @@ export class ShotlistsService implements OnModuleDestroy {
     await this.db.transaction(async (manager) => {
       await manager.query(
         'INSERT INTO shot_list_documents(id,name,owner_user_id,state) VALUES($1,$2,$3,$4)',
-        [id, name.trim(), user.userID, Buffer.from(Y.encodeStateAsUpdate(doc))],
+        [
+          id,
+          name.trim(),
+          user.userID,
+          Buffer.from(Y.encodeStateAsUpdate(doc)),
+        ],
       );
     });
     doc.destroy();
@@ -180,7 +204,8 @@ export class ShotlistsService implements OnModuleDestroy {
     try {
       await operation;
     } finally {
-      if (this.saveQueues.get(id) === operation) this.saveQueues.delete(id);
+      if (this.saveQueues.get(id) === operation)
+        this.saveQueues.delete(id);
     }
   }
   async attach(http: HttpServer) {
@@ -190,7 +215,9 @@ export class ShotlistsService implements OnModuleDestroy {
       'SELECT pg_try_advisory_lock(1793426400) AS acquired',
     );
     if (!lock.acquired)
-      throw new Error('Only one Shot Lists collaboration replica may run.');
+      throw new Error(
+        'Only one Shot Lists collaboration replica may run.',
+      );
     this.collab = Server.configure({
       name: 'Whiteout Shot Lists',
       quiet: true,
@@ -218,7 +245,9 @@ export class ShotlistsService implements OnModuleDestroy {
           // Refresh the full authorization identity, not only the session validity.
           // Recheck before handling the first message after the freshness window.
           if (Date.now() - context.checkedAt > 30000) {
-            const user = await this.auth.verifySchedulerToken(context.token);
+            const user = await this.auth.verifySchedulerToken(
+              context.token,
+            );
             if (user.userID !== context.user.userID)
               throw new Error('Session changed');
             await this.authorize(documentName, user);
@@ -256,7 +285,12 @@ export class ShotlistsService implements OnModuleDestroy {
           throw collaborationError(error, 1013);
         }
       },
-      onStateless: async ({ payload, document, documentName, connection }) => {
+      onStateless: async ({
+        payload,
+        document,
+        documentName,
+        connection,
+      }) => {
         try {
           if (payload !== 'persistence-status') return;
           if (this.failedSaves.has(documentName))
@@ -316,9 +350,10 @@ export class ShotlistsService implements OnModuleDestroy {
       const url = new URL(request.url || '/', 'http://localhost');
       // Other workspaces authenticate independently before accepting updates.
       if (
-        ['/api/storyboards/collaboration', '/api/flows/collaboration'].includes(
-          url.pathname,
-        )
+        [
+          '/api/storyboards/collaboration',
+          '/api/flows/collaboration',
+        ].includes(url.pathname)
       )
         return;
       if (
@@ -326,7 +361,9 @@ export class ShotlistsService implements OnModuleDestroy {
         url.search ||
         !origins.has(request.headers.origin || '')
       ) {
-        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        socket.write(
+          'HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n',
+        );
         socket.destroy();
         return;
       }
@@ -337,7 +374,9 @@ export class ShotlistsService implements OnModuleDestroy {
   }
   async export(id: string, user: Collaborator) {
     await this.authorize(id, user);
-    const connection = await this.collab!.openDirectConnection(id, { user });
+    const connection = await this.collab!.openDirectConnection(id, {
+      user,
+    });
     try {
       const doc = connection.document!;
       const result = {
@@ -347,9 +386,27 @@ export class ShotlistsService implements OnModuleDestroy {
         shootDays: doc.getMap('shootDays').toJSON(),
         shootAssignments: doc.getMap('shootAssignments').toJSON(),
       };
-      const labels=new Map<string,number>();for(const shot of Object.values(result.shots) as any[]){if(!shot.deleted&&!shot.deletedAt){const label=sourceLabel(shot,result);labels.set(label,(labels.get(label)||0)+1);}}
-      return {...result,shots:Object.fromEntries(Object.entries(result.shots).map(([id,s]:[string,any])=>[id,{...s,originalNumber:s.number,number:sourceLabel(s,result),labelConflict:(labels.get(sourceLabel(s,result))||0)>1}]))};
-
+      const labels = new Map<string, number>();
+      for (const shot of Object.values(result.shots) as any[]) {
+        if (!shot.deleted && !shot.deletedAt) {
+          const label = sourceLabel(shot, result);
+          labels.set(label, (labels.get(label) || 0) + 1);
+        }
+      }
+      return {
+        ...result,
+        shots: Object.fromEntries(
+          Object.entries(result.shots).map(([id, s]: [string, any]) => [
+            id,
+            {
+              ...s,
+              originalNumber: s.number,
+              number: sourceLabel(s, result),
+              labelConflict: (labels.get(sourceLabel(s, result)) || 0) > 1,
+            },
+          ]),
+        ),
+      };
     } finally {
       await connection.disconnect();
     }
@@ -379,8 +436,12 @@ export class ShotlistsService implements OnModuleDestroy {
         !payload.name.trim() ||
         payload.name.length > 180)
     )
-      throw new BadRequestException('Enter a name of up to 180 characters.');
-    const connection = await this.collab!.openDirectConnection(id, { user });
+      throw new BadRequestException(
+        'Enter a name of up to 180 characters.',
+      );
+    const connection = await this.collab!.openDirectConnection(id, {
+      user,
+    });
     try {
       await connection.transact((doc) => {
         if (payload.action === 'rename')
@@ -390,7 +451,9 @@ export class ShotlistsService implements OnModuleDestroy {
             .getMap('meta')
             .set(
               'archivedAt',
-              payload.action === 'archive' ? new Date().toISOString() : null,
+              payload.action === 'archive'
+                ? new Date().toISOString()
+                : null,
             );
       });
       await this.persist(connection.document!, id);
@@ -417,7 +480,10 @@ export class ShotlistsService implements OnModuleDestroy {
     const doc = new Y.Doc();
     try {
       Y.applyUpdate(doc, row.state);
-      return await renderSpreadsheet(snapshot(doc), options as TablePrintSpec);
+      return await renderSpreadsheet(
+        snapshot(doc),
+        options as TablePrintSpec,
+      );
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : 'PDF generation failed.',
@@ -545,7 +611,9 @@ export class ShotlistsService implements OnModuleDestroy {
         )
           throw new BadRequestException('Invalid schedule reference.');
     }
-    const connection = await this.collab!.openDirectConnection(id, { user });
+    const connection = await this.collab!.openDirectConnection(id, {
+      user,
+    });
     let result: unknown;
     try {
       await connection.transact((doc) =>
@@ -562,7 +630,9 @@ export class ShotlistsService implements OnModuleDestroy {
               (shot) =>
                 !shot.get('deleted') &&
                 allScenes.has(String(shot.get('sceneId'))) &&
-                !allScenes.get(String(shot.get('sceneId')))?.get('deleted'),
+                !allScenes
+                  .get(String(shot.get('sceneId')))
+                  ?.get('deleted'),
             )
             .map((shot) => ({
               number: String(shot.get('number')),

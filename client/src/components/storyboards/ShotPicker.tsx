@@ -1,4 +1,4 @@
-import {sourceLabel} from '../../../../server/src/flows/scheduling'
+import { sourceLabel } from '../../../../server/src/flows/scheduling'
 import { useEffect, useState } from 'react'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
@@ -20,10 +20,10 @@ export default function ShotPicker({
   flowContext = false,
   onConnectList,
   selectionLimit,
-  preselectAvailable=false,
+  preselectAvailable = false,
 }: {
   onConnectList?: (id: string) => void
-  preselectAvailable?:boolean
+  preselectAvailable?: boolean
   selectionLimit?: number
   flowContext?: boolean
   initial?: ShotLink[]
@@ -32,7 +32,9 @@ export default function ShotPicker({
   onClose: () => void
 }) {
   const [lists, setLists] = useState<ShotListMetadata[]>([]),
-    [listId, setListId] = useState(connectedListId || initial[0]?.listId || ''),
+    [listId, setListId] = useState(
+      connectedListId || initial[0]?.listId || '',
+    ),
     [data, setData] = useState<LinkedSnapshot>(),
     [search, setSearch] = useState(''),
     [selected, setSelected] = useState(initial),
@@ -51,7 +53,17 @@ export default function ShotPicker({
     let alive = true
     setData(undefined)
     shotRequest<LinkedSnapshot>(`/${listId}/export`)
-      .then((d) => {if(alive){setData(d);if(preselectAvailable)setSelected(Object.entries(d.shots).filter(([,s])=>!s.deleted&&!s.deletedAt).map(([shotId])=>({listId,shotId})))}})
+      .then((d) => {
+        if (alive) {
+          setData(d)
+          if (preselectAvailable)
+            setSelected(
+              Object.entries(d.shots)
+                .filter(([, s]) => !s.deleted && !s.deletedAt)
+                .map(([shotId]) => ({ listId, shotId })),
+            )
+        }
+      })
       .catch((e) => alive && setError(e.message))
     return () => {
       alive = false
@@ -100,12 +112,20 @@ export default function ShotPicker({
       className={`sb-shot-picker ${flowContext ? 'flow-shot-picker' : ''}`}
       footer={
         <>
-          <span className="sb-picker-count">{selected.length} selected</span>
-          <Button disabled={!selected.length} onClick={() => setSelected([])}>
+          <span className="sb-picker-count">
+            {selected.length} selected
+          </span>
+          <Button
+            disabled={!selected.length}
+            onClick={() => setSelected([])}
+          >
             Clear selection
           </Button>
           {onConnectList && (
-            <Button disabled={!listId} onClick={() => onConnectList(listId)}>
+            <Button
+              disabled={!listId}
+              onClick={() => onConnectList(listId)}
+            >
               Connect without scheduling
             </Button>
           )}
@@ -119,7 +139,9 @@ export default function ShotPicker({
       {error && <p role="alert">{error}</p>}
       <div className="sb-toolstrip">
         <Menu
-          label={lists.find((l) => l.id === listId)?.name || 'Choose Shot List'}
+          label={
+            lists.find((l) => l.id === listId)?.name || 'Choose Shot List'
+          }
           items={lists.map((l) => ({ value: l.id, label: l.name }))}
           value={listId}
           disabled={!!connectedListId}
@@ -130,14 +152,19 @@ export default function ShotPicker({
           }}
         />
         <Menu
-          label={scene ? `Scene ${data?.scenes[scene]?.number}` : 'All scenes'}
+          label={
+            scene ? `Scene ${data?.scenes[scene]?.number}` : 'All scenes'
+          }
           value={scene}
           onChange={setScene}
           items={[
             { value: '', label: 'All scenes' },
             ...Object.entries(data?.scenes || {})
               .filter(([, s]) => !s.deletedAt)
-              .map(([id, s]) => ({ value: id, label: `Scene ${s.number}` })),
+              .map(([id, s]) => ({
+                value: id,
+                label: `Scene ${s.number}`,
+              })),
           ]}
         />
       </div>
@@ -154,7 +181,9 @@ export default function ShotPicker({
             <label>
               <DrawCheckbox
                 aria-label="Select shown shots"
-                checked={!!shots.length && shots.every(([id]) => checked(id))}
+                checked={
+                  !!shots.length && shots.every(([id]) => checked(id))
+                }
                 indeterminate={
                   shots.some(([id]) => checked(id)) &&
                   !shots.every(([id]) => checked(id))
@@ -165,7 +194,8 @@ export default function ShotPicker({
                     e.target.checked
                       ? [
                           ...old.filter(
-                            (x) => x.listId !== listId || !ids.has(x.shotId),
+                            (x) =>
+                              x.listId !== listId || !ids.has(x.shotId),
                           ),
                           ...shots.map(([id]) => ({ listId, shotId: id })),
                         ]
@@ -187,7 +217,10 @@ export default function ShotPicker({
               onChange={(e) => toggle(id, e.target.checked)}
             />
             <span>
-              <strong>{sourceLabel(s,data)||'Untitled shot'}</strong>
+              <strong>{sourceLabel(s, data) || 'Untitled shot'}</strong>
+              {s.labelConflict === true && (
+                <small>Code conflict · {id.slice(0, 8)}</small>
+              )}
               {flowContext && (
                 <small>
                   {[
@@ -204,7 +237,8 @@ export default function ShotPicker({
                 </small>
               )}
               <small>
-                Scene {String(data?.scenes[String(s.sceneId)]?.number || '—')} ·{' '}
+                Scene{' '}
+                {String(data?.scenes[String(s.sceneId)]?.number || '—')} ·{' '}
                 {id.slice(0, 8)}
               </small>
               <span>{String(s.coverage || '')}</span>

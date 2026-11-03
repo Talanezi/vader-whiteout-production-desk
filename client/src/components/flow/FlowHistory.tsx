@@ -1,3 +1,7 @@
+import {
+  resolveSchedule,
+  clockText,
+} from '../../../../server/src/flows/scheduling'
 import { useEffect, useState } from 'react'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
@@ -11,9 +15,11 @@ type Revision = {
 }
 export default function FlowHistory({
   id,
+  source,
   onClose,
 }: {
   id: string
+  source?: any
   onClose: () => void
 }) {
   const [items, setItems] = useState<Revision[]>([]),
@@ -43,7 +49,11 @@ export default function FlowHistory({
     }
   }
   return (
-    <Overlay title="Flow revisions" onClose={onClose} className="flow-history">
+    <Overlay
+      title="Flow revisions"
+      onClose={onClose}
+      className="flow-history"
+    >
       <div className="flow-history-save">
         <input
           placeholder="Revision summary"
@@ -86,7 +96,9 @@ export default function FlowHistory({
             </Button>
           </article>
         ))}
-        {!items.length && <p className="flow-muted">No saved revisions.</p>}
+        {!items.length && (
+          <p className="flow-muted">No saved revisions.</p>
+        )}
       </div>
       {preview && (
         <section className="flow-revision-preview">
@@ -95,8 +107,9 @@ export default function FlowHistory({
           </h3>
           <p>
             {
-              Object.values(preview.events).filter((e: any) => !e.deletedAt)
-                .length
+              Object.values(preview.events).filter(
+                (e: any) => !e.deletedAt,
+              ).length
             }{' '}
             events ·{' '}
             {
@@ -116,27 +129,24 @@ export default function FlowHistory({
                 </tr>
               </thead>
               <tbody>
-                {Object.values(preview.events)
-                  .filter((e: any) => !e.deletedAt)
-                  .sort((a: any, b: any) => a.order - b.order)
-                  .map((e: any) => (
-                    <tr key={e.id}>
-                      <td>{e.start || 'Unscheduled'}</td>
-                      <td>{e.description || e.reference}</td>
-                      <td>
-                        {Object.values(preview.instructions)
-                          .filter((i: any) => i.eventId === e.id && i.text)
-                          .map((i: any) => (
-                            <p key={i.id}>
-                              <strong>
-                                {preview.departments[i.departmentId]?.name}
-                              </strong>{' '}
-                              {i.text}
-                            </p>
-                          ))}
-                      </td>
-                    </tr>
-                  ))}
+                {resolveSchedule(preview, source).events.map((e: any) => (
+                  <tr key={e.id}>
+                    <td>{clockText(e.minute)}</td>
+                    <td>{e.description || e.reference}</td>
+                    <td>
+                      {Object.values(preview.instructions)
+                        .filter((i: any) => i.eventId === e.id && i.text)
+                        .map((i: any) => (
+                          <p key={i.id}>
+                            <strong>
+                              {preview.departments[i.departmentId]?.name}
+                            </strong>{' '}
+                            {i.text}
+                          </p>
+                        ))}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -154,7 +164,10 @@ export default function FlowHistory({
               variant="primary"
               state={busy ? 'pending' : 'idle'}
               onClick={() =>
-                void action({ action: 'restoreRevision', revisionId: selected })
+                void action({
+                  action: 'restoreRevision',
+                  revisionId: selected,
+                })
               }
             >
               Restore revision

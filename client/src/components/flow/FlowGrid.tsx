@@ -1,6 +1,6 @@
 import DepartmentHeader from './DepartmentHeader'
-import {displayShot} from '../../lib/shotDocument'
-import {clockText} from '../../lib/flow/model'
+import { displayShot, hasShotNumberConflict } from '../../lib/shotDocument'
+import { clockText } from '../../lib/flow/model'
 import { useDroppable } from '@dnd-kit/react'
 import { useSortable } from '@dnd-kit/react/sortable'
 import type * as Y from 'yjs'
@@ -38,7 +38,9 @@ function Row({
         ? p.shots?.get(event.shotId || '')
         : undefined,
     valid = source && !source.get('deleted') && !source.get('deletedAt'),
-    label = valid ? displayShot(source.doc!,source) : event.reference || '',
+    label = valid
+      ? displayShot(source.doc!, source)
+      : event.reference || '',
     estimate = duration(event, valid ? source : undefined)
 
   return (
@@ -46,33 +48,40 @@ function Row({
       ref={s.ref}
       data-event={event.id}
       data-dragging={s.isDragging || undefined}
-      className={`${event.type === 'milestone' ? 'flow-milestone' : ''} ${p.selected.has(event.id) ? 'is-selected' : ''} ${s.isDropTarget ? 'is-drop-target' : ''}`}
+      className={`${event.type === 'milestone' ? 'flow-milestone' : ''} ${
+        p.selected.has(event.id) ? 'is-selected' : ''
+      } ${s.isDropTarget ? 'is-drop-target' : ''}`}
     >
-      <td className="flow-selection-cell">          <div className="flow-row-tools">
-            <button
-              ref={s.handleRef as never}
-              aria-label={`Move ${event.description || label || 'event'}`}
-              className="flow-grip"
-            >
-              ⠿
-            </button>
-            <DrawCheckbox
-              aria-label={`Select ${event.description || label || 'event'}`}
-              checked={p.selected.has(event.id)}
-              onChange={(e) => p.onSelect(event.id, e.target.checked)}
-            />
-          </div></td>
-      <td className="flow-time-cell" tabIndex={0} data-grid-cell>
-          <button className="flow-time" onClick={() => p.onTime(event)}>
-            {clockText(event.minute)}
-            {event.minute!=null&&event.minute>=1440&&<small>Next day</small>}
-            {estimate != null && (
-              <small>
-                {estimate} min
-                {event.fixed ? ' · fixed' : ''}
-              </small>
-            )}
+      <td className="flow-selection-cell">
+        {' '}
+        <div className="flow-row-tools">
+          <button
+            ref={s.handleRef as never}
+            aria-label={`Move ${event.description || label || 'event'}`}
+            className="flow-grip"
+          >
+            ⠿
           </button>
+          <DrawCheckbox
+            aria-label={`Select ${event.description || label || 'event'}`}
+            checked={p.selected.has(event.id)}
+            onChange={(e) => p.onSelect(event.id, e.target.checked)}
+          />
+        </div>
+      </td>
+      <td className="flow-time-cell" tabIndex={0} data-grid-cell>
+        <button className="flow-time" onClick={() => p.onTime(event)}>
+          {clockText(event.minute)}
+          {event.minute != null && event.minute >= 1440 && (
+            <small>Next day</small>
+          )}
+          {estimate != null && (
+            <small>
+              {estimate} min
+              {event.fixed ? ' · fixed' : ''}
+            </small>
+          )}
+        </button>
       </td>
       <td className="flow-action-cell" tabIndex={0} data-grid-cell>
         {event.type === 'shot' && (
@@ -81,6 +90,11 @@ function Row({
             onClick={() => p.onInspect(event)}
           >
             {label || 'Shot'}
+            {valid && hasShotNumberConflict(source.doc!, source) && (
+              <small className="flow-label-conflict">
+                Code conflict · {String(event.shotId).slice(0, 8)}
+              </small>
+            )}
             {p.events.filter(
               (e) =>
                 e.shotId === event.shotId &&
@@ -117,7 +131,9 @@ function Row({
         />
         {valid && (
           <p className="flow-shot-context">
-            {[source.get('subject'),source.get('coverage')].filter(Boolean).join(' · ')}
+            {[source.get('subject'), source.get('coverage')]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         )}
         <div className="flow-row-actions">
@@ -162,10 +178,34 @@ function Row({
             provider={p.provider}
             undo={p.undo}
             compact
-            label={`${d.name} · ${event.description || label || index + 1}`}
+            label={`${d.name} · ${
+              event.description || label || index + 1
+            }`}
           />
-          <button className="flow-instruction-add" aria-label={'Add '+d.name+' activity'} onClick={()=>p.onDepartmentInsert(event,d.id)}>+</button>
-          <button className="flow-instruction-time" aria-label={'Timing for '+d.name+' in activity '+(index+1)} onClick={()=>p.onDepartmentTime(event,d.id)}><span aria-hidden="true">◷</span>{String(p.doc.getMap<Y.Map<unknown>>('instructions').get(event.id+':'+d.id)?.get('timing')||'')==='relative'?'Relative timing':''}</button>
+          <button
+            className="flow-instruction-add"
+            aria-label={'Add ' + d.name + ' activity'}
+            onClick={() => p.onDepartmentInsert(event, d.id)}
+          >
+            +
+          </button>
+          <button
+            className="flow-instruction-time"
+            aria-label={
+              'Timing for ' + d.name + ' in activity ' + (index + 1)
+            }
+            onClick={() => p.onDepartmentTime(event, d.id)}
+          >
+            <span aria-hidden="true">◷</span>
+            {String(
+              p.doc
+                .getMap<Y.Map<unknown>>('instructions')
+                .get(event.id + ':' + d.id)
+                ?.get('timing') || '',
+            ) === 'relative'
+              ? 'Relative timing'
+              : ''}
+          </button>
         </td>
       ))}
     </tr>
@@ -184,9 +224,9 @@ type GridProps = {
   shots?: Y.Map<Y.Map<unknown>>
   selected: Set<string>
   widths: Record<string, number>
-  onDepartmentInsert:(event:FlowEvent,departmentId:string)=>void
-  onDepartmentTime:(event:FlowEvent,departmentId:string)=>void
-  onHideDepartment:(id:string)=>void
+  onDepartmentInsert: (event: FlowEvent, departmentId: string) => void
+  onDepartmentTime: (event: FlowEvent, departmentId: string) => void
+  onHideDepartment: (id: string) => void
   onWidth: (id: string, v: number) => void
   onSelect: (id: string, v: boolean) => void
   onAll: (v: boolean) => void
@@ -228,11 +268,19 @@ export default function FlowGrid(p: GridProps) {
         if (
           (editing && e.key === 'Tab') ||
           (!editing &&
-            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab'].includes(
-              e.key,
-            ))
+            [
+              'ArrowLeft',
+              'ArrowRight',
+              'ArrowUp',
+              'ArrowDown',
+              'Tab',
+            ].includes(e.key))
         ) {
-          if (target.closest('button,input') && !editing && e.key !== 'Tab')
+          if (
+            target.closest('button,input') &&
+            !editing &&
+            e.key !== 'Tab'
+          )
             return
           let r = ri,
             c = ci
@@ -247,7 +295,9 @@ export default function FlowGrid(p: GridProps) {
             r++
             c = 1
           }
-          const next = body.children[r]?.children[c] as HTMLElement | undefined
+          const next = body.children[r]?.children[c] as
+            | HTMLElement
+            | undefined
           if (next) {
             e.preventDefault()
             next.focus()
@@ -257,7 +307,9 @@ export default function FlowGrid(p: GridProps) {
         if (e.key === 'Enter' && !editing && target === cell) {
           e.preventDefault()
           cell
-            .querySelector<HTMLButtonElement>('.pd-text-preview,.flow-time')
+            .querySelector<HTMLButtonElement>(
+              '.pd-text-preview,.flow-time',
+            )
             ?.click()
         }
       }}
@@ -304,7 +356,11 @@ export default function FlowGrid(p: GridProps) {
                 t =
                   index === 2
                     ? text(p.doc, 'events', event.id, 'description')
-                    : instruction(p.doc, event.id, p.departments[index - 3].id)
+                    : instruction(
+                        p.doc,
+                        event.id,
+                        p.departments[index - 3].id,
+                      )
               t.delete(0, t.length)
               t.insert(0, value)
             }),
@@ -314,7 +370,8 @@ export default function FlowGrid(p: GridProps) {
     >
       <table className="flow-grid" aria-label="Department Flow">
         <colgroup>
-          <col style={{width:64}}/><col style={{width:96}}/>
+          <col style={{ width: 64 }} />
+          <col style={{ width: 96 }} />
           <col style={{ width: 300 }} />
           {p.departments.map((d) => (
             <col key={d.id} style={{ width: p.widths[d.id] || 210 }} />
@@ -322,9 +379,42 @@ export default function FlowGrid(p: GridProps) {
         </colgroup>
         <thead>
           <tr>
-            <th className="flow-selection-cell"><div className="flow-row-tools"><span className="flow-grip" aria-hidden="true" style={{visibility:'hidden'}}>⠿</span><DrawCheckbox aria-label="Select all events" checked={p.events.length>0&&p.events.every(e=>p.selected.has(e.id))} indeterminate={p.events.some(e=>p.selected.has(e.id))&&!p.events.every(e=>p.selected.has(e.id))} onChange={e=>p.onAll(e.target.checked)}/></div></th><th className="flow-time-cell">Time</th>
+            <th className="flow-selection-cell">
+              <div className="flow-row-tools">
+                <span
+                  className="flow-grip"
+                  aria-hidden="true"
+                  style={{ visibility: 'hidden' }}
+                >
+                  ⠿
+                </span>
+                <DrawCheckbox
+                  aria-label="Select all events"
+                  checked={
+                    p.events.length > 0 &&
+                    p.events.every((e) => p.selected.has(e.id))
+                  }
+                  indeterminate={
+                    p.events.some((e) => p.selected.has(e.id)) &&
+                    !p.events.every((e) => p.selected.has(e.id))
+                  }
+                  onChange={(e) => p.onAll(e.target.checked)}
+                />
+              </div>
+            </th>
+            <th className="flow-time-cell">Time</th>
             <th className="flow-action-cell">Current Action</th>
-            {p.departments.map((d,i)=><DepartmentHeader key={d.id} doc={p.doc} department={d} index={i} width={p.widths[d.id]||210} onWidth={v=>p.onWidth(d.id,v)} onHide={()=>p.onHideDepartment(d.id)}/>)}
+            {p.departments.map((d, i) => (
+              <DepartmentHeader
+                key={d.id}
+                doc={p.doc}
+                department={d}
+                index={i}
+                width={p.widths[d.id] || 210}
+                onWidth={(v) => p.onWidth(d.id, v)}
+                onHide={() => p.onHideDepartment(d.id)}
+              />
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -338,7 +428,8 @@ export default function FlowGrid(p: GridProps) {
           <StudioGlyph name="layers" />
           <h2>A clear start to the day</h2>
           <p>
-            Add a production event or schedule shots from the connected rail.
+            Add a production event or schedule shots from the connected
+            rail.
           </p>
         </div>
       )}

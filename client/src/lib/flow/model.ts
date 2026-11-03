@@ -1,4 +1,7 @@
-import {resolveSchedule,clockText} from '../../../../server/src/flows/scheduling'
+import {
+  resolveSchedule,
+  clockText,
+} from '../../../../server/src/flows/scheduling'
 import * as Y from 'yjs'
 export type Department = {
   id: string
@@ -25,18 +28,21 @@ export type FlowEvent = {
   sourceListId?: string
   reference?: string
   deletedAt?: string
-  timing?: "sequence" | "anchor" | "relative" | "unscheduled"
+  timing?: 'sequence' | 'anchor' | 'relative' | 'unscheduled'
   clockStart?: number | null
   dependsOn?: string
   offsetMinutes?: number
-  relativeEdge?: "start" | "end"
+  relativeEdge?: 'start' | 'end'
   minute?: number | null
   effectiveDuration?: number | null
+  sourceMissing?: boolean
   label?: string
   provenance?: unknown
 }
 export function records<T>(d: Y.Doc, k: string): T[] {
-  return [...d.getMap<Y.Map<unknown>>(k).values()].map((m) => m.toJSON() as T)
+  return [...d.getMap<Y.Map<unknown>>(k).values()].map(
+    (m) => m.toJSON() as T,
+  )
 }
 export function put(
   d: Y.Doc,
@@ -55,7 +61,8 @@ export function put(
       if (v === undefined) return
       if (
         typeof v === 'string' &&
-        (((k === 'description' || k === 'notes') && collection === 'events') ||
+        (((k === 'description' || k === 'notes') &&
+          collection === 'events') ||
           (k === 'text' && collection === 'instructions'))
       ) {
         const existing = m!.get(k)
@@ -65,18 +72,14 @@ export function put(
             existing.insert(0, v)
           }
         } else m!.set(k, new Y.Text(v))
-      } else if(m!.get(k)!==v) m!.set(k, v)
+      } else if (m!.get(k) !== v) m!.set(k, v)
     })
   })
 }
 export function orderedEvents(d: Y.Doc) {
   return records<FlowEvent>(d, 'events')
     .filter((e) => !e.deletedAt)
-    .sort(
-      (a, b) =>
-        a.order - b.order ||
-        a.id.localeCompare(b.id),
-    )
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 }
 export function departments(d: Y.Doc) {
   return records<Department>(d, 'departments')
@@ -127,7 +130,10 @@ export function addEvent(d: Y.Doc, value: Partial<FlowEvent> = {}) {
 export function duration(e: FlowEvent, shot?: Y.Map<unknown>) {
   if (e.duration != null) return e.duration
   const n = shot?.get('estimatedMinutes')
-  return n !== '' && n != null && Number.isFinite(Number(n)) && Number(n) >= 0
+  return n !== '' &&
+    n != null &&
+    Number.isFinite(Number(n)) &&
+    Number(n) >= 0
     ? Number(n)
     : null
 }
@@ -143,7 +149,9 @@ export function localParts(value: string, zone: string) {
     hourCycle: 'h23',
   }).formatToParts(new Date(value))
   const v = (k: string) => p.find((p) => p.type === k)?.value || ''
-  return `${v('year')}-${v('month')}-${v('day')} ${v('hour')}:${v('minute')}`
+  return `${v('year')}-${v('month')}-${v('day')} ${v('hour')}:${v(
+    'minute',
+  )}`
 }
 /** Resolve every possible offset around the local day. DST folds/gaps require an explicit choice. */
 export function localCandidates(local: string, zone: string) {
@@ -190,5 +198,25 @@ export function moveEvent(d: Y.Doc, e: FlowEvent, target: FlowEvent) {
   })
 }
 
-export {resolveSchedule,clockText}
-export function scheduleState(doc:Y.Doc,source?:Y.Doc) {return resolveSchedule(Object.fromEntries(['meta','departments','events','instructions','comments','imports'].map(k=>[k,doc.getMap(k).toJSON()])),source?{id:doc.getMap('meta').get('listId'),shots:source.getMap('shots').toJSON(),scenes:source.getMap('scenes').toJSON()}:null)}
+export { resolveSchedule, clockText }
+export function scheduleState(doc: Y.Doc, source?: Y.Doc) {
+  return resolveSchedule(
+    Object.fromEntries(
+      [
+        'meta',
+        'departments',
+        'events',
+        'instructions',
+        'comments',
+        'imports',
+      ].map((k) => [k, doc.getMap(k).toJSON()]),
+    ),
+    source
+      ? {
+          id: doc.getMap('meta').get('listId'),
+          shots: source.getMap('shots').toJSON(),
+          scenes: source.getMap('scenes').toJSON(),
+        }
+      : null,
+  )
+}

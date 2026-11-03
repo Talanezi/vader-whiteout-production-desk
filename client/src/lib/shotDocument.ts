@@ -1,4 +1,7 @@
-import {canonicalLabel,scenePrefix} from '../../../server/src/flows/scheduling'
+import {
+  canonicalLabel,
+  scenePrefix,
+} from '../../../server/src/flows/scheduling'
 import * as Y from 'yjs'
 
 export const operationMeta = 'whiteout-shot-operation'
@@ -133,11 +136,29 @@ export function change(
   user?: number,
 ) {
   doc.transact(() => {
-    if(key==='number') {
-      const v=String(value).trim(), scene=str(scenes(doc).get(str(map,'sceneId')),'number')
-      if(!/^(?:.+-)?[a-z]+$/i.test(v)) throw Error('Use an alphabetic shot code, such as A or AA. Existing imported references are preserved until edited.')
-      value=canonicalLabel(v,scene)
-      if([...shots(doc).values()].some(other=>other!==map&&!other.get('deleted')&&str(other,'sceneId')===str(map,'sceneId')&&canonicalLabel(str(other,'number'),scene)===value)) throw Error('That shot code is already used in this scene.')
+    if (key === 'number' && String(value).trim() !== str(map, 'number')) {
+      const v = String(value).trim(),
+        scene = str(scenes(doc).get(str(map, 'sceneId')), 'number')
+      if (!/^(?:.+-)?[a-z]+$/i.test(v))
+        throw Error(
+          'Use an alphabetic shot code, such as A or AA. Existing imported references are preserved until edited.',
+        )
+      value = canonicalLabel(v, scene)
+      if (
+        scenePrefix(scene) &&
+        !String(value).startsWith(scenePrefix(scene) + '-')
+      )
+        throw Error('The shot code must use its current scene prefix.')
+      if (
+        [...shots(doc).values()].some(
+          (other) =>
+            other !== map &&
+            !other.get('deleted') &&
+            str(other, 'sceneId') === str(map, 'sceneId') &&
+            canonicalLabel(str(other, 'number'), scene) === value,
+        )
+      )
+        throw Error('That shot code is already used in this scene.')
     }
     map.set(key, value)
     map.set('updatedAt', new Date().toISOString())
@@ -181,7 +202,8 @@ export function nextShotNumber(doc: Y.Doc, sceneId: string) {
       label = String.fromCharCode(65 + (n % 26)) + label
       n = Math.floor(n / 26)
     }
-    const number = scenePrefix(scene) + '-' + label
+    const number =
+      (scenePrefix(scene) ? scenePrefix(scene) + '-' : '') + label
     if (!used.has(number)) return number
   }
   throw Error('Too many shot identifiers.')
@@ -203,14 +225,22 @@ export function addShot(
         .map((s) => Number(s.get('order')) || 0),
     ) + 1024
   const plan =
-    Math.max(0, ...all.map((s) => Number(s.get('planningOrder')) || 0)) + 1024
+    Math.max(0, ...all.map((s) => Number(s.get('planningOrder')) || 0)) +
+    1024
   shotOperation(
     doc,
     () => {
       shots(doc).set(id, map)
       for (const key of Object.keys(fields)) {
-        const value = from ? str(from, key) : key === 'camera' ? 'CAM A' : ''
-        map.set(key, narrativeFields.includes(key) ? new Y.Text(value) : value)
+        const value = from
+          ? str(from, key)
+          : key === 'camera'
+          ? 'CAM A'
+          : ''
+        map.set(
+          key,
+          narrativeFields.includes(key) ? new Y.Text(value) : value,
+        )
       }
       map.set('number', nextShotNumber(doc, sceneId))
       if (from?.get('source')) map.set('source', str(from, 'source'))
@@ -244,8 +274,8 @@ export function reorder(
   const low = before
     ? Number(before.get(key))
     : after
-      ? Number(after.get(key)) - 2048
-      : 0
+    ? Number(after.get(key)) - 2048
+    : 0
   const high = after ? Number(after.get(key)) : low + 2048
   shotOperation(
     doc,
@@ -258,18 +288,23 @@ export function hasShotNumberConflict(doc: Y.Doc, shot: RecordMap) {
   const identity = (record: RecordMap) => {
     const number = str(record, 'number'),
       scene = str(scenes(doc).get(str(record, 'sceneId')), 'number')
-    return canonicalLabel(number,scene)
+    return canonicalLabel(number, scene)
   }
   const number = identity(shot)
   return (
     !!number &&
     [...shots(doc).values()].some(
       (other) =>
-        other !== shot && !other.get('deleted') && identity(other) === number,
+        other !== shot &&
+        !other.get('deleted') &&
+        identity(other) === number,
     )
   )
 }
 
-export function displayShot(doc:Y.Doc,shot:RecordMap) {
- return canonicalLabel(str(shot,'number'),str(scenes(doc).get(str(shot,'sceneId')),'number'))
+export function displayShot(doc: Y.Doc, shot: RecordMap) {
+  return canonicalLabel(
+    str(shot, 'number'),
+    str(scenes(doc).get(str(shot, 'sceneId')), 'number'),
+  )
 }

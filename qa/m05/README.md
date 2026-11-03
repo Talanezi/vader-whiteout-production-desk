@@ -47,3 +47,15 @@ departments, eight size/style combinations, continuation behavior and exact
 byte determinism. Browser tests compare the actual downloaded PDF bytes with
 the PDF response used for preview. Physical iPad/Pencil and printer hardware
 are separate owner acceptance; desktop WebKit/touch emulation are not hardware tests.
+
+## Final owner corrective pass
+
+Use `CORRECTIONS.md` and `CORRECTIVE-ACCEPTANCE.md`. The original scripts above
+record the first M05 release and may assert superseded timezone/status/actual-time
+UI. Current corrective scripts are `scheduling-corrections.cjs`,
+`labels-corrections.cjs`, `corrective-fixture.cjs`, `corrective-browser.cjs`,
+`corrective-interactions.cjs`, `corrective-import.cjs`, `history-corrections.cjs`,
+`pack-corrections.cjs`, `permissions-corrections.cjs` and the adjusted
+`connections.cjs`. Start `qa/m05/authority.cjs` in place of the earlier M04
+loopback authority to exercise the actual current Scheduler membership function.
+It is never imported by deployable application code.

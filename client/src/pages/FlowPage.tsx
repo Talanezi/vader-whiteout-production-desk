@@ -1,7 +1,7 @@
 import DatePicker from '../components/whiteout/DatePicker'
 import InstructionTiming from '../components/flow/InstructionTiming'
-import {change} from '../lib/shotDocument'
-import {scheduleState,clockText} from '../lib/flow/model'
+import { change, displayShot } from '../lib/shotDocument'
+import { scheduleState, clockText } from '../lib/flow/model'
 import { useEffect, useRef, useState } from 'react'
 import {
   useLocation,
@@ -68,7 +68,8 @@ function Connected({
 export default function FlowPage() {
   const { id = '' } = useParams(),
     c = useFlowCollaboration(id)
-  if (!getAuthToken() || c.error === 'UNAUTHORIZED') return <SessionState />
+  if (!getAuthToken() || c.error === 'UNAUTHORIZED')
+    return <SessionState />
   if (!c.synced || !c.provider || !c.session || c.session.id !== id)
     return (
       <div className="pd-page">
@@ -106,7 +107,10 @@ function Workspace({
     listId = String(meta.get('listId') || ''),
     zone = 'UTC',
     date = String(meta.get('date') || ''),
-    scheduleView = scheduleState(doc,source?.synced?source.doc:undefined),
+    scheduleView = scheduleState(
+      doc,
+      source?.synced ? source.doc : undefined,
+    ),
     events = scheduleView.events as FlowEvent[],
     deps = departments(doc),
     toast = useToast(),
@@ -118,9 +122,13 @@ function Workspace({
     [selected, setSelected] = useState(new Set<string>()),
     [inspector, setInspector] = useState<{ id: string; tab: string }>(),
     [time, setTime] = useState<string>(),
-    [newDepartment,setNewDepartment]=useState(false),
-    [departmentName,setDepartmentName]=useState(''),
-    [instructionTime,setInstructionTime]=useState<{event:FlowEvent;departmentId:string}>(),
+    [timeSuggestion, setTimeSuggestion] = useState<number>(),
+    [newDepartment, setNewDepartment] = useState(false),
+    [departmentName, setDepartmentName] = useState(''),
+    [instructionTime, setInstructionTime] = useState<{
+      event: FlowEvent
+      departmentId: string
+    }>(),
     [print, setPrint] = useState(false),
     [history, setHistory] = useState(false),
     [importing, setImporting] = useState(
@@ -140,9 +148,15 @@ function Workspace({
       start?: string
       duration?: number | null
     }>(),
-    [durationBusy,setDurationBusy]=useState(false),
-    [conflict,setConflict]=useState<{eventId:string;anchorId:string}>()
-  const allSaved = c.saved && !durationBusy && (!source || source.saved || Boolean(source.error))
+    [durationBusy, setDurationBusy] = useState(false),
+    [conflict, setConflict] = useState<{
+      eventId: string
+      anchorId: string
+    }>()
+  const allSaved =
+    c.saved &&
+    !durationBusy &&
+    (!source || source.saved || Boolean(source.error))
   const key = `whiteout:flow:${id}:user:${c.session!.user.id}:layout`,
     [layout, setLayout] = useState<{
       hidden: string[]
@@ -168,7 +182,8 @@ function Workspace({
   }, [layout, key])
   useEffect(() => {
     setSelected(
-      (v) => new Set([...v].filter((id) => events.some((e) => e.id === id))),
+      (v) =>
+        new Set([...v].filter((id) => events.some((e) => e.id === id))),
     )
   }, [c.revision])
   const filter = events.filter((e) =>
@@ -193,18 +208,28 @@ function Workspace({
     setInspector({ id: e.id, tab })
     c.provider?.setAwarenessField('cell', { shotId: e.id, field: tab })
   }
-  function add(type: FlowEvent['type'], after?: FlowEvent, where = 'after') {
+  function add(
+    type: FlowEvent['type'],
+    after?: FlowEvent,
+    where = 'after',
+  ) {
     const id = addEvent(doc, {
       type,
       description: type === 'milestone' ? 'Shared milestone' : '',
       start: null,
-      timing: type==='department'?'unscheduled':'sequence',
+      timing: type === 'department' ? 'unscheduled' : 'sequence',
       order: after
         ? after.order + (where === 'before' ? -1 : 1)
         : Math.max(0, ...events.map((e) => e.order)) + 1024,
     })
     setSelected(new Set([id]))
-    requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-event="${id}"] .flow-action-cell .pd-text-preview`)?.click())
+    requestAnimationFrame(() =>
+      document
+        .querySelector<HTMLElement>(
+          `[data-event="${id}"] .flow-action-cell .pd-text-preview`,
+        )
+        ?.click(),
+    )
   }
   function schedule(s: Y.Map<unknown>, target?: FlowEvent) {
     const sid = str(s, 'id'),
@@ -212,10 +237,10 @@ function Workspace({
         type: 'shot',
         shotId: sid,
         sourceListId: listId,
-        reference: str(s, 'number'),
+        reference: s?.doc ? displayShot(s.doc, s) : str(s, 'number'),
         description: '',
         start: null,
-        timing:'sequence',
+        timing: 'sequence',
         order: target
           ? target.order - 0.5
           : Math.max(0, ...events.map((e) => e.order)) + 1024,
@@ -223,7 +248,15 @@ function Workspace({
     setSelected(new Set([id]))
   }
   async function remove() {
-    try{await flowRequest(`/${id}/manage`,{action:'checkpoint',summary:'Before deleting activities'})}catch(e){setError((e as Error).message);return}
+    try {
+      await flowRequest(`/${id}/manage`, {
+        action: 'checkpoint',
+        summary: 'Before deleting activities',
+      })
+    } catch (e) {
+      setError((e as Error).message)
+      return
+    }
     const ids = deleting.filter((id) => events.some((e) => e.id === id))
     doc.transact(() =>
       ids.forEach((id) =>
@@ -237,7 +270,9 @@ function Workspace({
         label: 'Restore',
         run: () =>
           doc.transact(() =>
-            ids.forEach((id) => put(doc, 'events', id, { deletedAt: null })),
+            ids.forEach((id) =>
+              put(doc, 'events', id, { deletedAt: null }),
+            ),
           ),
       },
     })
@@ -289,7 +324,8 @@ function Workspace({
           (other) =>
             other.id !== move.event.id &&
             other.start &&
-            duration(other, sourceShots?.get(other.shotId || '')) != null &&
+            duration(other, sourceShots?.get(other.shotId || '')) !=
+              null &&
             Date.parse(other.start) <
               Date.parse(proposedStart) +
                 (move.duration ??
@@ -300,7 +336,8 @@ function Workspace({
                   0) *
                   60000 &&
             Date.parse(other.start) +
-              (duration(other, sourceShots?.get(other.shotId || '')) || 0) *
+              (duration(other, sourceShots?.get(other.shotId || '')) ||
+                0) *
                 60000 >
               Date.parse(proposedStart) &&
             deps.some(
@@ -345,29 +382,34 @@ function Workspace({
       <header className="flow-document-header">
         <div>
           <div className="flow-breadcrumb">
-            <button onClick={() => navigate('/flows')}>Flow of the Day</button>
+            <button onClick={() => navigate('/flows')}>
+              Flow of the Day
+            </button>
             <span>{date || 'Set Shoot date'}</span>
           </div>
           <h1>{String(meta.get('name'))}</h1>
         </div>
         <div className="flow-document-actions">
           <span className="flow-save" role="status">
-            {!allSaved && !c.error && !source?.error && <DotsLoader small />}
+            {!allSaved && !c.error && !source?.error && (
+              <DotsLoader small />
+            )}
             {c.error
               ? 'Save interrupted'
               : source?.error && c.saved
-                ? 'Flow saved · source unavailable'
-                : !c.connected || Boolean(source && !source.connected)
-                  ? 'Reconnecting'
-                  : allSaved
-                    ? 'Saved'
-                    : 'Syncing'}
+              ? 'Flow saved · source unavailable'
+              : !c.connected || Boolean(source && !source.connected)
+              ? 'Reconnecting'
+              : allSaved
+              ? 'Saved'
+              : 'Syncing'}
           </span>
           <div className="pd-collaborators">
             {c.peers
               .filter(
                 (p, i, a) =>
-                  p.user && a.findIndex((v) => v.user?.id === p.user?.id) === i,
+                  p.user &&
+                  a.findIndex((v) => v.user?.id === p.user?.id) === i,
               )
               .map((p) => (
                 <NameTooltip
@@ -439,7 +481,25 @@ function Workspace({
           Connected Shot List: {source.error}. Flow entries remain intact.
         </ErrorNotice>
       )}
-      {scheduleView.conflicts.length>0&&<div className="flow-conflicts" role="status">{scheduleView.conflicts.map((x:any)=><div key={x.eventId+':'+x.anchorId}><span>{events.find(e=>e.id===x.eventId)?.label||events.find(e=>e.id===x.eventId)?.description} overlaps {events.find(e=>e.id===x.anchorId)?.description||'a fixed activity'} by {x.overlap} min.</span><Button icon="calendar" onClick={()=>setConflict(x)}>Resolve timing</Button></div>)}</div>}
+      {scheduleView.conflicts.length > 0 && (
+        <div className="flow-conflicts" role="status">
+          {scheduleView.conflicts.map((x: any) => (
+            <div key={x.eventId + ':' + x.anchorId}>
+              <span>
+                {events.find((e) => e.id === x.eventId)?.label ||
+                  events.find((e) => e.id === x.eventId)?.description}{' '}
+                overlaps{' '}
+                {events.find((e) => e.id === x.anchorId)?.description ||
+                  'a fixed activity'}{' '}
+                by {x.overlap} min.
+              </span>
+              <Button icon="calendar" onClick={() => setConflict(x)}>
+                Resolve timing
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flow-toolbar">
         <SearchField
           label="Search events"
@@ -455,7 +515,10 @@ function Workspace({
             <Icon name="columns" />
             Department Flow
           </button>
-          <button aria-pressed={mode === 'map'} onClick={() => setMode('map')}>
+          <button
+            aria-pressed={mode === 'map'}
+            onClick={() => setMode('map')}
+          >
             <Icon name="calendar" />
             Time Map
           </button>
@@ -473,8 +536,54 @@ function Workspace({
             onClick={() => c.undo.redo()}
             disabled={!c.undo.canRedo()}
           />
-          <Button icon="plus" onClick={()=>add('custom')}>Add activity</Button>
-          <Menu label="Layout" icon="columns" items={[{value:'core',label:'Core Crew',onSelect:()=>setLayout(l=>({...l,hidden:deps.filter(d=>!/camera|grip|electric|talent|actor|sound|director|production|producer/i.test(d.name)).map(d=>d.id)}))},{value:'all',label:'All Departments',onSelect:()=>setLayout(l=>({...l,hidden:[]}))},...deps.map(d=>({value:d.id,label:(layout.hidden.includes(d.id)?'Show ':'Hide ')+d.name,onSelect:()=>setLayout(l=>({...l,hidden:l.hidden.includes(d.id)?l.hidden.filter(x=>x!==d.id):[...l.hidden,d.id]}))})),{value:'add',label:'Add department',onSelect:()=>setNewDepartment(true)}]}/>
+          <Button icon="plus" onClick={() => add('custom')}>
+            Add activity
+          </Button>
+          <Menu
+            label="Layout"
+            icon="columns"
+            items={[
+              {
+                value: 'core',
+                label: 'Core Crew',
+                onSelect: () =>
+                  setLayout((l) => ({
+                    ...l,
+                    hidden: deps
+                      .filter(
+                        (d) =>
+                          !/camera|grip|electric|talent|actor|sound|director|production|producer/i.test(
+                            d.name,
+                          ),
+                      )
+                      .map((d) => d.id),
+                  })),
+              },
+              {
+                value: 'all',
+                label: 'All Departments',
+                onSelect: () => setLayout((l) => ({ ...l, hidden: [] })),
+              },
+              ...deps.map((d) => ({
+                value: d.id,
+                label:
+                  (layout.hidden.includes(d.id) ? 'Show ' : 'Hide ') +
+                  d.name,
+                onSelect: () =>
+                  setLayout((l) => ({
+                    ...l,
+                    hidden: l.hidden.includes(d.id)
+                      ? l.hidden.filter((x) => x !== d.id)
+                      : [...l.hidden, d.id],
+                  })),
+              })),
+              {
+                value: 'add',
+                label: 'Add department',
+                onSelect: () => setNewDepartment(true),
+              },
+            ]}
+          />
           <Button
             icon={rail ? 'collapse' : 'shots'}
             aria-pressed={rail}
@@ -516,7 +625,9 @@ function Workspace({
                   setCopied(true)
                   setTimeout(() => setCopied(false), 1800)
                 })
-                .catch(() => setError('Could not copy the selected events.'))
+                .catch(() =>
+                  setError('Could not copy the selected events.'),
+                )
             }}
           >
             Copy selected
@@ -541,7 +652,11 @@ function Workspace({
         onDragStart={(e) => {
           dropTarget.current = ''
           dragStart.current = filter.map((e) => e.id)
-          setDragging(String(e.operation.source?.id || ''))
+          setDragging(
+            String(e.operation.source?.id || '').startsWith('department:')
+              ? ''
+              : String(e.operation.source?.id || ''),
+          )
         }}
         onDragOver={(e) => {
           const target = String(e.operation.target?.id || '')
@@ -552,8 +667,29 @@ function Workspace({
             dropTarget.current = target
         }}
         onDragEnd={(e) => {
-          if(String(e.operation.source?.id||'').startsWith('department:')) {
-            const source=e.operation.source;if(!e.canceled&&isSortable(source)){const id=String(source.id).slice(11),order=[...visible],i=order.findIndex(d=>d.id===id),v=order.splice(i,1)[0];order.splice(source.index,0,v);doc.transact(()=>order.forEach((d,i)=>put(doc,'departments',d.id,{order:(i+1)*1024})));}return;
+          if (
+            String(e.operation.source?.id || '').startsWith('department:')
+          ) {
+            const source = e.operation.source
+            if (!e.canceled && isSortable(source)) {
+              const id = String(source.id).slice(11),
+                target = visible[source.index]
+              if (target && id !== target.id) {
+                const from = deps.findIndex((d) => d.id === id),
+                  to = deps.findIndex((d) => d.id === target.id),
+                  all = deps.filter((d) => d.id !== id),
+                  at = all.findIndex((d) => d.id === target.id)
+                all.splice(at + (from < to ? 1 : 0), 0, deps[from])
+                doc.transact(() =>
+                  all.forEach((d, i) =>
+                    put(doc, 'departments', d.id, {
+                      order: (i + 1) * 1024,
+                    }),
+                  ),
+                )
+              }
+            }
+            return
           }
           const from = String(e.operation.source?.id || ''),
             to = String(e.operation.target?.id || '')
@@ -579,7 +715,7 @@ function Workspace({
           }
           const event = events.find((v) => v.id === from)
           if (!event) return
-          moveEvent(doc,event,target)
+          moveEvent(doc, event, target)
         }}
       >
         <div className={`flow-content ${rail ? 'has-rail' : ''}`}>
@@ -599,7 +735,10 @@ function Workspace({
                 selected={selected}
                 widths={layout.widths}
                 onWidth={(id, v) =>
-                  setLayout((l) => ({ ...l, widths: { ...l.widths, [id]: v } }))
+                  setLayout((l) => ({
+                    ...l,
+                    widths: { ...l.widths, [id]: v },
+                  }))
                 }
                 onSelect={(id, v) =>
                   setSelected((s) => {
@@ -610,11 +749,31 @@ function Workspace({
                   })
                 }
                 onAll={(v) =>
-                  setSelected(v ? new Set(filter.map((e) => e.id)) : new Set())
+                  setSelected(
+                    v ? new Set(filter.map((e) => e.id)) : new Set(),
+                  )
                 }
-                onDepartmentInsert={(event,departmentId)=>{const id=addEvent(doc,{type:'department',departmentId,order:event.order+.5,timing:'unscheduled'} as Partial<FlowEvent>);requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-event="${id}"] [data-department="${departmentId}"] .pd-text-preview`)?.click())}}
-                onDepartmentTime={(event,departmentId)=>setInstructionTime({event,departmentId})}
-                onHideDepartment={(id)=>setLayout(l=>({...l,hidden:[...l.hidden,id]}))}
+                onDepartmentInsert={(event, departmentId) => {
+                  const id = addEvent(doc, {
+                    type: 'department',
+                    departmentId,
+                    order: event.order + 0.5,
+                    timing: 'unscheduled',
+                  } as Partial<FlowEvent>)
+                  requestAnimationFrame(() =>
+                    document
+                      .querySelector<HTMLElement>(
+                        `[data-event="${id}"] [data-department="${departmentId}"] .pd-text-preview`,
+                      )
+                      ?.click(),
+                  )
+                }}
+                onDepartmentTime={(event, departmentId) =>
+                  setInstructionTime({ event, departmentId })
+                }
+                onHideDepartment={(id) =>
+                  setLayout((l) => ({ ...l, hidden: [...l.hidden, id] }))
+                }
                 onTime={(e) => setTime(e.id)}
                 onInspect={inspect}
                 onDelete={setDeleting}
@@ -622,7 +781,9 @@ function Workspace({
               />
             ) : (
               <TimeMap
-                onDepartmentTime={(event,departmentId)=>setInstructionTime({event,departmentId})}
+                onDepartmentTime={(event, departmentId) =>
+                  setInstructionTime({ event, departmentId })
+                }
                 selected={selected}
                 onSelect={(e) => setSelected(new Set([e.id]))}
                 onShowInFlow={(e) => {
@@ -639,15 +800,23 @@ function Workspace({
                 departments={visible}
                 zone={zone}
                 shots={sourceShots}
-                onMove={(event, start, duration) =>
-                  {if(duration!==undefined){setTime(event.id);return;}setMove({event,start})}
-                }
+                onMove={(event, start, duration) => {
+                  if (duration !== undefined && duration !== null) {
+                    setTimeSuggestion(duration)
+                    setTime(event.id)
+                    return
+                  }
+                  setMove({ event, start })
+                }}
                 onInspect={(e) => setTime(e.id)}
               />
             )}
           </main>
           {rail && (
             <ShotRail
+              onAttention={(e) =>
+                e.sourceMissing ? inspect(e) : setTime(e.id)
+              }
               source={source?.synced ? source.doc : undefined}
               listId={listId}
               events={events}
@@ -658,13 +827,17 @@ function Workspace({
               onAdd={(s) => schedule(s)}
               onSelect={(s) => {
                 const event = events.find(
-                  (e) => e.shotId === str(s, 'id') && e.sourceListId === listId,
+                  (e) =>
+                    e.shotId === str(s, 'id') && e.sourceListId === listId,
                 )
                 if (event) {
                   setSelected(new Set([event.id]))
                   document
                     .querySelector(`[data-event="${event.id}"]`)
-                    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+                    ?.scrollIntoView({
+                      block: 'nearest',
+                      behavior: 'smooth',
+                    })
                 }
               }}
             />
@@ -717,27 +890,157 @@ function Workspace({
             </>
           }
         >
-          <p>Keep this document open to reconnect and save your changes.</p>
+          <p>
+            Keep this document open to reconnect and save your changes.
+          </p>
         </Overlay>
       )}
       {time && events.find((e) => e.id === time) && (
         <TimeEditor
+          suggestedDuration={timeSuggestion}
           event={events.find((e) => e.id === time)!}
           zone={zone}
           date={date}
           inherited={duration(
             { ...events.find((e) => e.id === time)!, duration: null },
-            sourceShots?.get(events.find((e) => e.id === time)?.shotId || ''),
+            sourceShots?.get(
+              events.find((e) => e.id === time)?.shotId || '',
+            ),
           )}
-          onSharedDuration={source?async(value)=>{
-            const shot=sourceShots?.get(events.find(e=>e.id===time)?.shotId||'');if(!shot||!source.connected||source.error||!source.provider)throw Error('Reconnect the Shot List before changing its shared estimate.');
-            setDurationBusy(true);
-            try {
-              await new Promise<void>((resolve,reject)=>{const p=source.provider!;let expected='';const timer=setTimeout(()=>done(Error('The source estimate has not been acknowledged. Keep this window open and reconnect.')),15000);function done(error?:Error){clearTimeout(timer);p.off('stateless',ack);error?reject(error):resolve()}function ack({payload}:{payload:string}){void(async()=>{const m=JSON.parse(payload);if(m.type==='persistence-error')return done(Error('The Shot List could not save this estimate.'));if(m.type==='persisted'&&expected){const current=await crypto.subtle.digest('SHA-256',Y.encodeSnapshot(Y.snapshot(source!.doc)) as BufferSource),hash=Array.from(new Uint8Array(current)).map(x=>x.toString(16).padStart(2,'0')).join('');if(m.digest===expected||m.digest===hash&&String(shot!.get('estimatedMinutes'))===(value==null?'':String(value)))done()}})().catch(()=>{})}p.on('stateless',ack);change(source.doc,shot,'estimatedMinutes',value==null?'':String(value),c.session!.user.id);void crypto.subtle.digest('SHA-256',Y.encodeSnapshot(Y.snapshot(source!.doc)) as BufferSource).then(b=>{expected=Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');p.sendStateless('persistence-status')}).catch(e=>done(e));});
-            }finally{setDurationBusy(false)}
-          }:undefined}
-          onSave={(v) => {const e=events.find(e=>e.id===time)!;if(e.type==='milestone'&&v.clockStart!=null){const next=events.find(other=>other.id!==e.id&&other.minute!=null&&other.minute>=v.clockStart!),before=next?events.filter(x=>x.id!==e.id&&x.order<next.order).slice(-1)[0]:undefined;v.order=next?((before?.order??next.order-2048)+next.order)/2:e.order;}put(doc,'events',time,v)}}
-          onClose={() => setTime(undefined)}
+          onSharedDuration={
+            source
+              ? async (value) => {
+                  const shot = sourceShots?.get(
+                    events.find((e) => e.id === time)?.shotId || '',
+                  )
+                  if (
+                    !shot ||
+                    !source.connected ||
+                    source.error ||
+                    !source.provider
+                  )
+                    throw Error(
+                      'Reconnect the Shot List before changing its shared estimate.',
+                    )
+                  setDurationBusy(true)
+                  try {
+                    await new Promise<void>((resolve, reject) => {
+                      const p = source.provider!
+                      let expected = ''
+                      const timer = setTimeout(
+                        () =>
+                          done(
+                            Error(
+                              'The source estimate has not been acknowledged. Keep this window open and reconnect.',
+                            ),
+                          ),
+                        15000,
+                      )
+                      function done(error?: Error) {
+                        clearTimeout(timer)
+                        p.off('stateless', ack)
+                        error ? reject(error) : resolve()
+                      }
+                      function ack({ payload }: { payload: string }) {
+                        void (async () => {
+                          const m = JSON.parse(payload)
+                          if (m.type === 'persistence-error')
+                            return done(
+                              Error(
+                                'The Shot List could not save this estimate.',
+                              ),
+                            )
+                          if (m.type === 'persisted' && expected) {
+                            const current = await crypto.subtle.digest(
+                                'SHA-256',
+                                Y.encodeSnapshot(
+                                  Y.snapshot(source!.doc),
+                                ) as BufferSource,
+                              ),
+                              hash = Array.from(new Uint8Array(current))
+                                .map((x) =>
+                                  x.toString(16).padStart(2, '0'),
+                                )
+                                .join('')
+                            if (
+                              m.digest === expected ||
+                              (m.digest === hash &&
+                                String(shot!.get('estimatedMinutes')) ===
+                                  (value == null ? '' : String(value)))
+                            )
+                              done()
+                          }
+                        })().catch(() => {})
+                      }
+                      p.on('stateless', ack)
+                      change(
+                        source.doc,
+                        shot,
+                        'estimatedMinutes',
+                        value == null ? '' : String(value),
+                        c.session!.user.id,
+                      )
+                      void crypto.subtle
+                        .digest(
+                          'SHA-256',
+                          Y.encodeSnapshot(
+                            Y.snapshot(source!.doc),
+                          ) as BufferSource,
+                        )
+                        .then((b) => {
+                          expected = Array.from(new Uint8Array(b))
+                            .map((x) => x.toString(16).padStart(2, '0'))
+                            .join('')
+                          p.sendStateless('persistence-status')
+                        })
+                        .catch((e) => done(e))
+                    })
+                  } finally {
+                    setDurationBusy(false)
+                  }
+                }
+              : undefined
+          }
+          onSave={(v) => {
+            const e = events.find((e) => e.id === time)!
+            if (
+              e.type === 'shot' &&
+              e.id === events.find((x) => x.type === 'shot')?.id &&
+              !v.fixed &&
+              v.timing === 'anchor'
+            ) {
+              doc.transact(() => {
+                meta.set('filmingStart', v.clockStart)
+                put(doc, 'events', time, {
+                  ...v,
+                  timing: 'sequence',
+                  clockStart: null,
+                })
+              })
+              return
+            }
+            if (e.type === 'milestone' && v.clockStart != null) {
+              const next = events.find(
+                  (other) =>
+                    other.id !== e.id &&
+                    other.minute != null &&
+                    other.minute >= v.clockStart!,
+                ),
+                before = next
+                  ? events
+                      .filter((x) => x.id !== e.id && x.order < next.order)
+                      .slice(-1)[0]
+                  : undefined
+              v.order = next
+                ? ((before?.order ?? next.order - 2048) + next.order) / 2
+                : e.order
+            }
+            put(doc, 'events', time, v)
+          }}
+          onClose={() => {
+            setTime(undefined)
+            setTimeSuggestion(undefined)
+          }}
         />
       )}
       {inspector && events.find((e) => e.id === inspector.id) && (
@@ -762,13 +1065,139 @@ function Workspace({
           }}
         />
       )}
-      {conflict&&<Overlay title="Resolve fixed-time conflict" className="flow-time-dialog" onClose={()=>setConflict(undefined)} footer={<><Button onClick={()=>setConflict(undefined)}>Keep current timing</Button><Button variant="primary" onClick={()=>{const event=events.find(e=>e.id===conflict.eventId)!,anchor=events.find(e=>e.id===conflict.anchorId)!,next=events.find(e=>e.order>anchor.order&&e.id!==event.id);put(doc,'events',event.id,{order:(anchor.order+(next?.order??anchor.order+1024))/2,timing:'sequence',clockStart:null,fixed:false});setConflict(undefined)}}>Move shot after fixed activity</Button></>}><p>The fixed activity keeps its clock time. The shot keeps its full duration and moves after it; following flexible shots recalculate.</p></Overlay>}
-      {instructionTime&&<InstructionTiming doc={doc} event={instructionTime.event} department={deps.find(d=>d.id===instructionTime.departmentId)!} onClose={()=>setInstructionTime(undefined)}/>}
-      {newDepartment&&<Overlay title="Add department" onClose={()=>setNewDepartment(false)} footer={<Button variant="primary" disabled={!departmentName.trim()} onClick={()=>{const id=crypto.randomUUID();doc.transact(()=>{put(doc,'departments',id,{name:departmentName.trim(),order:Math.max(0,...deps.map(d=>d.order))+1024,personnel:''});for(const e of events)put(doc,'instructions',e.id+':'+id,{eventId:e.id,departmentId:id,text:''});});setNewDepartment(false);setDepartmentName('')}}>Add department</Button>}><label className="flow-field">Department name<input data-initial-focus value={departmentName} onChange={e=>setDepartmentName(e.target.value)} maxLength={100}/></label></Overlay>}
-      {print && (
-        <FlowPrint title={String(meta.get('name'))} date={date} onDateChange={v=>meta.set('date',v)} id={id} departments={deps} onClose={() => setPrint(false)} />
+      {conflict && (
+        <Overlay
+          title="Resolve fixed-time conflict"
+          className="flow-time-dialog"
+          onClose={() => setConflict(undefined)}
+          footer={
+            <>
+              <Button onClick={() => setConflict(undefined)}>
+                Keep current timing
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  const event = events.find(
+                      (e) => e.id === conflict.eventId,
+                    )!,
+                    anchor = events.find(
+                      (e) => e.id === conflict.anchorId,
+                    )!,
+                    next = events.find(
+                      (e) => e.order > anchor.order && e.id !== event.id,
+                    )
+                  put(doc, 'events', event.id, {
+                    order:
+                      (anchor.order +
+                        (next?.order ?? anchor.order + 1024)) /
+                      2,
+                    timing: 'sequence',
+                    clockStart: null,
+                    fixed: false,
+                  })
+                  setConflict(undefined)
+                }}
+              >
+                Move shot after fixed activity
+              </Button>
+            </>
+          }
+        >
+          <p>
+            The fixed activity keeps its clock time. The shot keeps its
+            full duration and moves after it; following flexible shots
+            recalculate.
+          </p>
+        </Overlay>
       )}
-      {history && <FlowHistory id={id} onClose={() => setHistory(false)} />}
+      {instructionTime && (
+        <InstructionTiming
+          doc={doc}
+          event={instructionTime.event}
+          department={
+            deps.find((d) => d.id === instructionTime.departmentId)!
+          }
+          onClose={() => setInstructionTime(undefined)}
+        />
+      )}
+      {newDepartment && (
+        <Overlay
+          title="Add department"
+          onClose={() => setNewDepartment(false)}
+          footer={
+            <Button
+              variant="primary"
+              disabled={!departmentName.trim()}
+              onClick={() => {
+                const id = crypto.randomUUID()
+                doc.transact(() => {
+                  put(doc, 'departments', id, {
+                    name: departmentName.trim(),
+                    order: Math.max(0, ...deps.map((d) => d.order)) + 1024,
+                    personnel: '',
+                  })
+                  for (const e of events)
+                    put(doc, 'instructions', e.id + ':' + id, {
+                      eventId: e.id,
+                      departmentId: id,
+                      text: '',
+                    })
+                })
+                setNewDepartment(false)
+                setDepartmentName('')
+              }}
+            >
+              Add department
+            </Button>
+          }
+        >
+          <label className="flow-field">
+            Department name
+            <input
+              data-initial-focus
+              value={departmentName}
+              onChange={(e) => setDepartmentName(e.target.value)}
+              maxLength={100}
+            />
+          </label>
+        </Overlay>
+      )}
+      {print && (
+        <FlowPrint
+          title={String(meta.get('name'))}
+          date={date}
+          onDateChange={(value) => {
+            doc.transact(() => {
+              for (const e of events) {
+                if (
+                  e.minute != null &&
+                  e.timing === 'anchor' &&
+                  doc
+                    .getMap<Y.Map<unknown>>('events')
+                    .get(e.id)
+                    ?.get('clockStart') === undefined
+                )
+                  put(doc, 'events', e.id, {
+                    clockStart: e.minute,
+                    timing: 'anchor',
+                  })
+              }
+              meta.set('date', value)
+            })
+          }}
+          id={id}
+          departments={deps}
+          onClose={() => setPrint(false)}
+        />
+      )}
+      {history && (
+        <FlowHistory
+          id={id}
+          source={source?.doc.toJSON()}
+          onClose={() => setHistory(false)}
+        />
+      )}
       {importing && (
         <FlowImport
           id={id}
@@ -813,7 +1242,12 @@ function Workspace({
                 put(doc, 'events', relink, {
                   shotId: links[0].shotId,
                   sourceListId: links[0].listId,
-                  reference: str(sourceShots?.get(links[0].shotId), 'number'),
+                  reference: sourceShots?.get(links[0].shotId)?.doc
+                    ? displayShot(
+                        sourceShots.get(links[0].shotId)!.doc!,
+                        sourceShots.get(links[0].shotId)!,
+                      )
+                    : '',
                   type: 'shot',
                 })
               } else
@@ -833,7 +1267,9 @@ function Workspace({
       )}
       {deleting.length > 0 && (
         <Overlay
-          title={`Delete ${deleting.length} selected event${deleting.length === 1 ? '' : 's'}?`}
+          title={`Delete ${deleting.length} selected event${
+            deleting.length === 1 ? '' : 's'
+          }?`}
           onClose={() => setDeleting([])}
           footer={
             <>
@@ -845,8 +1281,8 @@ function Workspace({
           }
         >
           <p>
-            Only these Flow occurrences are removed. You can restore them using
-            the notification. Source shots are unchanged.
+            Only these Flow occurrences are removed. You can restore them
+            using the notification. Source shots are unchanged.
           </p>
         </Overlay>
       )}
@@ -863,7 +1299,7 @@ function Workspace({
                       const shot = sourceShots?.get(event.shotId)
                       if (shot)
                         put(doc, 'events', event.id, {
-                          reference: str(shot, 'number'),
+                          reference: displayShot(shot.doc!, shot),
                         })
                     }
                   }
@@ -877,12 +1313,42 @@ function Workspace({
           }
         >
           <p>
-            All Flow events, instructions and historical references remain. No
-            source shots are deleted.
+            All Flow events, instructions and historical references remain.
+            No source shots are deleted.
           </p>
         </Overlay>
       )}
-      {settings&&<Overlay title="Shoot date" onClose={()=>setSettings(false)} className="flow-time-dialog"><DatePicker label="Shoot date" value={date} onChange={value=>{doc.transact(()=>{for(const e of events){if(e.minute!=null&&e.timing==='anchor'&&doc.getMap<Y.Map<unknown>>('events').get(e.id)?.get('clockStart')===undefined)put(doc,'events',e.id,{clockStart:e.minute,timing:'anchor'});}meta.set('date',value)})}}/></Overlay>}
+      {settings && (
+        <Overlay
+          title="Shoot date"
+          onClose={() => setSettings(false)}
+          className="flow-time-dialog"
+        >
+          <DatePicker
+            label="Shoot date"
+            value={date}
+            onChange={(value) => {
+              doc.transact(() => {
+                for (const e of events) {
+                  if (
+                    e.minute != null &&
+                    e.timing === 'anchor' &&
+                    doc
+                      .getMap<Y.Map<unknown>>('events')
+                      .get(e.id)
+                      ?.get('clockStart') === undefined
+                  )
+                    put(doc, 'events', e.id, {
+                      clockStart: e.minute,
+                      timing: 'anchor',
+                    })
+                }
+                meta.set('date', value)
+              })
+            }}
+          />
+        </Overlay>
+      )}
       {move && (
         <Overlay
           title="Preview timing change"
@@ -894,8 +1360,14 @@ function Workspace({
                 if (move.target) moveEvent(doc, move.event, move.target)
                 else
                   put(doc, 'events', move.event.id, {
-                    clockStart:(move.event.minute||0)+(move.start&&move.event.start?(Date.parse(move.start)-Date.parse(move.event.start))/60000:0),
-                    timing:'anchor',
+                    clockStart:
+                      (move.event.minute || 0) +
+                      (move.start && move.event.start
+                        ? (Date.parse(move.start) -
+                            Date.parse(move.event.start)) /
+                          60000
+                        : 0),
+                    timing: 'anchor',
                   })
                 setMove(undefined)
               }}
@@ -909,7 +1381,9 @@ function Workspace({
               <p className="flow-warning">
                 This interval crosses fixed milestones:{' '}
                 {crossingFixed
-                  .map((e) => e.description || e.reference || 'Fixed event')
+                  .map(
+                    (e) => e.description || e.reference || 'Fixed event',
+                  )
                   .join(', ')}
                 .
               </p>
@@ -919,7 +1393,8 @@ function Workspace({
                 Shared department work overlaps{' '}
                 {overlap
                   .map(
-                    (e) => e.description || e.reference || 'another activity',
+                    (e) =>
+                      e.description || e.reference || 'another activity',
                   )
                   .join(', ')}
                 . Parallel work may be intended; review before applying.
@@ -942,27 +1417,30 @@ function Workspace({
             </strong>
             <p>
               {changing?.start
-                ? localParts(changing.start, zone)
+                ? clockText(changing.minute)
                 : 'Unscheduled'}{' '}
               →{' '}
               {move.target?.start || move.start
-                ? localParts((move.target?.start || move.start)!, zone)
+                ? clockText(
+                    (Date.parse((move.target?.start || move.start)!) -
+                      Date.parse(scheduleView.base + 'T00:00:00Z')) /
+                      60000,
+                  )
                 : 'Unscheduled'}
             </p>
             {changing?.fixed && (
               <p className="flow-warning">
-                This event is fixed. Applying this explicit move changes its
-                anchor.
+                This event is fixed. Applying this explicit move changes
+                its anchor.
               </p>
             )}
             <p>
-              Only this occurrence changes. Other activities and the master shot
-              order are preserved.
+              Following flexible activities recalculate. Fixed times and
+              the master shot order remain anchored.
             </p>
           </div>
         </Overlay>
       )}
-
     </div>
   )
 }
