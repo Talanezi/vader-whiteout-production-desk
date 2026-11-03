@@ -32,6 +32,7 @@ import {
 @Injectable()
 export class FlowsService implements OnModuleDestroy {
   private collab?: Hocuspocus;
+  private historyClock = new Map<string,{at:number,hash:string}>();
   private sockets?: WebSocketServer;
   private recheck?: ReturnType<typeof setInterval>;
   private queues = new Map<string, Promise<void>>();
@@ -111,7 +112,8 @@ export class FlowsService implements OnModuleDestroy {
     try {
       Object.entries({
         name: p.name.trim(),
-        schemaVersion: 1,
+        schemaVersion: 2,
+        clockVersion: 2,
         date: p.date || '',
         zone: p.zone || 'America/Los_Angeles',
         status: 'draft',
@@ -144,6 +146,7 @@ export class FlowsService implements OnModuleDestroy {
           const eventId = randomUUID();
           setRecord(d, 'events', eventId, {
             type: 'shot',
+            timing: 'sequence',
             shotId: id,
             sourceListId: p.listId,
             reference: String(shot.number || ''),
@@ -374,12 +377,22 @@ export class FlowsService implements OnModuleDestroy {
       throw new BadRequestException('Invalid Flow action.');
     });
   }
+  private async autoCheckpoint(id:string,d:Y.Doc) {
+    const clock=this.historyClock.get(id), hash=stableJSON(capture(d));
+    if(!clock){this.historyClock.set(id,{at:Date.now(),hash});return;}
+    if(Date.now()-clock.at<300000||clock.hash===hash)return;
+    this.historyClock.set(id,{at:Date.now(),hash});
+    const author=String(d.getMap('meta').get('author')||'Production team');
+    try {await this.checkpoint(id,{name:author} as Collaborator,d,'Automatic checkpoint');} catch(e){this.historyClock.set(id,clock);throw e;}
+  }
   private async checkpoint(
     id: string,
     user: Collaborator,
     d: Y.Doc,
     summary: string,
   ) {
+    const [previous]=await this.db.query('SELECT state FROM flow_revisions WHERE document_id=$1 ORDER BY created_at DESC LIMIT 1',[id]);
+    if(previous){const old=new Y.Doc();try{Y.applyUpdate(old,previous.state);if(stableJSON(capture(old))===stableJSON(capture(d)))return;}finally{old.destroy();}}
     await this.db.query(
       'INSERT INTO flow_revisions(id,document_id,state,author,summary) VALUES($1,$2,$3,$4,$5)',
       [
@@ -432,8 +445,8 @@ export class FlowsService implements OnModuleDestroy {
         id,
         key,
         JSON.stringify(settings),
-        JSON.stringify(state),
-        bytes,
+        JSON.stringify({title:state.state?.meta?.name,date:state.state?.meta?.date,revision:key}),
+        Buffer.alloc(0),
         user.userID,
       ],
     );
@@ -445,7 +458,7 @@ export class FlowsService implements OnModuleDestroy {
       'SELECT pdf FROM flow_prints WHERE document_id=$1 AND digest=$2',
       [id, key],
     );
-    if (!r) throw new BadRequestException('Print snapshot unavailable.');
+    if (!r || !r.pdf.length) throw new BadRequestException('This temporary export has expired. Generate a fresh preview.');
     return r.pdf as Buffer;
   }
   private async persist(
@@ -560,6 +573,7 @@ export class FlowsService implements OnModuleDestroy {
           );
           if (!row) throw new Error('Unavailable');
           Y.applyUpdate(document, row.state);
+          this.historyClock.set(documentName,{at:Date.now(),hash:stableJSON(capture(document))});
           return document;
         } catch (error) {
           throw collaborationError(error, 4403);
@@ -592,7 +606,8 @@ export class FlowsService implements OnModuleDestroy {
       },
     });
     this.recheck = setInterval(() => {
-      for (const doc of this.collab!.documents.values())
+      for (const doc of this.collab!.documents.values()) {
+        if(doc.getConnectionsCount()>0) void this.autoCheckpoint(doc.name,doc).catch(()=>{});
         for (const c of doc.getConnections())
           void (async () => {
             const user = await this.auth.verifySchedulerToken(c.context.token);
@@ -603,6 +618,7 @@ export class FlowsService implements OnModuleDestroy {
           })().catch(() =>
             c.close({ code: 4403, reason: 'Session or membership revoked' }),
           );
+      }
     }, 30000);
     this.recheck.unref();
     this.sockets = new WebSocketServer({

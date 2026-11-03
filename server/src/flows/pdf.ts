@@ -1,3 +1,4 @@
+import {resolveSchedule,clockText,sourceLabel} from './scheduling';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -43,20 +44,12 @@ export async function renderFlow(
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   if (raw.product === 'department' && departments.length !== 1)
     throw Error('Choose one department for Department Focus.');
-  const events = (Object.values(state.events) as any[])
-    .filter((e) => !e.deletedAt)
-    .sort(
-      (a, b) =>
-        (a.start ? Date.parse(a.start) : Infinity) -
-          (b.start ? Date.parse(b.start) : Infinity) ||
-        a.order - b.order ||
-        a.id.localeCompare(b.id),
-    );
+  const resolved = resolveSchedule(state,source), events = resolved.events;
   const rows = events.filter((e) =>
     raw.product === 'rundown'
       ? e.type !== 'department'
       : raw.product === 'department'
-        ? e.type === 'milestone' ||
+        ? e.type !== 'department' || e.departmentId===departments[0]?.id ||
           departments.some((d) =>
             String(state.instructions[e.id + ':' + d.id]?.text || '').trim(),
           )
@@ -123,25 +116,7 @@ export async function renderFlow(
     }
     if (band.length) bands.push(band);
   }
-  const format = (v: string) => {
-    if (!v) return 'Unscheduled';
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: state.meta.zone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(new Date(v));
-    const part = (key: string) =>
-      parts.find((p) => p.type === key)?.value || '';
-    const date = `${part('year')}-${part('month')}-${part('day')}`;
-    return (
-      `${part('hour')}:${part('minute')}` +
-      (date !== state.meta.date ? '\n' + date : '')
-    );
-  };
+  const format = (e:any) => clockText(e.minute)+(e.minute>=1440?'\nNext day':'');
   const shotFor = (e: any) =>
     e.sourceListId === state.meta.listId && source
       ? source.shots[e.shotId]
@@ -161,29 +136,25 @@ export async function renderFlow(
     const shot = shotFor(e),
       valid = shot && !shot.deleted && !shot.deletedAt;
     return [
-      format(e.start) +
-        (raw.actual && e.actualStart
-          ? '\nActual ' + format(e.actualStart)
-          : '') +
-        (raw.actual && e.actualEnd ? '\nDone ' + format(e.actualEnd) : ''),
+      format(e),
       [
         e.type === 'shot'
           ? valid
-            ? String(shot.number) + ' ' + String(shot.subject || '')
+            ? sourceLabel(shot,source) + ' ' + String(shot.subject || '')
             : String(e.reference || 'Shot') + ' · source unavailable'
           : '',
         e.category,
         e.description,
         valid ? String(shot.coverage || '') : '',
         dur(e) != null
-          ? `${dur(e)} min${e.duration == null ? ' · inherited' : ''}`
+          ? `${dur(e)} min`
           : '',
         raw.notes ? e.notes : '',
       ]
         .filter(Boolean)
         .join('\n'),
       ...departments.map((d) =>
-        String(state.instructions[e.id + ':' + d.id]?.text || ''),
+        (() => {const i=resolved.instructions.find((i:any)=>i.eventId===e.id&&i.departmentId===d.id);return [i?.minute!=null?clockText(i.minute)+(i.minute>=1440?' · Next day':'')+(i.duration!=null?' · '+i.duration+' min':''):'',i?.text||''].filter(Boolean).join('\n')})(),
       ),
     ];
   });
@@ -212,8 +183,8 @@ export async function renderFlow(
       ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, size)),
     ),
   );
-  const titleLines = wrapCell(String(state.meta.name), usable - 150, font, 15);
-  const docHeader = 52 + titleLines.length * 19;
+  const titleLines = wrapCell(String(state.meta.name), usable, font, 15);
+  const docHeader = 36 + titleLines.length * 19;
   const bandHeadings = bands.map((ds, bi) =>
     [
       'Time',
@@ -285,19 +256,7 @@ export async function renderFlow(
       const draw = (text: string, x: number, y: number, fontSize = size) =>
         page.drawText(text, { x, y, size: fontSize, font, color: ink });
       titleLines.forEach((t, i) => draw(t, margin, H - 30 - i * 19, 15));
-      draw('WHITEOUT / FLOW OF THE DAY', W - margin - 150, H - 28, 8);
-      draw(
-        `${state.meta.date || 'Date unconfirmed'} · ${state.meta.zone} · ${raw.product === 'master' ? 'Master Departmental Flow' : raw.product === 'department' ? 'Department Focus' : 'Daily Rundown · condensed'}`,
-        margin,
-        H - docHeader + 24,
-        8,
-      );
-      draw(
-        `Revision ${revision} · ${state.meta.status || 'draft'}`,
-        margin,
-        H - docHeader + 10,
-        8,
-      );
+      draw(state.meta.date ? new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(new Date(state.meta.date+'T12:00:00Z')) : 'Shoot date not set',margin,H-docHeader+12,9);
       let y = H - docHeader,
         x = margin;
       const headingLines = bandHeadings[bi],
@@ -331,7 +290,7 @@ export async function renderFlow(
             color:
               raw.style === 'mono'
                 ? rgb(0.94, 0.94, 0.94)
-                : rgb(0.89, 0.95, 0.97),
+                : /lunch|break/i.test(e.description||e.category||'') ? rgb(0.97,0.94,0.88) : /wrap/i.test(e.description||e.category||'') ? rgb(0.9,0.93,0.92) : rgb(0.89, 0.95, 0.97),
           });
         x = margin;
         lines[bi][f.ri].forEach((ls, i) => {
@@ -354,24 +313,10 @@ export async function renderFlow(
           color: rule,
         });
       }
-      draw(
-        `Section ${bi + 1}/${bands.length} · ${bands[bi].map((d) => d.name).join(' / ') || 'Daily Rundown'}`.slice(
-          0,
-          160,
-        ),
-        margin,
-        20,
-        7,
-      );
-      draw(
-        `Range ${vi + 1}/${pages.length} · Page ${vi * bands.length + bi + 1}/${pages.length * bands.length}`,
-        W - margin - 135,
-        20,
-        7,
-      );
+      draw(String(vi * bands.length + bi + 1),W-margin-12,20,8);
     }
   pdf.setTitle(String(state.meta.name));
-  pdf.setSubject(`Flow revision ${revision}`);
+  pdf.setSubject('Production-day schedule');
   pdf.setCreationDate(new Date('2026-01-01T00:00:00Z'));
   pdf.setModificationDate(new Date('2026-01-01T00:00:00Z'));
   return Buffer.from(await pdf.save());

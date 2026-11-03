@@ -1,3 +1,5 @@
+import {sourceLabel} from '../flows/scheduling';
+import {assertProductionMember} from '../auth/production-member';
 import { collaborationError } from '../collaboration-error';
 import {
   BadRequestException,
@@ -24,16 +26,6 @@ export type Collaborator = {
   role?: unknown;
   productionMembership?: unknown;
 };
-const editingRoles = new Map([
-  ['Executive Producer', 'Production'],
-  ['Producer', 'Production'],
-  ['Co-Producer', 'Production'],
-  ['Associate Producer', 'Production'],
-  ['1st Assistant Director', 'Production'],
-  ['2nd Assistant Director', 'Production'],
-  ['Director', 'Creative'],
-  ['Director of Photography', 'Creative'],
-]);
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -54,29 +46,7 @@ export class ShotlistsService implements OnModuleDestroy {
     private readonly auth: AuthService,
   ) {}
 
-  assertProductionMember(user: Collaborator) {
-    const membership = user.productionMembership as Record<
-      string,
-      unknown
-    > | null;
-    if (
-      !membership ||
-      membership.verified !== true ||
-      !Number.isSafeInteger(user.userID) ||
-      membership.userID !== user.userID ||
-      membership.email !== user.email.toLowerCase() ||
-      typeof user.role !== 'string' ||
-      !editingRoles.has(user.role) ||
-      editingRoles.get(user.role) !== user.department ||
-      membership.department !== user.department ||
-      membership.role !== user.role ||
-      typeof membership.verifiedAt !== 'string' ||
-      !Number.isFinite(Date.parse(membership.verifiedAt))
-    )
-      throw new ForbiddenException(
-        'Verified production-team membership in an eligible role is required.',
-      );
-  }
+  assertProductionMember(user: Collaborator) {assertProductionMember(user);}
   async authorize(id: string, user: Collaborator) {
     this.assertProductionMember(user);
     if (!uuid.test(id))
@@ -370,13 +340,16 @@ export class ShotlistsService implements OnModuleDestroy {
     const connection = await this.collab!.openDirectConnection(id, { user });
     try {
       const doc = connection.document!;
-      return {
+      const result = {
         meta: doc.getMap('meta').toJSON(),
         scenes: doc.getMap('scenes').toJSON(),
         shots: doc.getMap('shots').toJSON(),
         shootDays: doc.getMap('shootDays').toJSON(),
         shootAssignments: doc.getMap('shootAssignments').toJSON(),
       };
+      const labels=new Map<string,number>();for(const shot of Object.values(result.shots) as any[]){if(!shot.deleted&&!shot.deletedAt){const label=sourceLabel(shot,result);labels.set(label,(labels.get(label)||0)+1);}}
+      return {...result,shots:Object.fromEntries(Object.entries(result.shots).map(([id,s]:[string,any])=>[id,{...s,originalNumber:s.number,number:sourceLabel(s,result),labelConflict:(labels.get(sourceLabel(s,result))||0)>1}]))};
+
     } finally {
       await connection.disconnect();
     }

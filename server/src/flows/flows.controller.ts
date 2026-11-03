@@ -1,3 +1,4 @@
+import {zipFiles,safeFilename} from './zip';
 import {
   BadRequestException,
   Body,
@@ -70,6 +71,7 @@ export function checkWorkbook(b: Buffer) {
 @UseGuards(SchedulerAuthGuard)
 @Controller('api/flows')
 export class FlowsController {
+  private packBusy=false;
   constructor(
     private readonly flows: FlowsService,
     private readonly storage: StoryboardStorage,
@@ -138,6 +140,25 @@ export class FlowsController {
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
+  }
+  @Post(':id/department-pack')
+  @Header('Cache-Control','private, no-store')
+  async pack(@Req() r:{user:Collaborator;aborted?:boolean},@Param('id') id:string,@Body() b:FlowPrint) {
+    if(this.packBusy)throw new BadRequestException('A department pack is already being prepared. Try again shortly.');
+    this.packBusy=true;
+    try {
+      const {state,source}=await this.flows.resolved(id,r.user), ids=b?.departments;
+      if(!Array.isArray(ids)||!ids.length||ids.length>32||new Set(ids).size!==ids.length)throw Error('Choose between one and 32 departments.');
+      const files:{name:string;bytes:Buffer}[]=[];let total=0;
+      for(const [i,dep] of ids.entries()) {
+        if(r.aborted)throw Error('Download cancelled.');
+        if(!state.departments[dep]||state.departments[dep].removedAt)throw Error('A selected department is unavailable.');
+        const bytes=await renderFlow(state,source,{...b,product:'department',departments:[dep]});
+        total+=bytes.length;if(total>32*1024*1024)throw Error('This pack exceeds 32 MB. Choose fewer departments.');
+        files.push({name:safeFilename(state.meta.name)+' - '+(state.meta.date||'Date TBD')+' - '+safeFilename(state.departments[dep].name)+' - '+(i+1)+'.pdf',bytes});
+      }
+      return new StreamableFile(zipFiles(files),{type:'application/zip',disposition:'attachment; filename="department-pack.zip"'});
+    }catch(e){throw new BadRequestException((e as Error).message)}finally{this.packBusy=false}
   }
   @Get(':id/prints/:key')
   @Header('Cache-Control', 'private, no-store')

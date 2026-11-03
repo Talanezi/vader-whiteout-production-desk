@@ -1,3 +1,4 @@
+import {canonicalLabel,scenePrefix} from '../../../server/src/flows/scheduling'
 import * as Y from 'yjs'
 
 export const operationMeta = 'whiteout-shot-operation'
@@ -132,6 +133,12 @@ export function change(
   user?: number,
 ) {
   doc.transact(() => {
+    if(key==='number') {
+      const v=String(value).trim(), scene=str(scenes(doc).get(str(map,'sceneId')),'number')
+      if(!/^(?:.+-)?[a-z]+$/i.test(v)) throw Error('Use an alphabetic shot code, such as A or AA. Existing imported references are preserved until edited.')
+      value=canonicalLabel(v,scene)
+      if([...shots(doc).values()].some(other=>other!==map&&!other.get('deleted')&&str(other,'sceneId')===str(map,'sceneId')&&canonicalLabel(str(other,'number'),scene)===value)) throw Error('That shot code is already used in this scene.')
+    }
     map.set(key, value)
     map.set('updatedAt', new Date().toISOString())
     if (user) map.set('updatedBy', user)
@@ -174,7 +181,7 @@ export function nextShotNumber(doc: Y.Doc, sceneId: string) {
       label = String.fromCharCode(65 + (n % 26)) + label
       n = Math.floor(n / 26)
     }
-    const number = scene + '-' + label
+    const number = scenePrefix(scene) + '-' + label
     if (!used.has(number)) return number
   }
   throw Error('Too many shot identifiers.')
@@ -251,7 +258,7 @@ export function hasShotNumberConflict(doc: Y.Doc, shot: RecordMap) {
   const identity = (record: RecordMap) => {
     const number = str(record, 'number'),
       scene = str(scenes(doc).get(str(record, 'sceneId')), 'number')
-    return scene && /^[A-Za-z]+$/.test(number) ? `${scene}-${number}` : number
+    return canonicalLabel(number,scene)
   }
   const number = identity(shot)
   return (
@@ -263,17 +270,6 @@ export function hasShotNumberConflict(doc: Y.Doc, shot: RecordMap) {
   )
 }
 
-export function displayShot(doc: Y.Doc, shot: RecordMap) {
-  const n = str(shot, 'number'),
-    scene = str(scenes(doc).get(str(shot, 'sceneId')), 'number')
-  if (!scene || !/^[A-Za-z]+$/.test(n)) return n
-  const full = `${scene}-${n}`,
-    collision = [...shots(doc).values()].some(
-      (other) =>
-        other !== shot &&
-        !other.get('deleted') &&
-        str(other, 'sceneId') === str(shot, 'sceneId') &&
-        str(other, 'number') === full,
-    )
-  return collision ? `${full} [${n}]` : full
+export function displayShot(doc:Y.Doc,shot:RecordMap) {
+ return canonicalLabel(str(shot,'number'),str(scenes(doc).get(str(shot,'sceneId')),'number'))
 }

@@ -1,3 +1,4 @@
+import {sourceLabel} from '../../../../server/src/flows/scheduling'
 import { useEffect, useState } from 'react'
 import { Overlay } from '../whiteout/Overlay'
 import { Button } from '../whiteout/Button'
@@ -19,8 +20,10 @@ export default function ShotPicker({
   flowContext = false,
   onConnectList,
   selectionLimit,
+  preselectAvailable=false,
 }: {
   onConnectList?: (id: string) => void
+  preselectAvailable?:boolean
   selectionLimit?: number
   flowContext?: boolean
   initial?: ShotLink[]
@@ -48,7 +51,7 @@ export default function ShotPicker({
     let alive = true
     setData(undefined)
     shotRequest<LinkedSnapshot>(`/${listId}/export`)
-      .then((d) => alive && setData(d))
+      .then((d) => {if(alive){setData(d);if(preselectAvailable)setSelected(Object.entries(d.shots).filter(([,s])=>!s.deleted&&!s.deletedAt).map(([shotId])=>({listId,shotId})))}})
       .catch((e) => alive && setError(e.message))
     return () => {
       alive = false
@@ -184,7 +187,7 @@ export default function ShotPicker({
               onChange={(e) => toggle(id, e.target.checked)}
             />
             <span>
-              <strong>{String(s.number || 'Untitled shot')}</strong>
+              <strong>{sourceLabel(s,data)||'Untitled shot'}</strong>
               {flowContext && (
                 <small>
                   {[

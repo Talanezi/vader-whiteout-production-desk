@@ -1,3 +1,4 @@
+import {assertProductionMember} from './production-member';
 import {
   CanActivate,
   ExecutionContext,
@@ -27,6 +28,7 @@ export class SchedulerAuthGuard implements CanActivate {
     }
 
     request.user = await this.authService.verifySchedulerToken(token);
+    assertProductionMember(request.user);
     return true;
   }
 }

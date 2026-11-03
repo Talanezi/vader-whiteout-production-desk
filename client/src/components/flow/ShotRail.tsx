@@ -33,6 +33,7 @@ function RailShot({
   const s = useDraggable({
     id: 'rail:' + str(shot, 'id'),
     type: scope,
+    disabled: count>0,
   })
   return (
     <article
@@ -72,11 +73,7 @@ function RailShot({
           </small>
         )}
       </button>
-      <IconButton
-        name="plus"
-        label={`Add occurrence of ${displayShot(doc, shot)}`}
-        onClick={() => onAdd(shot)}
-      />
+      {!count&&<IconButton name="plus" label={`Schedule ${displayShot(doc,shot)}`} onClick={()=>onAdd(shot)}/>}
     </article>
   )
 }
@@ -200,10 +197,11 @@ export default function ShotRail({
                 : []),
             ]}
           />
-          <div className="flow-rail-scroll">
+          <div className="flow-rail-scroll">            {events.some(e=>!e.start||e.effectiveDuration==null)&&<section><h3>Needs attention</h3>{events.filter(e=>e.type==='shot'&&(!e.start||e.effectiveDuration==null)).map(e=><button className="flow-rail-issue" key={e.id} onClick={()=>{const s=source&&shots(source).get(e.shotId||'');if(s)onSelect(s)}}>{e.label||e.reference||'Source unavailable'}<small>{e.effectiveDuration==null?'Estimate needed':'Set the first shooting time'}</small></button>)}</section>}
+
             {[false, true].map((scheduled) => (
-              <section key={String(scheduled)}>
-                <h3>{scheduled ? 'Scheduled' : 'Not scheduled'}</h3>
+              <details key={String(scheduled)} open={!scheduled}>
+                <summary>{scheduled ? 'Scheduled' : 'Needs scheduling'}</summary>
                 {rows
                   .filter((s) => Boolean(count(str(s, 'id'))) === scheduled)
                   .map((s, i) => (
@@ -221,7 +219,7 @@ export default function ShotRail({
                       }}
                     />
                   ))}
-              </section>
+              </details>
             ))}
             {!rows.length && (
               <p className="flow-muted">No available shots match this view.</p>

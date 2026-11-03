@@ -1,16 +1,7 @@
+import {resolveSchedule} from './scheduling';
 import * as Y from 'yjs';
 import { BadRequestException } from '@nestjs/common';
-export const DEFAULT_DEPARTMENTS = [
-  'Camera + G&E',
-  'Actors',
-  'Stunt Team',
-  'Sound',
-  'Costume',
-  'HMU',
-  'Props',
-  'Director/Choreographer',
-  'Producers',
-];
+export const DEFAULT_DEPARTMENTS = ['Camera','Grip & Electric','Talent','Sound','Costume','Hair & Makeup','Props','Stunts','Director/Choreography','Production'];
 export const collections = [
   'meta',
   'departments',
@@ -88,6 +79,9 @@ export function validateFlow(s: any) {
       !Number.isFinite(e.order)
     )
       throw new BadRequestException('Invalid event.');
+    if(e.clockStart!=null&&(!Number.isFinite(e.clockStart)||Math.abs(e.clockStart)>10080)) throw new BadRequestException('Clock time is outside the seven-day schedule.');
+    if(e.offsetMinutes!=null&&(!Number.isFinite(e.offsetMinutes)||Math.abs(e.offsetMinutes)>10080)) throw new BadRequestException('Invalid relative offset.');
+    if(e.timing&&!['sequence','anchor','relative','unscheduled'].includes(e.timing)) throw new BadRequestException('Invalid timing relationship.');
     for (const k of ['description', 'notes', 'reference'])
       if (e[k] != null && (typeof e[k] !== 'string' || e[k].length > 30000))
         throw new BadRequestException(
@@ -113,8 +107,12 @@ export function validateFlow(s: any) {
     )
       throw new BadRequestException('Actual completion precedes start.');
   }
+  try{resolveSchedule(s,null);}catch(e){throw new BadRequestException((e as Error).message)}
   for (const i of Object.values(s.instructions) as any[]) {
     if (
+      (i.clockStart!=null&&(!Number.isFinite(i.clockStart)||Math.abs(i.clockStart)>10080)) ||
+      (i.offsetMinutes!=null&&(!Number.isFinite(i.offsetMinutes)||Math.abs(i.offsetMinutes)>10080)) ||
+      (i.duration!=null&&(!Number.isFinite(i.duration)||i.duration<0||i.duration>10080)) ||
       !s.events[i.eventId] ||
       !s.departments[i.departmentId] ||
       typeof i.text !== 'string' ||

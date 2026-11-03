@@ -18,6 +18,7 @@ import {
   addEvent,
   departments,
   localParts,
+  clockText,
   orderedEvents,
   instruction,
 } from '../../lib/flow/model'
@@ -200,6 +201,8 @@ export default function FlowImport({
               type: linked ? 'shot' : ((types[r.row] || r.type) as 'custom'),
               description: linked ? '' : r.description,
               start: r.start,
+              clockStart:r.start?(Date.parse(r.start)-Date.parse(date+'T00:00:00Z'))/60000:null,
+              timing:r.start?'anchor':'unscheduled',
               actualStart: r.actualStart,
               duration: r.duration,
               notes:
@@ -586,7 +589,7 @@ export default function FlowImport({
                       <tr key={r.row}>
                         <td>{r.row}</td>
                         <td>
-                          {r.start ? localParts(r.start, zone) : 'Unscheduled'}
+                          {r.start ? clockText((Date.parse(r.start)-Date.parse(date+'T00:00:00Z'))/60000) : 'TBD'}
                           {r.actualStart && (
                             <small>
                               Actual {localParts(r.actualStart, zone)}

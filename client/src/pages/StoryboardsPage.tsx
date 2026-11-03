@@ -1,3 +1,4 @@
+import CreationChoices from '../components/whiteout/CreationChoices'
 import { StoryboardIllustration } from '../components/storyboards/StoryboardIdentity'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -321,19 +322,7 @@ export default function StoryboardsPage() {
           </label>
           {creating && (
             <div className="sb-creation-options">
-              {[
-                ['import', 'Import artwork'],
-                ['shots', 'From Shot List'],
-                ['blank', 'Start drawing'],
-              ].map(([id, label]) => (
-                <Button
-                  key={id}
-                  aria-pressed={workflow === id}
-                  onClick={() => setWorkflow(id)}
-                >
-                  {label}
-                </Button>
-              ))}
+              <CreationChoices value={workflow} onChange={setWorkflow} choices={[{id:'import',label:'Import artwork',icon:'import'},{id:'shots',label:'From Shot List',icon:'shots'},{id:'blank',label:'Start drawing',icon:'edit'}]}/>
               {workflow === 'shots' && (
                 <Button onClick={() => setPicker(true)}>
                   Choose shots{links.length ? ` · ${links.length}` : ''}

@@ -1,3 +1,4 @@
+import {resolveSchedule,clockText} from '../../../../server/src/flows/scheduling'
 import * as Y from 'yjs'
 export type Department = {
   id: string
@@ -24,6 +25,14 @@ export type FlowEvent = {
   sourceListId?: string
   reference?: string
   deletedAt?: string
+  timing?: "sequence" | "anchor" | "relative" | "unscheduled"
+  clockStart?: number | null
+  dependsOn?: string
+  offsetMinutes?: number
+  relativeEdge?: "start" | "end"
+  minute?: number | null
+  effectiveDuration?: number | null
+  label?: string
   provenance?: unknown
 }
 export function records<T>(d: Y.Doc, k: string): T[] {
@@ -56,7 +65,7 @@ export function put(
             existing.insert(0, v)
           }
         } else m!.set(k, new Y.Text(v))
-      } else m!.set(k, v)
+      } else if(m!.get(k)!==v) m!.set(k, v)
     })
   })
 }
@@ -65,8 +74,6 @@ export function orderedEvents(d: Y.Doc) {
     .filter((e) => !e.deletedAt)
     .sort(
       (a, b) =>
-        (a.start ? Date.parse(a.start) : Infinity) -
-          (b.start ? Date.parse(b.start) : Infinity) ||
         a.order - b.order ||
         a.id.localeCompare(b.id),
     )
@@ -109,6 +116,7 @@ export function addEvent(d: Y.Doc, value: Partial<FlowEvent> = {}) {
       duration: null,
       fixed: value.type === 'milestone',
       status: 'planned',
+      timing: value.type === 'department' ? 'unscheduled' : 'sequence',
       order: Math.max(0, ...orderedEvents(d).map((e) => e.order)) + 1024,
       ...value,
     })
@@ -177,8 +185,10 @@ export function moveEvent(d: Y.Doc, e: FlowEvent, target: FlowEvent) {
       i = all.findIndex((x) => x.id === target.id),
       before = all[i - 1]
     put(d, 'events', e.id, {
-      start: target.start,
       order: ((before?.order || target.order - 2048) + target.order) / 2,
     })
   })
 }
+
+export {resolveSchedule,clockText}
+export function scheduleState(doc:Y.Doc,source?:Y.Doc) {return resolveSchedule(Object.fromEntries(['meta','departments','events','instructions','comments','imports'].map(k=>[k,doc.getMap(k).toJSON()])),source?{id:doc.getMap('meta').get('listId'),shots:source.getMap('shots').toJSON(),scenes:source.getMap('scenes').toJSON()}:null)}

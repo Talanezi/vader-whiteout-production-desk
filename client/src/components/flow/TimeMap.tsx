@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import {scheduleState,clockText,put} from '../../lib/flow/model'
+import {useState,useRef,useEffect} from 'react'
 import type * as Y from 'yjs'
-import { Button } from '../whiteout/Button'
+import {Button,IconButton} from '../whiteout/Button'
 import {
   localParts,
   duration,
@@ -18,7 +19,9 @@ export default function TimeMap({
   selected,
   onSelect,
   onShowInFlow,
+  onDepartmentTime,
 }: {
+  onDepartmentTime:(event:FlowEvent,departmentId:string)=>void
   doc: Y.Doc
   events: FlowEvent[]
   departments: Department[]
@@ -34,8 +37,12 @@ export default function TimeMap({
   onSelect: (e: FlowEvent) => void
   onShowInFlow: (e: FlowEvent) => void
 }) {
+  const host=useRef<HTMLDivElement>(null),[available,setAvailable]=useState(900)
+  useEffect(()=>{const node=host.current;if(!node)return;const o=new ResizeObserver(()=>setAvailable(Math.max(200,node.clientWidth-150)));o.observe(node);return()=>o.disconnect()},[])
   const [zoom, setZoom] = useState(2),
     [drag, setDrag] = useState<{ id: string; delta: number; resize: boolean }>()
+  function moveBlock(e:FlowEvent,start:string,duration:number|null|undefined){const i=(e as any).instructionKey;if(!i)return onMove(e,start,duration);const record=doc.getMap<Y.Map<unknown>>('instructions').get(i)!,delta=(Date.parse(start)-Date.parse(e.start!))/60000;put(doc,'instructions',i,duration!==undefined?{duration}:record.get('timing')==='relative'?{offsetMinutes:Number(record.get('offsetMinutes')||0)+delta}:{timing:'anchor',clockStart:(e.minute||0)+delta})}
+  function inspectBlock(e:FlowEvent){const k=e as any;k.instructionKey?onDepartmentTime(events.find(v=>v.id===k.parentId)!,k.departmentId):onInspect(e)}
   const timed = events.filter((e) => e.start),
     first = timed.length
       ? Math.floor(
@@ -54,18 +61,15 @@ export default function TimeMap({
     width = Math.max(700, ((last - first) / 60000) * zoom),
     lanes = [{ id: 'production', name: 'Production' }, ...departments]
   return (
-    <div className="flow-time-map">
-      <div className="flow-map-controls">
+    <div ref={host} className="flow-time-map">
+      <div className="flow-map-controls flow-map-toolbar">
         <Button
           icon="plus"
           onClick={() => setZoom((v) => Math.min(6, v + 0.5))}
         >
           Zoom in
         </Button>
-        <Button onClick={() => setZoom((v) => Math.max(0.5, v - 0.5))}>
-          Zoom out
-        </Button>
-        <small>{zoom * 30}px / 30 min</small>
+        <div className="flow-map-zoom"><IconButton name="plus" label="Zoom in" onClick={()=>setZoom(v=>Math.min(12,v*1.25))}/><small>{Math.round(zoom*30)} px / 30 min</small><IconButton name="collapse" label="Zoom out" onClick={()=>setZoom(v=>Math.max(.15,v/1.25))}/></div><Button icon="expand" onClick={()=>setZoom(Math.max(.15,available/Math.max(60,(last-first)/60000)))}>Fit day</Button>
         {selected.size === 1 && events.some((e) => selected.has(e.id)) && (
           <>
             <Button
@@ -86,44 +90,30 @@ export default function TimeMap({
         )}
       </div>
       <div className="flow-map-scroll">
-        <div className="flow-map-inner" style={{ width: width + 150 }}>
+        <div className="flow-map-inner" style={{ width: Math.max(width,available)+150,minWidth:'100%' }}>
           <div className="flow-time-ruler">
             <span>Production local time</span>
-            <div style={{ width }}>
+            <div style={{ width:Math.max(width,available) }}>
               {Array.from(
                 { length: Math.ceil((last - first) / 3600000) },
                 (_, i) => (
                   <time key={i} style={{ left: i * 60 * zoom }}>
-                    {localParts(
-                      new Date(first + i * 3600000).toISOString(),
-                      zone,
-                    ).slice(5)}
+                    {clockText((first+i*3600000-Date.parse(scheduleState(doc,shots?.doc||undefined).base+'T00:00:00Z'))/60000)}
                   </time>
                 ),
               )}
             </div>
           </div>
           {lanes.map((l) => {
-            const lane = timed.filter((e) =>
-              l.id === 'production'
-                ? e.type !== 'department'
-                : e.type === 'milestone' ||
-                  !!doc
-                    .getMap<Y.Map<unknown>>('instructions')
-                    .get(e.id + ':' + l.id)
-                    ?.get('text')
-                    ?.toString()
-                    .trim(),
-            )
+            const resolved=scheduleState(doc,shots?.doc||undefined),parentById=new Map(events.map(e=>[e.id,e]));
+            const lane:any[]=l.id==='production'?timed.filter(e=>e.type!=='department'): [...timed.filter(e=>e.type==='department'&&doc.getMap<Y.Map<unknown>>('events').get(e.id)?.get('departmentId')===l.id),...resolved.instructions.filter((i:any)=>i.departmentId===l.id&&i.minute!=null&&parentById.has(i.eventId)).map((i:any):any=>({...parentById.get(i.eventId)!,id:i.id,description:i.text,minute:i.minute,start:new Date(Date.parse(resolved.base+'T00:00:00Z')+i.minute*60000).toISOString(),duration:i.duration??null,effectiveDuration:i.duration??null,type:'department' as const,instructionKey:i.id,parentId:i.eventId,departmentId:l.id}))];
+            const notes=l.id==='production'?[]:resolved.instructions.filter((i:any)=>i.departmentId===l.id&&i.minute==null&&String(i.text||'').trim()&&parentById.has(i.eventId));
             const ends: number[] = []
             const positioned = lane.map((e) => {
               const start = Date.parse(e.start!),
                 end =
                   start +
-                  Math.max(
-                    84 / zoom,
-                    duration(e, shots?.get(e.shotId || '')) || 0,
-                  ) *
+                  ((e.instructionKey?e.duration:duration(e,shots?.get(e.shotId||'')))||0) *
                     60000
               let track = ends.findIndex((v) => v <= start)
               if (track < 0) track = ends.length
@@ -136,17 +126,17 @@ export default function TimeMap({
                 key={l.id}
                 style={{ height: Math.max(70, ends.length * 55 + 12) }}
               >
-                <h3>{l.name}</h3>
-                <div className="flow-lane-track" style={{ width }}>
+                <h3>{l.name}{notes.length>0&&<small className="flow-map-note-list">{notes.map((i:any)=><button key={i.id} title={i.text} onClick={()=>onDepartmentTime(parentById.get(i.eventId)!,l.id)}>{parentById.get(i.eventId)?.label||'Activity'} · Note</button>)}</small>}</h3>
+                <div className="flow-lane-track" style={{ width:Math.max(width,available) }}>
                   {positioned.map(({ e, track }) => {
-                    const delta = drag?.id === e.id ? drag.delta : 0,
-                      resize = drag?.id === e.id && drag.resize,
-                      base = duration(e, shots?.get(e.shotId || '')),
+                    const delta = drag?.id === e.id ? drag!.delta : 0,
+                      resize = drag?.id === e.id && drag!.resize,
+                      base = (e as any).instructionKey ? e.duration : duration(e, shots?.get(e.shotId || '')),
                       left =
                         ((Date.parse(e.start!) - first) / 60000) * zoom +
                         (resize ? 0 : delta * zoom),
                       w = Math.max(
-                        84,
+                        base==null?12:2,
                         ((base || 0) + (resize ? delta : 0)) * zoom,
                       )
                     function pointer(
@@ -175,7 +165,7 @@ export default function TimeMap({
                         el.onpointerup = null
                         setDrag(undefined)
                         if (delta)
-                          onMove(
+                          moveBlock(
                             e,
                             resize
                               ? e.start!
@@ -196,7 +186,7 @@ export default function TimeMap({
                         <button
                           onPointerDown={(v) => pointer(v, false)}
                           onClick={() => onSelect(e)}
-                          onDoubleClick={() => onInspect(e)}
+                          onDoubleClick={() => inspectBlock(e)}
                           aria-label={`Move ${e.description || e.reference || 'event'}`}
                           onKeyDown={(v) => {
                             if (
@@ -204,7 +194,7 @@ export default function TimeMap({
                               v.key === 'ArrowRight'
                             ) {
                               v.preventDefault()
-                              onMove(
+                              moveBlock(
                                 e,
                                 new Date(
                                   Date.parse(e.start!) +
@@ -212,20 +202,14 @@ export default function TimeMap({
                                 ).toISOString(),
                                 undefined,
                               )
-                            } else if (v.key === 'Enter') onInspect(e)
+                            } else if (v.key === 'Enter') inspectBlock(e)
                           }}
                         >
                           {e.description ||
                             e.reference ||
                             'Department activity'}
                           <small>
-                            {localParts(
-                              new Date(
-                                Date.parse(e.start!) +
-                                  (resize ? 0 : delta * 60000),
-                              ).toISOString(),
-                              zone,
-                            ).slice(11)}
+                            {clockText((e.minute||0)+(resize?0:delta))}
                             {e.fixed ? ' · fixed' : ''}
                           </small>
                         </button>
@@ -239,7 +223,7 @@ export default function TimeMap({
                               v.key === 'ArrowRight'
                             ) {
                               v.preventDefault()
-                              onMove(
+                              moveBlock(
                                 e,
                                 e.start!,
                                 Math.max(
@@ -260,8 +244,8 @@ export default function TimeMap({
           })}
         </div>
       </div>
-      <section className="flow-unscheduled">
-        <h3>Unscheduled</h3>
+      {events.some(e=>!e.start)&&<details className="flow-unscheduled">
+        <summary>Needs scheduling · {events.filter(e=>!e.start).length}</summary>
         {events
           .filter((e) => !e.start)
           .map((e) => (
@@ -274,7 +258,7 @@ export default function TimeMap({
             Set planned times to place activities on the Time Map.
           </p>
         )}
-      </section>
+      </details>}
     </div>
   )
 }

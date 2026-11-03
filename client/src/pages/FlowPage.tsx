@@ -1,3 +1,7 @@
+import DatePicker from '../components/whiteout/DatePicker'
+import InstructionTiming from '../components/flow/InstructionTiming'
+import {change} from '../lib/shotDocument'
+import {scheduleState,clockText} from '../lib/flow/model'
 import { useEffect, useRef, useState } from 'react'
 import {
   useLocation,
@@ -15,7 +19,6 @@ import { getAuthToken } from '../lib/api'
 import {
   put,
   addEvent,
-  orderedEvents,
   departments,
   records,
   moveEvent,
@@ -44,7 +47,6 @@ import TimeMap from '../components/flow/TimeMap'
 import ShotRail from '../components/flow/ShotRail'
 import TimeEditor from '../components/flow/TimeEditor'
 import EventInspector from '../components/flow/EventInspector'
-import Departments from '../components/flow/Departments'
 import FlowPrint from '../components/flow/FlowPrint'
 import FlowHistory from '../components/flow/FlowHistory'
 import FlowImport from '../components/flow/FlowImport'
@@ -102,9 +104,10 @@ function Workspace({
   const doc = c.doc,
     meta = doc.getMap('meta'),
     listId = String(meta.get('listId') || ''),
-    zone = String(meta.get('zone') || 'America/Los_Angeles'),
+    zone = 'UTC',
     date = String(meta.get('date') || ''),
-    events = orderedEvents(doc),
+    scheduleView = scheduleState(doc,source?.synced?source.doc:undefined),
+    events = scheduleView.events as FlowEvent[],
     deps = departments(doc),
     toast = useToast(),
     navigate = useNavigate(),
@@ -115,7 +118,9 @@ function Workspace({
     [selected, setSelected] = useState(new Set<string>()),
     [inspector, setInspector] = useState<{ id: string; tab: string }>(),
     [time, setTime] = useState<string>(),
-    [config, setConfig] = useState(false),
+    [newDepartment,setNewDepartment]=useState(false),
+    [departmentName,setDepartmentName]=useState(''),
+    [instructionTime,setInstructionTime]=useState<{event:FlowEvent;departmentId:string}>(),
     [print, setPrint] = useState(false),
     [history, setHistory] = useState(false),
     [importing, setImporting] = useState(
@@ -135,9 +140,9 @@ function Workspace({
       start?: string
       duration?: number | null
     }>(),
-    [shift, setShift] = useState(false),
-    [shiftMinutes, setShiftMinutes] = useState('15')
-  const allSaved = c.saved && (!source || source.saved || Boolean(source.error))
+    [durationBusy,setDurationBusy]=useState(false),
+    [conflict,setConflict]=useState<{eventId:string;anchorId:string}>()
+  const allSaved = c.saved && !durationBusy && (!source || source.saved || Boolean(source.error))
   const key = `whiteout:flow:${id}:user:${c.session!.user.id}:layout`,
     [layout, setLayout] = useState<{
       hidden: string[]
@@ -192,12 +197,14 @@ function Workspace({
     const id = addEvent(doc, {
       type,
       description: type === 'milestone' ? 'Shared milestone' : '',
-      start: after?.start || null,
+      start: null,
+      timing: type==='department'?'unscheduled':'sequence',
       order: after
         ? after.order + (where === 'before' ? -1 : 1)
         : Math.max(0, ...events.map((e) => e.order)) + 1024,
     })
-    setInspector({ id, tab: 'details' })
+    setSelected(new Set([id]))
+    requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-event="${id}"] .flow-action-cell .pd-text-preview`)?.click())
   }
   function schedule(s: Y.Map<unknown>, target?: FlowEvent) {
     const sid = str(s, 'id'),
@@ -207,14 +214,16 @@ function Workspace({
         sourceListId: listId,
         reference: str(s, 'number'),
         description: '',
-        start: target?.start || null,
+        start: null,
+        timing:'sequence',
         order: target
           ? target.order - 0.5
           : Math.max(0, ...events.map((e) => e.order)) + 1024,
       })
     setSelected(new Set([id]))
   }
-  function remove() {
+  async function remove() {
+    try{await flowRequest(`/${id}/manage`,{action:'checkpoint',summary:'Before deleting activities'})}catch(e){setError((e as Error).message);return}
     const ids = deleting.filter((id) => events.some((e) => e.id === id))
     doc.transact(() =>
       ids.forEach((id) =>
@@ -330,26 +339,14 @@ function Workspace({
                   60000,
         )
       : []
-  const changing = move?.event,
-    shiftBase =
-      events.find((e) => selected.has(e.id) && e.start) ||
-      events.find((e) => e.start),
-    shiftAmount = Number(shiftMinutes),
-    shifted = shiftBase
-      ? events.filter(
-          (e) =>
-            e.start &&
-            Date.parse(e.start) >= Date.parse(shiftBase.start!) &&
-            !e.fixed,
-        )
-      : []
+  const changing = move?.event
   return (
     <div className="flow-workspace">
       <header className="flow-document-header">
         <div>
           <div className="flow-breadcrumb">
             <button onClick={() => navigate('/flows')}>Flow of the Day</button>
-            <span>{date || 'Date unconfirmed'}</span>
+            <span>{date || 'Set Shoot date'}</span>
           </div>
           <h1>{String(meta.get('name'))}</h1>
         </div>
@@ -414,7 +411,7 @@ function Workspace({
             items={[
               {
                 value: 'settings',
-                label: 'Production date and timezone',
+                label: 'Shoot date',
                 onSelect: () => setSettings(true),
               },
               {
@@ -442,6 +439,7 @@ function Workspace({
           Connected Shot List: {source.error}. Flow entries remain intact.
         </ErrorNotice>
       )}
+      {scheduleView.conflicts.length>0&&<div className="flow-conflicts" role="status">{scheduleView.conflicts.map((x:any)=><div key={x.eventId+':'+x.anchorId}><span>{events.find(e=>e.id===x.eventId)?.label||events.find(e=>e.id===x.eventId)?.description} overlaps {events.find(e=>e.id===x.anchorId)?.description||'a fixed activity'} by {x.overlap} min.</span><Button icon="calendar" onClick={()=>setConflict(x)}>Resolve timing</Button></div>)}</div>}
       <div className="flow-toolbar">
         <SearchField
           label="Search events"
@@ -475,51 +473,8 @@ function Workspace({
             onClick={() => c.undo.redo()}
             disabled={!c.undo.canRedo()}
           />
-          <Menu
-            label="Add event"
-            icon="plus"
-            items={[
-              {
-                value: 'shot',
-                label: 'Schedule shots',
-                onSelect: () => {
-                  setRail(true)
-                  if (!listId) setPicker(true)
-                },
-              },
-              {
-                value: 'milestone',
-                label: 'Shared milestone',
-                onSelect: () => add('milestone'),
-              },
-              {
-                value: 'department',
-                label: 'Department activity',
-                onSelect: () => add('department'),
-              },
-              {
-                value: 'custom',
-                label: 'Custom action',
-                onSelect: () => add('custom'),
-              },
-            ]}
-          />
-          <Menu
-            label="Layout"
-            icon="columns"
-            items={[
-              {
-                value: 'departments',
-                label: 'Departments and layout',
-                onSelect: () => setConfig(true),
-              },
-              {
-                value: 'shift',
-                label: 'Shift following activities',
-                onSelect: () => setShift(true),
-              },
-            ]}
-          />
+          <Button icon="plus" onClick={()=>add('custom')}>Add activity</Button>
+          <Menu label="Layout" icon="columns" items={[{value:'core',label:'Core Crew',onSelect:()=>setLayout(l=>({...l,hidden:deps.filter(d=>!/camera|grip|electric|talent|actor|sound|director|production|producer/i.test(d.name)).map(d=>d.id)}))},{value:'all',label:'All Departments',onSelect:()=>setLayout(l=>({...l,hidden:[]}))},...deps.map(d=>({value:d.id,label:(layout.hidden.includes(d.id)?'Show ':'Hide ')+d.name,onSelect:()=>setLayout(l=>({...l,hidden:l.hidden.includes(d.id)?l.hidden.filter(x=>x!==d.id):[...l.hidden,d.id]}))})),{value:'add',label:'Add department',onSelect:()=>setNewDepartment(true)}]}/>
           <Button
             icon={rail ? 'collapse' : 'shots'}
             aria-pressed={rail}
@@ -597,6 +552,9 @@ function Workspace({
             dropTarget.current = target
         }}
         onDragEnd={(e) => {
+          if(String(e.operation.source?.id||'').startsWith('department:')) {
+            const source=e.operation.source;if(!e.canceled&&isSortable(source)){const id=String(source.id).slice(11),order=[...visible],i=order.findIndex(d=>d.id===id),v=order.splice(i,1)[0];order.splice(source.index,0,v);doc.transact(()=>order.forEach((d,i)=>put(doc,'departments',d.id,{order:(i+1)*1024})));}return;
+          }
           const from = String(e.operation.source?.id || ''),
             to = String(e.operation.target?.id || '')
           setDragging('')
@@ -621,8 +579,7 @@ function Workspace({
           }
           const event = events.find((v) => v.id === from)
           if (!event) return
-          if (event.start || target.start) setMove({ event, target })
-          else moveEvent(doc, event, target)
+          moveEvent(doc,event,target)
         }}
       >
         <div className={`flow-content ${rail ? 'has-rail' : ''}`}>
@@ -655,6 +612,9 @@ function Workspace({
                 onAll={(v) =>
                   setSelected(v ? new Set(filter.map((e) => e.id)) : new Set())
                 }
+                onDepartmentInsert={(event,departmentId)=>{const id=addEvent(doc,{type:'department',departmentId,order:event.order+.5,timing:'unscheduled'} as Partial<FlowEvent>);requestAnimationFrame(()=>document.querySelector<HTMLElement>(`[data-event="${id}"] [data-department="${departmentId}"] .pd-text-preview`)?.click())}}
+                onDepartmentTime={(event,departmentId)=>setInstructionTime({event,departmentId})}
+                onHideDepartment={(id)=>setLayout(l=>({...l,hidden:[...l.hidden,id]}))}
                 onTime={(e) => setTime(e.id)}
                 onInspect={inspect}
                 onDelete={setDeleting}
@@ -662,6 +622,7 @@ function Workspace({
               />
             ) : (
               <TimeMap
+                onDepartmentTime={(event,departmentId)=>setInstructionTime({event,departmentId})}
                 selected={selected}
                 onSelect={(e) => setSelected(new Set([e.id]))}
                 onShowInFlow={(e) => {
@@ -679,7 +640,7 @@ function Workspace({
                 zone={zone}
                 shots={sourceShots}
                 onMove={(event, start, duration) =>
-                  setMove({ event, start, duration })
+                  {if(duration!==undefined){setTime(event.id);return;}setMove({event,start})}
                 }
                 onInspect={(e) => setTime(e.id)}
               />
@@ -768,7 +729,14 @@ function Workspace({
             { ...events.find((e) => e.id === time)!, duration: null },
             sourceShots?.get(events.find((e) => e.id === time)?.shotId || ''),
           )}
-          onSave={(v) => put(doc, 'events', time, v)}
+          onSharedDuration={source?async(value)=>{
+            const shot=sourceShots?.get(events.find(e=>e.id===time)?.shotId||'');if(!shot||!source.connected||source.error||!source.provider)throw Error('Reconnect the Shot List before changing its shared estimate.');
+            setDurationBusy(true);
+            try {
+              await new Promise<void>((resolve,reject)=>{const p=source.provider!;let expected='';const timer=setTimeout(()=>done(Error('The source estimate has not been acknowledged. Keep this window open and reconnect.')),15000);function done(error?:Error){clearTimeout(timer);p.off('stateless',ack);error?reject(error):resolve()}function ack({payload}:{payload:string}){void(async()=>{const m=JSON.parse(payload);if(m.type==='persistence-error')return done(Error('The Shot List could not save this estimate.'));if(m.type==='persisted'&&expected){const current=await crypto.subtle.digest('SHA-256',Y.encodeSnapshot(Y.snapshot(source!.doc)) as BufferSource),hash=Array.from(new Uint8Array(current)).map(x=>x.toString(16).padStart(2,'0')).join('');if(m.digest===expected||m.digest===hash&&String(shot!.get('estimatedMinutes'))===(value==null?'':String(value)))done()}})().catch(()=>{})}p.on('stateless',ack);change(source.doc,shot,'estimatedMinutes',value==null?'':String(value),c.session!.user.id);void crypto.subtle.digest('SHA-256',Y.encodeSnapshot(Y.snapshot(source!.doc)) as BufferSource).then(b=>{expected=Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');p.sendStateless('persistence-status')}).catch(e=>done(e));});
+            }finally{setDurationBusy(false)}
+          }:undefined}
+          onSave={(v) => {const e=events.find(e=>e.id===time)!;if(e.type==='milestone'&&v.clockStart!=null){const next=events.find(other=>other.id!==e.id&&other.minute!=null&&other.minute>=v.clockStart!),before=next?events.filter(x=>x.id!==e.id&&x.order<next.order).slice(-1)[0]:undefined;v.order=next?((before?.order??next.order-2048)+next.order)/2:e.order;}put(doc,'events',time,v)}}
           onClose={() => setTime(undefined)}
         />
       )}
@@ -794,16 +762,11 @@ function Workspace({
           }}
         />
       )}
-      {config && (
-        <Departments
-          doc={doc}
-          hidden={layout.hidden}
-          onHidden={(hidden) => setLayout((l) => ({ ...l, hidden }))}
-          onClose={() => setConfig(false)}
-        />
-      )}
+      {conflict&&<Overlay title="Resolve fixed-time conflict" className="flow-time-dialog" onClose={()=>setConflict(undefined)} footer={<><Button onClick={()=>setConflict(undefined)}>Keep current timing</Button><Button variant="primary" onClick={()=>{const event=events.find(e=>e.id===conflict.eventId)!,anchor=events.find(e=>e.id===conflict.anchorId)!,next=events.find(e=>e.order>anchor.order&&e.id!==event.id);put(doc,'events',event.id,{order:(anchor.order+(next?.order??anchor.order+1024))/2,timing:'sequence',clockStart:null,fixed:false});setConflict(undefined)}}>Move shot after fixed activity</Button></>}><p>The fixed activity keeps its clock time. The shot keeps its full duration and moves after it; following flexible shots recalculate.</p></Overlay>}
+      {instructionTime&&<InstructionTiming doc={doc} event={instructionTime.event} department={deps.find(d=>d.id===instructionTime.departmentId)!} onClose={()=>setInstructionTime(undefined)}/>}
+      {newDepartment&&<Overlay title="Add department" onClose={()=>setNewDepartment(false)} footer={<Button variant="primary" disabled={!departmentName.trim()} onClick={()=>{const id=crypto.randomUUID();doc.transact(()=>{put(doc,'departments',id,{name:departmentName.trim(),order:Math.max(0,...deps.map(d=>d.order))+1024,personnel:''});for(const e of events)put(doc,'instructions',e.id+':'+id,{eventId:e.id,departmentId:id,text:''});});setNewDepartment(false);setDepartmentName('')}}>Add department</Button>}><label className="flow-field">Department name<input data-initial-focus value={departmentName} onChange={e=>setDepartmentName(e.target.value)} maxLength={100}/></label></Overlay>}
       {print && (
-        <FlowPrint id={id} departments={deps} onClose={() => setPrint(false)} />
+        <FlowPrint title={String(meta.get('name'))} date={date} onDateChange={v=>meta.set('date',v)} id={id} departments={deps} onClose={() => setPrint(false)} />
       )}
       {history && <FlowHistory id={id} onClose={() => setHistory(false)} />}
       {importing && (
@@ -919,56 +882,7 @@ function Workspace({
           </p>
         </Overlay>
       )}
-      {settings && (
-        <Overlay
-          title="Production day"
-          onClose={() => setSettings(false)}
-          className="flow-settings"
-        >
-          <div className="flow-form">
-            <label>
-              Production date
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => meta.set('date', e.target.value)}
-              />
-            </label>
-            <label>
-              Production timezone
-              <input
-                defaultValue={zone}
-                onBlur={(e) => {
-                  try {
-                    new Intl.DateTimeFormat('en', {
-                      timeZone: e.target.value,
-                    }).format()
-                    meta.set('zone', e.target.value)
-                  } catch {
-                    setError('Choose a valid named timezone.')
-                  }
-                }}
-              />
-            </label>
-            <label>
-              Status
-              <Menu
-                label={String(meta.get('status') || 'draft')}
-                value={String(meta.get('status') || 'draft')}
-                onChange={(v) => meta.set('status', v)}
-                items={['draft', 'ready', 'issued'].map((value) => ({
-                  value,
-                  label: value,
-                }))}
-              />
-            </label>
-            <p className="flow-muted">
-              Changing the timezone changes display only; scheduled instants
-              remain intact. Issued status does not send or publish a document.
-            </p>
-          </div>
-        </Overlay>
-      )}
+      {settings&&<Overlay title="Shoot date" onClose={()=>setSettings(false)} className="flow-time-dialog"><DatePicker label="Shoot date" value={date} onChange={value=>{doc.transact(()=>{for(const e of events){if(e.minute!=null&&e.timing==='anchor'&&doc.getMap<Y.Map<unknown>>('events').get(e.id)?.get('clockStart')===undefined)put(doc,'events',e.id,{clockStart:e.minute,timing:'anchor'});}meta.set('date',value)})}}/></Overlay>}
       {move && (
         <Overlay
           title="Preview timing change"
@@ -980,8 +894,8 @@ function Workspace({
                 if (move.target) moveEvent(doc, move.event, move.target)
                 else
                   put(doc, 'events', move.event.id, {
-                    start: move.start,
-                    duration: move.duration,
+                    clockStart:(move.event.minute||0)+(move.start&&move.event.start?(Date.parse(move.start)-Date.parse(move.event.start))/60000:0),
+                    timing:'anchor',
                   })
                 setMove(undefined)
               }}
@@ -1048,76 +962,7 @@ function Workspace({
           </div>
         </Overlay>
       )}
-      {shift && (
-        <Overlay
-          title="Shift following activities"
-          onClose={() => setShift(false)}
-          footer={
-            <Button
-              variant="primary"
-              disabled={
-                !Number.isFinite(shiftAmount) ||
-                Math.abs(shiftAmount) > 1440 ||
-                !shifted.length
-              }
-              onClick={() => {
-                doc.transact(() =>
-                  shifted.forEach((e) =>
-                    put(doc, 'events', e.id, {
-                      start: new Date(
-                        Date.parse(e.start!) + shiftAmount * 60000,
-                      ).toISOString(),
-                    }),
-                  ),
-                )
-                setShift(false)
-              }}
-            >
-              Shift {shifted.length} activities
-            </Button>
-          }
-        >
-          <label className="flow-field">
-            Minutes · positive or negative
-            <input
-              value={shiftMinutes}
-              onChange={(e) => setShiftMinutes(e.target.value)}
-            />
-          </label>
-          <p className="flow-muted">
-            From the first selected timed event, or the first timed event. Fixed
-            milestones stay anchored.
-          </p>
-          <div className="flow-shift-preview">
-            {shifted.map((e) => (
-              <p key={e.id}>
-                <strong>
-                  {e.description || e.reference || 'Department activity'}
-                </strong>
-                <span>
-                  {localParts(e.start!, zone)} →{' '}
-                  {Number.isFinite(shiftAmount)
-                    ? localParts(
-                        new Date(
-                          Date.parse(e.start!) + shiftAmount * 60000,
-                        ).toISOString(),
-                        zone,
-                      )
-                    : 'Invalid offset'}
-                </span>
-              </p>
-            ))}
-            {events
-              .filter((e) => e.fixed && e.start)
-              .map((e) => (
-                <p key={e.id}>
-                  <strong>{e.description}</strong>
-                  <span>Fixed · {localParts(e.start!, zone)}</span>
-                </p>
-              ))}
-          </div>
-        </Overlay>
-      )}
+
     </div>
   )
 }
