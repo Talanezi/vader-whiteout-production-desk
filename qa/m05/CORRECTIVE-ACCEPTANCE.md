@@ -54,6 +54,9 @@ is used for release. Fresh publication uses `qa/release.cjs`.
   Call Sheets/Roster indexes. `callsheet.cjs`: unchanged LaTeX PDF.
   `qa/m04/from-shots.cjs`: two UUID-linked panels with unchanged M03 state.
   `qa/m04/export.cjs`: actual M04 preview/download parity and 1/2/4/6 layouts.
+- **U** `corrective-surfaces.cjs`, Chromium + WebKit: compact index, global Create,
+  dated duplication preserving relative instructions/new UUIDs, natural activity
+  insertion/custom category, searchable Focus/Rundown controls, tablet/narrow layouts.
 - **D** Release evidence records production data hashes, actual Railway revisions,
   served GitHub Pages bundle hashes and authenticated read-only UI smoke. It is
   written after publication; publication is never inferred from source push alone.
@@ -89,23 +92,23 @@ M05 surface uses set-local time and does not expose the old lifecycle/comment UI
 
 | Requirement | Status / evidence |
 |---|---|
-| Global Create | Implemented; B / I |
-| Redundant New Flow | Implemented; B / I |
-| Index row geometry | Implemented; B / I |
-| Index metadata | Implemented; B / I |
-| Index status | Implemented; B / I |
-| Duplication | Implemented; B / I |
-| Previous-day creation | Implemented; B / I |
-| Creation interface | Implemented; B / I |
-| Shoot date | Implemented; B / I |
+| Global Create | Implemented; B / I / U |
+| Redundant New Flow | Implemented; B / I / U |
+| Index row geometry | Implemented; B / I / U |
+| Index metadata | Implemented; B / I / U |
+| Index status | Implemented; B / I / U |
+| Duplication | Implemented; B / I / U |
+| Previous-day creation | Implemented; B / I / U |
+| Creation interface | Implemented; B / I / U |
+| Shoot date | Implemented; B / I / U |
 | Timezone controls | Implemented; B / I / source audit |
 | Set-local time | Implemented; S / I |
 | Midnight | Implemented; S / I |
-| Time picker | Implemented; B / I |
-| Shot selection | Implemented; B / I |
-| Shot order | Implemented; B / I |
-| Up/Remove buttons | Implemented; B / I |
-| Shot preview | Implemented; B / I |
+| Time picker | Implemented; B / I / U |
+| Shot selection | Implemented; B / I / U |
+| Shot order | Implemented; B / I / U |
+| Up/Remove buttons | Implemented; B / I / U |
+| Shot preview | Implemented; B / I / U |
 | Canonical labels | Implemented; S / R |
 | Duplicate labels | Implemented; S / R |
 | Source UUIDs | Implemented; S / R |
@@ -115,36 +118,36 @@ M05 surface uses set-local time and does not expose the old lifecycle/comment UI
 | Day-only override | Implemented; S / I |
 | Fixed milestone | Implemented; S / I |
 | Conflicts | Implemented; S / I |
-| Shift Following dialog | Implemented; B / I |
+| Shift Following dialog | Implemented; B / I / U |
 | Relative department timing | Implemented; S / I |
 | Independent tasks | Implemented; S / I |
 | Department labels | Implemented; B / I / source audit |
 | Talent default | Implemented; B / I / source audit |
 | Camera/Grip/Electric | Implemented; B / I / source audit |
 | Custom departments | Implemented; B / I / source audit |
-| Personnel | Implemented; B / I |
-| Column drag | Implemented; B / I |
-| Column resize | Implemented; B / I |
-| Column hide | Implemented; B / I |
-| Layout presets | Implemented; B / I |
-| Huge department modal | Implemented; B / I |
-| Select All alignment | Implemented; B / I |
-| Caret contrast | Implemented; B / I |
-| Action separator dot | Implemented; B / I |
-| Multiline editing | Implemented; B / I |
-| Add activity | Implemented; B / I |
-| Custom activity categories | Implemented; B / I |
-| Start Now/Complete Now | Implemented; B / I |
-| Event statuses | Implemented; B / I |
-| Flow status lifecycle | Implemented; B / I |
-| Event comments | Implemented; B / I |
+| Personnel | Implemented; B / I / U |
+| Column drag | Implemented; B / I / U |
+| Column resize | Implemented; B / I / U |
+| Column hide | Implemented; B / I / U |
+| Layout presets | Implemented; B / I / U |
+| Huge department modal | Implemented; B / I / U |
+| Select All alignment | Implemented; B / I / U |
+| Caret contrast | Implemented; B / I / U |
+| Action separator dot | Implemented; B / I / U |
+| Multiline editing | Implemented; B / I / U |
+| Add activity | Implemented; B / I / U |
+| Custom activity categories | Implemented; B / I / U |
+| Start Now/Complete Now | Implemented; B / I / U |
+| Event statuses | Implemented; B / I / U |
+| Flow status lifecycle | Implemented; B / I / U |
+| Event comments | Implemented; B / I / U |
 | Time Map duration | Implemented; B / I / S |
 | Time Map lanes | Implemented; B / I / S |
 | Time Map source | Implemented; B / I / S |
 | Time Map empty space | Implemented; B / I / S |
 | Time Map toolbar | Implemented; B / I / S |
-| Shot Rail | Implemented; B / I |
-| Duplicate plus action | Implemented; B / I |
+| Shot Rail | Implemented; B / I / U |
+| Duplicate plus action | Implemented; B / I / U |
 | Revisions | Implemented; H |
 | Import | Implemented; W |
 | PDF engine | Implemented; P / B |

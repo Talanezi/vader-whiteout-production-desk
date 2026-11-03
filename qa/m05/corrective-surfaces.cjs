@@ -1,4 +1,229 @@
-const fs=require('fs'),assert=require('assert/strict'),kind=process.env.M05_BROWSER||'chromium',pw=require(kind==='webkit'?'/tmp/whiteout-m03-research/webkit-runtime/node_modules/playwright':'/Users/thameralanezi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),auth=JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),flow=JSON.parse(fs.readFileSync('/tmp/m05/corrections/'+kind+'/flow.json')),out='/tmp/m05/corrections/'+kind,headers={Authorization:'Bearer '+auth.tokens['101'],'Content-Type':'application/json'},base='http://127.0.0.1:4314/api/flows';
-(async()=>{const browser=await pw[kind].launch(),ctx=await browser.newContext({viewport:{width:1640,height:1050}});await ctx.addInitScript(t=>localStorage.setItem('token',t),auth.tokens['101']);const p=await ctx.newPage();p.setDefaultTimeout(18000);try{const original=await(await fetch(base+'/'+flow.id+'/snapshot',{headers})).json(),name=original.state.meta.name;await p.goto('http://127.0.0.1:5176/productiondesk/#/flows');await p.getByRole('searchbox',{name:'Search flows'}).fill(name);const row=p.locator('tbody tr').filter({hasText:name});await row.first().waitFor();assert.equal(await p.getByRole('button',{name:'New Flow',exact:true}).count(),0);assert.equal(await p.getByRole('columnheader',{name:'Status',exact:true}).count(),0);assert((await row.first().boundingBox()).height<130);await p.screenshot({path:out+'/15-compact-index.png'});await p.getByRole('button',{name:'Create',exact:true}).first().click();await p.getByRole('menuitem',{name:'New Flow of the Day',exact:true}).waitFor();await p.keyboard.press('Escape');await row.first().getByRole('button',{name:'Actions for '+name,exact:true}).click();await p.getByRole('menuitem',{name:'Duplicate for another day',exact:true}).click();assert(p.url().endsWith('/flows'));await p.getByLabel('Title',{exact:true}).fill('Corrective copied day '+kind);await p.getByLabel('Shoot date',{exact:true}).fill('2026-11-13');await p.getByRole('heading',{name:'Duplicate Flow',exact:true}).click();await p.getByRole('button',{name:'Create copy',exact:true}).click();await p.getByText('Saved',{exact:true}).waitFor();const id=p.url().split('/').pop(),copy=await(await fetch(base+'/'+id+'/snapshot',{headers})).json();assert.equal(copy.state.meta.date,'2026-11-13');assert.equal(Object.keys(copy.state.events).length,Object.keys(original.state.events).length);assert(Object.keys(copy.state.events).every(id=>!original.state.events[id]));for(const i of Object.values(copy.state.instructions)){assert(copy.state.events[i.eventId]);assert(copy.state.departments[i.departmentId])}assert(Object.values(copy.state.instructions).some(i=>i.timing==='relative'&&i.offsetMinutes===10));assert(Object.values(copy.state.events).every(e=>!e.actualStart&&!e.actualEnd));
-await p.getByRole('button',{name:'Add activity',exact:true}).click();await p.locator('.flow-grid tbody tr').last().locator('.cm-content').fill('Transport to next location');await p.getByRole('heading',{name:'Corrective copied day '+kind,exact:true}).click();const number=Object.keys(copy.state.events).length+1;await p.getByRole('button',{name:'Actions for event '+number,exact:true}).click();await p.getByRole('menuitem',{name:'Notes and details',exact:true}).click();const inspector=p.getByRole('dialog');assert.equal(await inspector.getByRole('button',{name:'Comments',exact:true}).count(),0);assert.equal(await inspector.getByText('Start Now',{exact:true}).count(),0);await p.getByRole('button',{name:'Activity category',exact:true}).click();await p.getByRole('combobox',{name:'Search activity category',exact:true}).fill('Equipment test');await p.getByRole('option',{name:/Equipment test/}).click();await p.getByRole('button',{name:'Close Transport to next location',exact:true}).click();await p.getByRole('button',{name:'Close Shot Rail',exact:true}).click();
-await p.getByRole('button',{name:'Print Studio',exact:true}).click();await p.locator('canvas[data-rendered=true]').first().waitFor({timeout:45000});const dialog=p.getByRole('dialog',{name:'Print Studio'});await dialog.locator('aside>label').first().getByRole('button').click();await p.getByRole('menuitemradio',{name:'Department Focus',exact:true}).click();await dialog.getByRole('button',{name:'Choose department',exact:true}).click();await p.getByRole('combobox',{name:'Search choose department',exact:true}).fill('Sound');await p.getByRole('option',{name:'Sound',exact:true}).click();await p.locator('canvas[data-rendered=true]').first().waitFor({timeout:45000});await p.screenshot({path:out+'/16-focus-preview.png'});await dialog.locator('aside>label').first().getByRole('button').click();await p.getByRole('menuitemradio',{name:'Daily Rundown',exact:true}).click();await p.locator('canvas[data-rendered=true]').first().waitFor({timeout:45000});assert.equal(await dialog.getByText('Departments',{exact:true}).count(),0);await p.screenshot({path:out+'/17-rundown-preview.png'});await p.getByRole('button',{name:'Close Print Studio',exact:true}).click();await p.setViewportSize({width:768,height:1024});await p.screenshot({path:out+'/18-tablet.png'});await p.setViewportSize({width:430,height:900});const scroll=p.locator('.flow-grid-scroll');await scroll.evaluate(e=>e.scrollLeft=900);await p.screenshot({path:out+'/19-narrow-scrolled.png'});assert((await scroll.boundingBox()).width<431);console.log(kind+' compact index/full-row contexts/global Create/dated duplication with relative links/new contextual activity/custom category/no lifecycle-comment UI/Focus searchable single department/Rundown controls/tablet and narrow horizontal scrolling passed.');}catch(e){await p.screenshot({path:out+'/surface-failure.png'});throw e}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
+const fs = require('fs'),
+  assert = require('assert/strict'),
+  kind = process.env.M05_BROWSER || 'chromium',
+  pw = require(kind === 'webkit'
+    ? '/tmp/whiteout-m03-research/webkit-runtime/node_modules/playwright'
+    : '/Users/thameralanezi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),
+  auth = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),
+  flow = JSON.parse(
+    fs.readFileSync('/tmp/m05/corrections/' + kind + '/flow.json'),
+  ),
+  out = '/tmp/m05/corrections/' + kind,
+  headers = {
+    Authorization: 'Bearer ' + auth.tokens['101'],
+    'Content-Type': 'application/json',
+  },
+  base = 'http://127.0.0.1:4314/api/flows'
+;(async () => {
+  const browser = await pw[kind].launch(),
+    ctx = await browser.newContext({
+      viewport: { width: 1640, height: 1050 },
+    })
+  await ctx.addInitScript(
+    (t) => localStorage.setItem('token', t),
+    auth.tokens['101'],
+  )
+  const p = await ctx.newPage()
+  p.setDefaultTimeout(18000)
+  try {
+    const original = await (
+        await fetch(base + '/' + flow.id + '/snapshot', { headers })
+      ).json(),
+      name = original.state.meta.name
+    await p.goto('http://127.0.0.1:5176/productiondesk/#/flows')
+    await p.getByRole('searchbox', { name: 'Search flows' }).fill(name)
+    const row = p.locator('tbody tr').filter({ hasText: name })
+    await row.first().waitFor()
+    assert.equal(
+      await p
+        .getByRole('button', { name: 'New Flow', exact: true })
+        .count(),
+      0,
+    )
+    assert.equal(
+      await p
+        .getByRole('columnheader', { name: 'Status', exact: true })
+        .count(),
+      0,
+    )
+    assert((await row.first().boundingBox()).height < 130)
+    await p.screenshot({ path: out + '/15-compact-index.png' })
+    await p
+      .getByRole('button', { name: 'Create', exact: true })
+      .first()
+      .click()
+    await p
+      .getByRole('menuitem', { name: 'New Flow of the Day', exact: true })
+      .waitFor()
+    await p.keyboard.press('Escape')
+    await row
+      .first()
+      .getByRole('button', { name: 'Actions for ' + name, exact: true })
+      .click()
+    await p
+      .getByRole('menuitem', {
+        name: 'Duplicate for another day',
+        exact: true,
+      })
+      .click()
+    assert(p.url().endsWith('/flows'))
+    await p
+      .getByLabel('Title', { exact: true })
+      .fill('Corrective copied day ' + kind)
+    await p.getByLabel('Shoot date', { exact: true }).fill('2026-11-13')
+    await p
+      .getByRole('heading', { name: 'Duplicate Flow', exact: true })
+      .click()
+    await p
+      .getByRole('button', { name: 'Create copy', exact: true })
+      .click()
+    await p.getByText('Saved', { exact: true }).waitFor()
+    const id = p.url().split('/').pop(),
+      copy = await (
+        await fetch(base + '/' + id + '/snapshot', { headers })
+      ).json()
+    assert.equal(copy.state.meta.date, '2026-11-13')
+    assert.equal(
+      Object.keys(copy.state.events).length,
+      Object.keys(original.state.events).length,
+    )
+    assert(
+      Object.keys(copy.state.events).every(
+        (id) => !original.state.events[id],
+      ),
+    )
+    for (const i of Object.values(copy.state.instructions)) {
+      assert(copy.state.events[i.eventId])
+      assert(copy.state.departments[i.departmentId])
+    }
+    assert(
+      Object.values(copy.state.instructions).some(
+        (i) => i.timing === 'relative' && i.offsetMinutes === 10,
+      ),
+    )
+    assert(
+      Object.values(copy.state.events).every(
+        (e) => !e.actualStart && !e.actualEnd,
+      ),
+    )
+    await p
+      .getByRole('button', { name: 'Add activity', exact: true })
+      .click()
+    await p
+      .locator('.flow-grid tbody tr')
+      .last()
+      .locator('.cm-content')
+      .fill('Transport to next location')
+    await p
+      .getByRole('heading', {
+        name: 'Corrective copied day ' + kind,
+        exact: true,
+      })
+      .click()
+    const number = Object.keys(copy.state.events).length + 1
+    await p
+      .getByRole('button', {
+        name: 'Actions for event ' + number,
+        exact: true,
+      })
+      .click()
+    await p
+      .getByRole('menuitem', { name: 'Notes and details', exact: true })
+      .click()
+    const inspector = p.getByRole('dialog')
+    assert.equal(
+      await inspector
+        .getByRole('button', { name: 'Comments', exact: true })
+        .count(),
+      0,
+    )
+    assert.equal(
+      await inspector.getByText('Start Now', { exact: true }).count(),
+      0,
+    )
+    await p
+      .getByRole('button', { name: 'Activity category', exact: true })
+      .click()
+    await p
+      .getByRole('combobox', {
+        name: 'Search activity category',
+        exact: true,
+      })
+      .fill('Equipment test')
+    await p.getByRole('option', { name: /Equipment test/ }).click()
+    await p
+      .getByRole('button', {
+        name: 'Close Transport to next location',
+        exact: true,
+      })
+      .click()
+    await p
+      .getByRole('button', { name: 'Close Shot Rail', exact: true })
+      .click()
+    await p
+      .getByRole('button', { name: 'Print Studio', exact: true })
+      .click()
+    await p
+      .locator('canvas[data-rendered=true]')
+      .first()
+      .waitFor({ timeout: 45000 })
+    const dialog = p.getByRole('dialog', { name: 'Print Studio' })
+    await dialog.locator('aside>label').first().getByRole('button').click()
+    await p
+      .getByRole('menuitemradio', {
+        name: 'Department Focus',
+        exact: true,
+      })
+      .click()
+    await dialog
+      .getByRole('button', { name: 'Choose department', exact: true })
+      .click()
+    await p
+      .getByRole('combobox', {
+        name: 'Search choose department',
+        exact: true,
+      })
+      .fill('Sound')
+    await p.getByRole('option', { name: 'Sound', exact: true }).click()
+    await p
+      .locator('canvas[data-rendered=true]')
+      .first()
+      .waitFor({ timeout: 45000 })
+    await p.screenshot({ path: out + '/16-focus-preview.png' })
+    await dialog.locator('aside>label').first().getByRole('button').click()
+    await p
+      .getByRole('menuitemradio', { name: 'Daily Rundown', exact: true })
+      .click()
+    await p
+      .locator('canvas[data-rendered=true]')
+      .first()
+      .waitFor({ timeout: 45000 })
+    assert.equal(
+      await dialog.getByText('Departments', { exact: true }).count(),
+      0,
+    )
+    await p.screenshot({ path: out + '/17-rundown-preview.png' })
+    await p
+      .getByRole('button', { name: 'Close Print Studio', exact: true })
+      .click()
+    await p.setViewportSize({ width: 768, height: 1024 })
+    await p.screenshot({ path: out + '/18-tablet.png' })
+    await p.setViewportSize({ width: 430, height: 900 })
+    const scroll = p.locator('.flow-grid-scroll')
+    await scroll.evaluate((e) => (e.scrollLeft = 900))
+    await p.screenshot({ path: out + '/19-narrow-scrolled.png' })
+    assert((await scroll.boundingBox()).width < 431)
+    console.log(
+      kind +
+        ' compact index/full-row contexts/global Create/dated duplication with relative links/new contextual activity/custom category/no lifecycle-comment UI/Focus searchable single department/Rundown controls/tablet and narrow horizontal scrolling passed.',
+    )
+  } catch (e) {
+    await p.screenshot({ path: out + '/surface-failure.png' })
+    throw e
+  } finally {
+    await browser.close()
+  }
+})().catch((e) => {
+  console.error(e)
+  process.exitCode = 1
+})
