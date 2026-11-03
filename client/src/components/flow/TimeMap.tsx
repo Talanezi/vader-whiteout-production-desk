@@ -2,6 +2,7 @@ import { scheduleState, clockText, put } from '../../lib/flow/model'
 import { useState, useRef, useEffect } from 'react'
 import type * as Y from 'yjs'
 import { Button, IconButton } from '../whiteout/Button'
+import { hasShotNumberConflict } from '../../lib/shotDocument'
 import {
   duration,
   type FlowEvent,
@@ -84,6 +85,19 @@ export default function TimeMap({
           k.departmentId,
         )
       : onInspect(e)
+  }
+  function blockLabel(e: FlowEvent) {
+    if (e.type !== 'shot')
+      return e.description || e.reference || 'Department activity'
+    const shot = shots?.get(e.shotId || ''),
+      conflict = shot?.doc && hasShotNumberConflict(shot.doc, shot)
+    return [
+      e.label || e.reference || 'Shot unavailable',
+      conflict ? '[' + e.shotId?.slice(0, 8) + ']' : '',
+      e.description,
+    ]
+      .filter(Boolean)
+      .join(' · ')
   }
   const resolved = scheduleState(doc, shots?.doc || undefined),
     parentById = new Map(events.map((e) => [e.id, e])),
@@ -337,11 +351,9 @@ export default function TimeMap({
                     return (
                       <div
                         key={e.id}
-                        title={`${
-                          e.description ||
-                          e.reference ||
-                          'Department activity'
-                        } · ${clockText(e.minute)} · ${
+                        title={`${blockLabel(e)} · ${clockText(
+                          e.minute,
+                        )} · ${
                           base == null ? 'Duration unknown' : base + ' min'
                         }`}
                         className={`flow-time-block ${
@@ -355,9 +367,7 @@ export default function TimeMap({
                           onPointerDown={(v) => pointer(v, false)}
                           onClick={() => onSelect(e)}
                           onDoubleClick={() => inspectBlock(e)}
-                          aria-label={`Move ${
-                            e.description || e.reference || 'event'
-                          }`}
+                          aria-label={`Move ${blockLabel(e)}`}
                           onKeyDown={(v) => {
                             if (
                               v.key === 'ArrowLeft' ||
@@ -376,9 +386,7 @@ export default function TimeMap({
                             } else if (v.key === 'Enter') inspectBlock(e)
                           }}
                         >
-                          {e.description ||
-                            e.reference ||
-                            'Department activity'}
+                          {blockLabel(e)}
                           <small>
                             {clockText(
                               (e.minute || 0) + (resize ? 0 : delta),
@@ -388,9 +396,9 @@ export default function TimeMap({
                         </button>
                         <button
                           className="flow-resize-duration"
-                          aria-label={`Resize duration of ${
-                            e.description || e.reference || 'event'
-                          }`}
+                          aria-label={`Resize duration of ${blockLabel(
+                            e,
+                          )}`}
                           onPointerDown={(v) => pointer(v, true)}
                           onKeyDown={(v) => {
                             if (
@@ -432,7 +440,7 @@ export default function TimeMap({
                 icon="calendar"
                 onClick={() => onInspect(e)}
               >
-                {e.description || e.reference || 'Department activity'}
+                {blockLabel(e)}
               </Button>
             ))}
           {!timed.length && (
