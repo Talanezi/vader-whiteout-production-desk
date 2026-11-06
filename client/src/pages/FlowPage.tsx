@@ -1,3 +1,6 @@
+import FlowLayout from '../components/flow/FlowLayout'
+import type {CastPerson} from '../../../server/src/flows/talent'
+import LiveProgress from '../components/flow/LiveProgress'
 import DatePicker from '../components/whiteout/DatePicker'
 import InstructionTiming from '../components/flow/InstructionTiming'
 import { change, displayShot } from '../lib/shotDocument'
@@ -116,6 +119,8 @@ function Workspace({
     toast = useToast(),
     navigate = useNavigate(),
     location = useLocation()
+  const [cast,setCast]=useState<CastPerson[]>([])
+  useEffect(()=>{flowRequest<CastPerson[]>(`/${id}/cast`).then(setCast).catch(()=>{})},[id])
   const [mode, setMode] = useState('flow'),
     [rail, setRail] = useState(true),
     [search, setSearch] = useState(''),
@@ -539,51 +544,7 @@ function Workspace({
           <Button icon="plus" onClick={() => add('custom')}>
             Add activity
           </Button>
-          <Menu
-            label="Layout"
-            icon="columns"
-            items={[
-              {
-                value: 'core',
-                label: 'Core Crew',
-                onSelect: () =>
-                  setLayout((l) => ({
-                    ...l,
-                    hidden: deps
-                      .filter(
-                        (d) =>
-                          !/camera|grip|electric|talent|actor|sound|director|production|producer/i.test(
-                            d.name,
-                          ),
-                      )
-                      .map((d) => d.id),
-                  })),
-              },
-              {
-                value: 'all',
-                label: 'All Departments',
-                onSelect: () => setLayout((l) => ({ ...l, hidden: [] })),
-              },
-              ...deps.map((d) => ({
-                value: d.id,
-                label:
-                  (layout.hidden.includes(d.id) ? 'Show ' : 'Hide ') +
-                  d.name,
-                onSelect: () =>
-                  setLayout((l) => ({
-                    ...l,
-                    hidden: l.hidden.includes(d.id)
-                      ? l.hidden.filter((x) => x !== d.id)
-                      : [...l.hidden, d.id],
-                  })),
-              })),
-              {
-                value: 'add',
-                label: 'Add department',
-                onSelect: () => setNewDepartment(true),
-              },
-            ]}
-          />
+          <FlowLayout deps={deps} hidden={layout.hidden} onHidden={hidden=>setLayout(l=>({...l,hidden}))} onAdd={()=>setNewDepartment(true)} onOrder={ids=>doc.transact(()=>ids.forEach((id,i)=>doc.getMap<Y.Map<unknown>>('departments').get(id)?.set('order',(i+1)*1024)),'local')}/>
           <Button
             icon={rail ? 'collapse' : 'shots'}
             aria-pressed={rail}
@@ -593,6 +554,7 @@ function Workspace({
           </Button>
         </div>
       </div>
+      <LiveProgress id={id} doc={doc} events={events} shots={sourceShots} user={c.session!.user} connected={c.connected}/>
       {selected.size > 0 && (
         <div className="flow-selection">
           <strong>{selected.size} selected</strong>
@@ -722,6 +684,7 @@ function Workspace({
           <main className="flow-editor">
             {mode === 'flow' ? (
               <FlowGrid
+                cast={cast}
                 doc={doc}
                 provider={c.provider!}
                 undo={c.undo}
@@ -902,7 +865,7 @@ function Workspace({
           zone={zone}
           date={date}
           inherited={duration(
-            { ...events.find((e) => e.id === time)!, duration: null },
+            { ...events.find((e) => e.id === time)!, duration: null, allottedMinutes:null },
             sourceShots?.get(
               events.find((e) => e.id === time)?.shotId || '',
             ),
@@ -1055,6 +1018,7 @@ function Workspace({
             events.find((e) => e.id === inspector.id)?.shotId || '',
           )}
           sourceDoc={source?.doc}
+          cast={cast}
           listId={listId}
           zone={zone}
           initialTab={inspector.tab}

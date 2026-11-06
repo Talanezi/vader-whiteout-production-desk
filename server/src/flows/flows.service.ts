@@ -1,3 +1,4 @@
+import {transitionLive,emptyLive,actualMinute} from './live';
 import * as decoding from 'lib0/decoding';
 import { collaborationError } from '../collaboration-error';
 import {
@@ -35,6 +36,7 @@ import {
 @Injectable()
 export class FlowsService implements OnModuleDestroy {
   private collab?: Hocuspocus;
+  private liveQueues=new Map<string,Promise<void>>();
   private historyClock = new Map<string, { at: number; hash: string }>();
   private sockets?: WebSocketServer;
   private recheck?: ReturnType<typeof setInterval>;
@@ -250,7 +252,23 @@ export class FlowsService implements OnModuleDestroy {
         source = null;
       }
     }
+    (state as any).cast=await this.cast(id,user);
     return { state, source };
+  }
+  async cast(id:string,user:Collaborator){await this.authorize(id,user);return this.db.query(`SELECT id,name,"roleOrDepartment" FROM production_desk_roster_people WHERE active=true AND category='cast' ORDER BY name,id`)}
+  async live(id:string,user:Collaborator,p?:any) {
+    await this.authorize(id,user);
+    if(!p)return this.withDocument(id,user,async(d)=>({live:d.getMap('meta').get('liveState')||emptyLive(),serverNow:Date.now(),clockMinute:actualMinute(Date.now(),d.getMap('meta').toJSON())}));
+    const previous=this.liveQueues.get(id)||Promise.resolve();let release!:()=>void;
+    const gate=new Promise<void>(r=>release=r),tail=previous.catch(()=>{}).then(()=>gate);this.liveQueues.set(id,tail);await previous.catch(()=>{});
+    try{return await this.withDocument(id,user,async(d)=>{
+      const state=capture(d),source=state.meta.listId?await this.shots.export(state.meta.listId,user):null;
+      let live:any;try{live=transitionLive(state.meta.liveState,p,state,source,{id:user.userID,name:user.name})}catch(e){throw new BadRequestException((e as Error).message)}
+      const old=d.getMap('meta').get('liveState');validateFlow({...state,meta:{...state.meta,liveState:live}});
+      d.transact(()=>d.getMap('meta').set('liveState',live),'production-log');
+      try{await this.persist(id,d)}catch(e){d.transact(()=>old===undefined?d.getMap('meta').delete('liveState'):d.getMap('meta').set('liveState',old),'production-log');throw e}
+      return {live,serverNow:Date.now(),clockMinute:actualMinute(Date.now(),state.meta)};
+    })}finally{release();if(this.liveQueues.get(id)===tail)this.liveQueues.delete(id)}
   }
   async manage(id: string, user: Collaborator, p: any) {
     await this.authorize(id, user, true);
@@ -310,6 +328,7 @@ export class FlowsService implements OnModuleDestroy {
           meta.set('date', p.date || '');
           if (p.zone) meta.set('zone', p.zone);
           meta.set('status', 'draft');
+          meta.delete('liveState');
           for (const key of [
             'issuedAt',
             'publishedAt',
@@ -400,6 +419,7 @@ export class FlowsService implements OnModuleDestroy {
         if (!row) throw new BadRequestException('Revision unavailable.');
         await this.checkpoint(id, user, d, 'Before restoration');
         const old = new Y.Doc();
+        const liveState=d.getMap('meta').get('liveState');
         try {
           Y.applyUpdate(old, row.state);
           d.transact(() => {
@@ -418,6 +438,7 @@ export class FlowsService implements OnModuleDestroy {
                   v instanceof Y.AbstractType ? v.clone() : v,
                 );
             }
+            if(liveState!==undefined)d.getMap('meta').set('liveState',liveState);else d.getMap('meta').delete('liveState');
           }, 'restore');
           await this.persist(id, d);
           return { id };
@@ -632,6 +653,9 @@ export class FlowsService implements OnModuleDestroy {
               try {
                 Y.applyUpdate(candidate, Y.encodeStateAsUpdate(document));
                 Y.applyUpdate(candidate, delta);
+                if(stableJSON(candidate.getMap('meta').get('liveState'))!==stableJSON(document.getMap('meta').get('liveState')))throw new BadRequestException('Use the production log controls to change actual records.');
+                const live:any=document.getMap('meta').get('liveState');
+                if(live?.activeId&&candidate.getMap<Y.Map<unknown>>('events').get(live.activeId)?.get('deletedAt'))throw new BadRequestException('Finish the active block before removing it.');
                 validateFlow(capture(candidate));
               } finally {
                 candidate.destroy();

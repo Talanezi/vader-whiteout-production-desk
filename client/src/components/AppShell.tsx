@@ -1,3 +1,4 @@
+import AccountMenu from './AccountMenu'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { IconButton } from './whiteout/Button'
@@ -120,6 +121,7 @@ function AppShell() {
           )}
           {navigation}
           <div className="pd-sidebar-bottom">
+            <AccountMenu collapsed={collapsed}/>
             <a
               href="/apps/"
               className="pd-nav-link"
@@ -187,6 +189,7 @@ function AppShell() {
             onClose={() => setMobileOpen(false)}
           >
             <div onClick={() => setMobileOpen(false)}>{navigation}</div>
+            <AccountMenu/>
             <a href="/apps/" className="pd-nav-link">
               <Icon name="grid" />
               All applications

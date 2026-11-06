@@ -1,3 +1,4 @@
+import VisualDescription from '../components/storyboards/VisualDescription'
 import CommentIndicator from '../components/storyboards/CommentIndicator'
 import { activeCommentCounts } from '../lib/storyboards/comments'
 import InlineDelete from '../components/whiteout/InlineDelete'
@@ -666,7 +667,8 @@ export default function StoryboardPage() {
                       if (mode === 'split') setMode('grid')
                     }}
                   />
-                  {p.notes && <p>{p.notes}</p>}
+                  <VisualDescription doc={c.doc} id={p.id} provider={c.provider!} undo={c.undo}/>
+                  {p.notes && <p className="sb-description-preview">{p.notes}</p>}
                 </footer>
               </>
             )}

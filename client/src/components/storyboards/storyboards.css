@@ -1486,3 +1486,7 @@
     transition: none;
   }
 }
+.sb-description-trigger{background:none;border:0;padding:4px 0;color:#8fb2c3;font:inherit;font-size:11px;cursor:pointer;text-align:left;}
+.sb-description-trigger:hover{color:#9adef8;}.sb-description-popover{z-index:230;padding:15px;background:#121f2a;border:1px solid #425b6f;border-radius:12px;box-shadow:0 18px 50px #0006;overflow:auto;}
+.sb-description-popover>strong{display:block;font-size:13px;margin-bottom:12px;}.sb-description-popover .pd-button{margin-top:12px;}.sb-description-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
+.sb-viewer-description{position:absolute;bottom:18px;left:18px;z-index:8;background:#10212be6;border:1px solid #304957;border-radius:9px;padding:5px 10px;}

@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { SchedulerAuthGuard } from './scheduler-auth.guard';
@@ -6,6 +6,9 @@ import { SchedulerAuthGuard } from './scheduler-auth.guard';
 @Controller('api/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('logout')
+  logout(@Req() req:Request){return this.authService.logout((req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim())}
 
   @UseGuards(SchedulerAuthGuard)
   @Get('me')

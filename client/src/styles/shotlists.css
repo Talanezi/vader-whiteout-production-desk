@@ -3037,3 +3037,12 @@
     transition: none;
   }
 }
+
+/* Shared planning colors remain independent of selection and live performance. */
+.pd-pro-table tr[data-colored] td { background-image:linear-gradient(color-mix(in srgb,var(--shot-row-color) 12%,transparent),color-mix(in srgb,var(--shot-row-color) 12%,transparent)); }
+.pd-pro-table tr[data-colored] td:first-child { box-shadow:inset 3px 0 var(--shot-row-color); }
+.pd-ad-context {display:flex;align-items:center;gap:12px;margin:0 0 10px;}
+.pd-take-trigger {border:0;border-radius:5px;background:transparent;color:var(--pd-blue,#8bd7f5);padding:6px 8px;font:inherit;text-align:left;cursor:pointer;}
+.pd-take-trigger:hover {background:#1a3242;}
+.pd-take-record {display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #2a3d49;}
+.pd-take-record small {display:block;color:#91aab7;font-size:11px;margin-top:4px;}

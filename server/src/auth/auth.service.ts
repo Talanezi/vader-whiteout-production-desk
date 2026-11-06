@@ -53,6 +53,12 @@ export class AuthService {
     };
   }
 
+  async logout(token:string){
+    if(!token)throw new UnauthorizedException('Invalid scheduler session');
+    const response=await fetch(`${this.getSchedulerApiBaseUrl()}/api/logout?everywhere=false`,{method:'POST',headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(10000)});
+    if(!response.ok)throw new UnauthorizedException('Scheduler could not confirm sign out');
+    return {ok:true};
+  }
   async meFromToken(token: string) {
     const user = await this.verifySchedulerToken(token);
     return {

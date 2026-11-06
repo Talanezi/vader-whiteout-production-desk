@@ -39,6 +39,7 @@ export default function FlowPrint({
     [packAbort, setPackAbort] = useState<AbortController>(),
     [personnel, setPersonnel] = useState(true),
     [notes, setNotes] = useState(true),
+    [productionLog,setProductionLog]=useState(false),
     [bytes, setBytes] = useState<Uint8Array>(),
     [readyBytes, setReadyBytes] = useState<Uint8Array>(),
     [generatedConfig, setGeneratedConfig] = useState(''),
@@ -53,6 +54,7 @@ export default function FlowPrint({
     style,
     departments: scope,
     actual: false,
+    productionLog,
     personnel,
     notes,
   })
@@ -230,6 +232,7 @@ export default function FlowPrint({
           <fieldset>
             <legend>Include</legend>
             {[
+              [productionLog,setProductionLog,'Include production log'],
               [personnel, setPersonnel, 'Personnel'],
               [notes, setNotes, 'Production notes'],
             ].map(([value, set, label]) => (

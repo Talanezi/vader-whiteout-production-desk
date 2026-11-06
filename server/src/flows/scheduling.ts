@@ -69,6 +69,7 @@ export function legacyMinute(
   );
 }
 export function effectiveDuration(e: any, source: any) {
+  if (e.allottedMinutes != null) return Number(e.allottedMinutes);
   if (e.duration != null) return Number(e.duration);
   const shot =
     e.sourceListId === source?.id || !source?.id

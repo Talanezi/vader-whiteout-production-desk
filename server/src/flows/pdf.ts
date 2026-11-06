@@ -1,3 +1,4 @@
+import {linkedTalent} from './talent';
 import { resolveSchedule, clockText, sourceLabel } from './scheduling';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { readFileSync } from 'fs';
@@ -13,6 +14,7 @@ export type FlowPrint = {
   departments: string[];
   style: 'color' | 'mono';
   actual: boolean;
+  productionLog?:boolean;
   personnel: boolean;
   notes: boolean;
 };
@@ -88,7 +90,7 @@ export async function renderFlow(
       raw.product === 'rundown'
         ? usable - timeWidth
         : Math.min(220, usable * 0.27),
-    departmentWidth = W >= 1100 ? 92 : 115;
+    departmentWidth = W >= 1100 ? 80 : 115;
   const count =
       raw.product === 'rundown'
         ? 0
@@ -103,27 +105,10 @@ export async function renderFlow(
   else if (!departments.length)
     throw Error('Choose at least one department.');
   else {
-    let band: any[] = [];
-    for (let i = 0; i < departments.length; ) {
-      let end = i + 1;
-      while (
-        departments[i].group &&
-        end < departments.length &&
-        departments[end].group === departments[i].group
-      )
-        end++;
-      const group = departments.slice(i, end);
-      for (let j = 0; j < group.length; j += count) {
-        const part = group.slice(j, j + count);
-        if (band.length && band.length + part.length > count) {
-          bands.push(band);
-          band = [];
-        }
-        band.push(...part);
-      }
-      i = end;
-    }
-    if (band.length) bands.push(band);
+    // Balanced, contiguous bands avoid an orphan final department. Ten normal
+    // departments fit one Tabloid landscape width without reducing 8.5pt text.
+    const bandCount=Math.ceil(departments.length/count), perBand=Math.ceil(departments.length/bandCount);
+    for(let i=0;i<departments.length;i+=perBand)bands.push(departments.slice(i,i+perBand));
   }
   const format = (e: any) =>
     clockText(e.minute) + (e.minute >= 1440 ? '\nNext day' : '');
@@ -131,17 +116,7 @@ export async function renderFlow(
     e.sourceListId === state.meta.listId && source
       ? source.shots[e.shotId]
       : undefined;
-  const dur = (e: any) =>
-    e.duration != null
-      ? e.duration
-      : shotFor(e) &&
-        !shotFor(e).deleted &&
-        shotFor(e).estimatedMinutes !== '' &&
-        shotFor(e).estimatedMinutes != null &&
-        Number.isFinite(Number(shotFor(e).estimatedMinutes)) &&
-        Number(shotFor(e).estimatedMinutes) >= 0
-      ? Number(shotFor(e).estimatedMinutes)
-      : null;
+  const dur = (e:any)=>e.effectiveDuration??null;
   const texts = rows.map((e) => {
     const shot = shotFor(e),
       valid = shot && !shot.deleted && !shot.deletedAt;
@@ -153,9 +128,7 @@ export async function renderFlow(
             ? sourceLabel(shot, source) +
               (shot.labelConflict
                 ? ' · code conflict [' + String(e.shotId).slice(0, 8) + ']'
-                : '') +
-              ' ' +
-              String(shot.subject || '')
+                : '')
             : String(e.reference || 'Shot') + ' · source unavailable'
           : '',
         e.category,
@@ -172,6 +145,7 @@ export async function renderFlow(
             (i: any) => i.eventId === e.id && i.departmentId === d.id,
           );
           return [
+            /^(talent|actors?|cast)$/i.test(d.name.trim())?linkedTalent(e,valid?shot:null,state.cast).map(p=>p.roleOrDepartment||p.name).join(', '):'',
             i?.minute != null
               ? clockText(i.minute) +
                 (i.minute >= 1440 ? ' · Next day' : '') +
@@ -196,11 +170,12 @@ export async function renderFlow(
         throw Error(
           `The PDF font does not support “${char}”. Update this text before printing.`,
         );
-  const widths = bands.map((ds) => [
-    timeWidth,
-    actionWidth,
-    ...ds.map(() => (usable - timeWidth - actionWidth) / ds.length),
-  ]);
+  const widths = bands.map((ds)=>{
+    const available=usable-timeWidth-actionWidth,min=ds.length?Math.min(80,available/ds.length):0;
+    const weights=ds.map(d=>{const column=2+departments.findIndex(x=>x.id===d.id);const samples=texts.map(t=>font.widthOfTextAtSize(String(t[column]||'').replace(/\n/g,' '),size)).sort((a,b)=>a-b);return Math.min(180,Math.max(40,font.widthOfTextAtSize(d.name,8),samples[Math.floor(samples.length*.7)]||0))});
+    const sum=weights.reduce((n,v)=>n+v,0)||1,extra=available-min*ds.length;
+    return [timeWidth,actionWidth,...weights.map(v=>min+extra*v/sum)];
+  });
   const lines = bands.map((ds, bi) =>
     texts.map((text) =>
       [
@@ -212,7 +187,9 @@ export async function renderFlow(
       ].map((v, i) => wrapCell(v, widths[bi][i] - 12, font, size)),
     ),
   );
-  const titleLines = wrapCell(String(state.meta.name), usable, font, 15);
+  const customTitle=String(state.meta.name||'').replace(/^Flow of the Day\s*(?:[-–—:]\s*)?/i,'').trim();
+  const printedTitle='Flow of the Day'+(customTitle?' — '+customTitle:'');
+  const titleLines = wrapCell(printedTitle, usable, font, 15);
   const docHeader = 36 + titleLines.length * 19;
   const bandHeadings = bands.map((ds, bi) =>
     [
@@ -363,7 +340,19 @@ export async function renderFlow(
       }
       draw(String(vi * bands.length + bi + 1), W - margin - 12, 20, 8);
     }
-  pdf.setTitle(String(state.meta.name));
+  if(raw.productionLog){
+    const records=Object.values(state.meta.liveState?.blocks||{}) as any[];
+    let page:any,y=0;const heading=()=>{page=pdf.addPage([W,H]);y=H-margin;page.drawText(printedTitle+' — Production log',{x:margin,y:y-12,size:13,font,color:ink});y-=36;page.drawText('Activity / Actual start / Actual finish / Elapsed / DP estimate / AD allotted / Budget variance',{x:margin,y,size:9,font,color:ink});y-=24};heading();
+    for(const b of records.sort((a,b)=>(a.startedAt||Infinity)-(b.startedAt||Infinity))){
+      const elapsed=b.status==='completed'?(b.endedAt-b.startedAt)/60000:null;
+      const text=[b.label,b.status==='skipped'?'Skipped':clockText(b.startMinute),b.status==='active'?'In progress':b.status==='skipped'?'—':clockText(b.endMinute),elapsed==null?'—':elapsed.toFixed(1)+' min',b.estimate==null?'—':b.estimate+' min',b.allotted==null?'—':b.allotted+' min',elapsed!=null&&b.kind==='shot'&&b.allotted!=null?(elapsed-b.allotted).toFixed(1)+' min':'—'].join(' / ');
+      for(const line of wrapCell(text,usable,font,size)){if(y<margin+25)heading();page.drawText(line,{x:margin,y,size,font,color:ink});y-=leading}y-=12;
+    }
+    if(!records.length)page.drawText('No recorded production blocks.',{x:margin,y,size,font,color:ink});
+    for(const audit of state.meta.liveState?.audit||[]){if(!['correct','undo'].includes(audit.type))continue;for(const line of wrapCell(`${audit.type} · ${audit.by.name} · ${new Date(audit.at).toISOString()} · ${audit.reason||'Previous action restored'}`,usable,font,size)){if(y<margin+25)heading();page.drawText(line,{x:margin,y,size,font,color:ink});y-=leading}y-=8}
+    pdf.getPages().slice(pages.length*bands.length).forEach((p,i)=>p.drawText(String(pages.length*bands.length+i+1),{x:W-margin-12,y:20,font,size:8,color:ink}));
+  }
+  pdf.setTitle(printedTitle);
   pdf.setSubject('Production-day schedule');
   pdf.setCreationDate(new Date('2026-01-01T00:00:00Z'));
   pdf.setModificationDate(new Date('2026-01-01T00:00:00Z'));

@@ -2,15 +2,15 @@ import { resolveSchedule } from './scheduling';
 import * as Y from 'yjs';
 import { BadRequestException } from '@nestjs/common';
 export const DEFAULT_DEPARTMENTS = [
-  'Camera',
+  'Camera & Lighting',
   'Grip & Electric',
   'Talent',
   'Sound',
   'Costume',
   'Hair & Makeup',
   'Props',
-  'Stunts',
-  'Director/Choreography',
+  'Choreography',
+  'Director',
   'Production',
 ];
 export const collections = [
@@ -136,6 +136,7 @@ export function validateFlow(s: any) {
         (!Number.isFinite(Date.parse(e[k])) || typeof e[k] !== 'string')
       )
         throw new BadRequestException('Invalid event time.');
+    if(e.allottedMinutes!=null&&(!Number.isFinite(e.allottedMinutes)||e.allottedMinutes<0||e.allottedMinutes>10080))throw new BadRequestException('Allotted duration must be between zero and seven days.');
     if (
       e.duration != null &&
       (!Number.isFinite(e.duration) ||

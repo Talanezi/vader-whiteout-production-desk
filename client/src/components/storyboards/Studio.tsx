@@ -11,7 +11,7 @@ import {
   type StudioEngine,
 } from '../../lib/storyboards/studioEngine'
 import { legacyPath, objectTransform } from '../../lib/storyboards/drawing'
-import { StudioIcon, StudioColor, StudioGlyph } from './StudioControls'
+import { StudioIcon, StudioColor, StudioGlyph, initialStudioPalette } from './StudioControls'
 import DotsLoader from '../whiteout/DotsLoader'
 import InlineDelete from '../whiteout/InlineDelete'
 import Menu from '../whiteout/Menu'
@@ -150,7 +150,11 @@ export default function Studio({
   onZoomChange,
   nativeHeight = 562.5,
   frame,
+  palette,
+  onPaletteChange,
 }: {
+  palette?:string[]
+  onPaletteChange?:(slot:number,color:string)=>void
   url?: string
   objects: Annotation[]
   onCommit: (a: Annotation, continuous?: boolean) => void
@@ -180,6 +184,7 @@ export default function Studio({
     [text, setText] = useState<Annotation>(),
     [properties, setProperties] = useState(false),
     [color, setColor] = useState('#172536'),
+    [paletteSlot,setPaletteSlot]=useState(0),
     [widths, setWidths] = useState<Record<string, number>>({
       brush: 4,
       pen: 3,
@@ -721,7 +726,9 @@ export default function Studio({
       } catch {}
     }, 800)
   }
+  const sampleReplacement=useRef<((v:string)=>void)|undefined>(undefined);
   function applyPickedColor(value: string) {
+    if(sampleReplacement.current){const replace=sampleReplacement.current;sampleReplacement.current=undefined;replace(value);return}
     if (tool === 'select' && active)
       onCommit(calculate({ ...active, color: value }))
     else setColor(value)
@@ -738,14 +745,14 @@ export default function Studio({
         applyPickedColor(result.sRGBHex)
         return
       } catch (e) {
-        if ((e as Error).name === 'AbortError') return
+        if ((e as Error).name === 'AbortError') {sampleReplacement.current=undefined;return}
       }
     }
     try {
       const group = svg.current?.querySelector<SVGGElement>(
         '.sb-studio-composition',
       )
-      if (!group) return
+      if (!group) {sampleReplacement.current=undefined;return}
       sampler.current = await compositionPixels(
         group,
         height,
@@ -1735,7 +1742,11 @@ export default function Studio({
               ) : (
                 <>
                   <StudioColor
-                    onSample={pickColor}
+                    palette={palette}
+                    onPaletteChange={onPaletteChange}
+                    selectedSlot={paletteSlot}
+                    onSelectSlot={setPaletteSlot}
+                    onSample={(replace)=>{sampleReplacement.current=replace;void pickColor()}}
                     value={shownColor}
                     onChange={(v) => {
                       if (tool === 'select' && active) style({ color: v })

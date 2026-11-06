@@ -1,3 +1,5 @@
+import VisualDescription from './VisualDescription'
+import {initialStudioPalette} from './StudioControls'
 import useDocumentScrollLock from '../../lib/useDocumentScrollLock'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type * as Y from 'yjs'
@@ -345,6 +347,11 @@ export default function PanelViewer({
               </div>
             ) : media.url || revision?.kind === 'native' ? (
               <Studio
+                palette={initialStudioPalette().map((color,i)=>String(doc.getMap('meta').get('studioPalette'+i)||color))}
+                onPaletteChange={(index,color)=>doc.transact(()=>{
+                  const meta=doc.getMap('meta');for(const [i,c]of initialStudioPalette().entries())if(!meta.has('studioPalette'+i))meta.set('studioPalette'+i,c);
+                  meta.set('studioPalette'+index,color)
+                })}
                 key={revision?.id}
                 url={media.url}
                 nativeHeight={revision?.height || 562.5}
@@ -427,6 +434,7 @@ export default function PanelViewer({
               </div>
             )}
           </div>
+          {!present&&<div className="sb-viewer-description"><VisualDescription doc={doc} id={panel.id} provider={provider} undo={undo}/></div>}
           {showCommentIndicator && (
             <div className="sb-viewer-comment-rail">
               <CommentIndicator

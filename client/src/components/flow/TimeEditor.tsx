@@ -24,9 +24,10 @@ export default function TimeEditor({
 }) {
   const [start, setStart] = useState<number | null>(event.minute ?? null),
     [minutes, setMinutes] = useState(
-      String(suggestedDuration ?? event.duration ?? inherited ?? ''),
+      String(suggestedDuration ?? event.allottedMinutes ?? event.duration ?? ''),
     ),
-    [override, setOverride] = useState(event.duration != null),
+    [editEstimate,setEditEstimate]=useState(false),
+    [sourceMinutes,setSourceMinutes]=useState(String(inherited??'')),
     [fixed, setFixed] = useState(event.fixed),
     [sequence, setSequence] = useState(event.timing === 'sequence'),
     [error, setError] = useState(''),
@@ -36,12 +37,12 @@ export default function TimeEditor({
     setBusy(true)
     try {
       const n = parseDuration(minutes)
-      if (event.type === 'shot' && !override && n !== inherited) {
+      if (event.type === 'shot' && editEstimate && parseDuration(sourceMinutes) !== inherited) {
         if (!onSharedDuration)
           throw Error(
             'Reconnect the Shot List to update its shared estimate.',
           )
-        await onSharedDuration(n)
+        await onSharedDuration(parseDuration(sourceMinutes))
       }
       onSave({
         clockStart: sequence ? null : start,
@@ -50,7 +51,7 @@ export default function TimeEditor({
           : start == null
           ? 'unscheduled'
           : 'anchor',
-        duration: event.type === 'shot' && !override ? null : n,
+        ...(event.type==='shot'?{allottedMinutes:n,duration:null}:{duration:n}),
         fixed,
       })
       onClose()
@@ -99,29 +100,9 @@ export default function TimeEditor({
             Continue after the previous activity
           </label>
         )}
-        <label>
-          {event.type === 'shot' && !override
-            ? 'Shared shooting estimate · min'
-            : 'Duration · min'}
-          <input
-            aria-label="Shooting duration"
-            value={minutes}
-            placeholder="Unknown"
-            onChange={(e) => setMinutes(e.target.value)}
-          />
-        </label>
-        {event.type === 'shot' && (
-          <label className="flow-check">
-            <DrawCheckbox
-              checked={override}
-              onChange={(e) => {
-                setOverride(e.target.checked)
-                if (!e.target.checked) setMinutes(String(inherited ?? ''))
-              }}
-            />
-            Use a different duration for this day
-          </label>
-        )}
+        {event.type==='shot'&&<div className="flow-estimate-readout"><span>DP estimate <strong>{inherited==null?'Unknown':inherited+' min'}</strong></span><Button icon="edit" onClick={()=>setEditEstimate(v=>!v)}>Edit DP estimate</Button></div>}
+        {editEstimate&&<label>Shared DP estimate · min<input aria-label="DP estimate" value={sourceMinutes} onChange={e=>setSourceMinutes(e.target.value)} placeholder="Unknown"/></label>}
+        <label>{event.type==='shot'?'AD allotted · min':'Duration · min'}<input aria-label="Shooting duration" value={minutes} placeholder={event.type==='shot'?'Use DP estimate':'Unknown'} onChange={e=>setMinutes(e.target.value)}/></label>
         <label className="flow-check">
           <DrawCheckbox
             checked={fixed}

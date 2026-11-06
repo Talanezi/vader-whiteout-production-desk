@@ -1,3 +1,5 @@
+import {linkedTalent,type CastPerson} from '../../../../server/src/flows/talent'
+import PreferredTake from '../shots/PreferredTake'
 import { useState } from 'react'
 import type * as Y from 'yjs'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
@@ -29,6 +31,8 @@ export default function EventInspector({
   source,
   sourceDoc,
   listId,
+  user,
+  cast=[],
   onClose,
   onRelink,
 }: {
@@ -36,6 +40,7 @@ export default function EventInspector({
   event: FlowEvent
   provider: HocuspocusProvider
   undo: Y.UndoManager
+  cast?:CastPerson[]
   user: { id: number; name: string }
   source?: Y.Map<unknown>
   sourceDoc?: Y.Doc
@@ -165,6 +170,8 @@ export default function EventInspector({
           )}
         {source && sourceDoc && !source.get('deleted') && (
           <>
+            <details><summary>Talent association</summary><Button onClick={()=>put(doc,'events',event.id,{talentIds:null})}>Use source association</Button>{cast.map(person=><label className="flow-check" key={person.id}><DrawCheckbox checked={linkedTalent(event,source.toJSON(),cast).some(p=>p.id===person.id)} onChange={e=>{const ids=linkedTalent(event,source.toJSON(),cast).map(p=>p.id);put(doc,'events',event.id,{talentIds:e.target.checked?[...ids,person.id]:ids.filter(id=>id!==person.id)})}}/>{person.roleOrDepartment||person.name} · {person.name}</label>)}</details>
+            <h3>Preferred take</h3><PreferredTake shot={source} user={user} context={{flowId:String(doc.getMap('meta').get('id')||''),eventId:event.id,date:String(doc.getMap('meta').get('date')||'')}}/>
             <h3>Shot List</h3>
             {(['subject', 'camera', 'framing', 'lens'] as ShotField[]).map(
               (field) => (

@@ -1,3 +1,4 @@
+import RowColor from '../components/shots/RowColor'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router-dom'
 import * as Y from 'yjs'
@@ -808,6 +809,7 @@ export default function ShotListPage() {
                 />
               ) : (
                 <ShotGrid
+                  listId={id}
                   undo={c.undo}
                   onPrintView={(view) => {
                     printView.current = {
@@ -837,6 +839,7 @@ export default function ShotListPage() {
                   user={c.session!.user.id}
                   role={c.session!.user.role}
                   department={c.session!.user.department}
+                  userName={c.session!.user.name}
                   onWaitForSaved={waitForSaved}
                   onDeleteSelected={(ids) =>
                     removeRecords(
@@ -847,6 +850,7 @@ export default function ShotListPage() {
                   }
                   actions={(s, index) => (
                     <div>
+                      <RowColor records={[s]}/>
                       <IconButton
                         name="expand"
                         label={`Inspect shot ${str(s, 'number')}`}

@@ -1,11 +1,13 @@
 import { fields, type ShotField } from './shotDocument'
 export type GridField =
   | ShotField
+  | 'adAllotted' | 'adProgress' | 'preferredTake' | 'productionNotes'
   | 'scene'
   | 'shootDates'
   | 'assignmentCount'
   | 'scheduleStatus'
 export const widths: Record<GridField, number> = {
+  adAllotted: 140, adProgress: 170, preferredTake: 160, productionNotes: 260,
   number: 106,
   scene: 110,
   shootDates: 190,
@@ -53,6 +55,7 @@ export const presets: Record<string, GridField[]> = {
     'setupMinutes',
     'estimatedMinutes',
   ],
+  'AD / On-Set': ['scene','subject','coverage','estimatedMinutes','adAllotted','adProgress','preferredTake','productionNotes'],
   'AD / Planning': [
     'scene',
     'shootDates',
@@ -64,12 +67,12 @@ export const presets: Record<string, GridField[]> = {
     'scriptSeconds',
   ],
   'Full Technical': Object.keys(widths).filter(
-    (f) => f !== 'number',
+    (f) => f !== 'number' && !['adAllotted','adProgress','preferredTake','productionNotes'].includes(f),
   ) as GridField[],
 }
 // Print presets are deliberately independent of editing-grid preset migrations.
 export const printPresets: Record<string, GridField[]> = {
-  ...presets,
+  ...Object.fromEntries(Object.entries(presets).filter(([key])=>key!=='AD / On-Set')),
   Cinematography: [
     'subject',
     'framing',
@@ -87,6 +90,7 @@ const previousCinematography = printPresets.Cinematography
 export const label = (field: string) =>
   (
     ({
+      adAllotted:'AD allotted · min',adProgress:'Production progress',preferredTake:'Preferred take',productionNotes:'Production notes',
       scene: 'Scene',
       shootDates: 'Shoot dates',
       assignmentCount: 'Assignments',

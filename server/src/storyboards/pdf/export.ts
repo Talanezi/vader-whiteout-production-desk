@@ -48,9 +48,9 @@ export async function renderStoryboard(
   annotations: any[],
   shotLabels: (links: any[]) => Promise<string>,
 ) {
-  const count = options.layout === undefined ? 4 : options.layout;
-  if (![1, 2, 4, 6].includes(count))
-    throw new BadRequestException('Choose 1, 2, 4 or 6 panels per page.');
+  const count = options.layout === undefined ? 6 : options.layout;
+  if (![1, 2, 4, 6,8].includes(count))
+    throw new BadRequestException('Choose 1, 2, 4, 6 or 8 panels per page.');
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(unicodeFontkit);
   const font = await pdf.embedFont(
@@ -67,7 +67,7 @@ export async function renderStoryboard(
     return s;
   }
   const base = options.paper === 'a4' ? [595.28, 841.89] : [612, 792],
-    landscape = options.orientation !== 'portrait',
+    landscape = options.orientation === 'landscape',
     width = landscape ? base[1] : base[0],
     height = landscape ? base[0] : base[1],
     margin = 28,
@@ -76,44 +76,30 @@ export async function renderStoryboard(
     rows = Math.ceil(count / cols),
     cellWidth = (width - margin * 2 - gap * (cols - 1)) / cols,
     cellHeight = (height - margin * 2 - 42 - gap * (rows - 1)) / rows;
-  let page: any;
-  for (let index = 0; index < panels.length; index++) {
-    if (index % count === 0) {
-      page = pdf.addPage([width, height]);
-      page.drawText(validate(title), {
-        x: margin,
-        y: height - margin - 10,
-        size: 11,
-        font,
-        color: rgb(0.1, 0.16, 0.2),
-      });
-      page.drawText(
-        `WHITEOUT · ${Math.floor(index / count) + 1} / ${Math.ceil(panels.length / count)}`,
-        { x: margin, y: 16, size: 8, font, color: rgb(0.4, 0.45, 0.5) },
-      );
-    }
-    const panel = panels[index],
-      slot = index % count,
-      x = margin + (slot % cols) * (cellWidth + gap),
-      top = height - margin - 32 - Math.floor(slot / cols) * (cellHeight + gap),
-      label = validate(panel.title || panel.label || `Panel ${index + 1}`),
-      notes = options.notes ? validate(String(panel.notes || '')) : '',
-      links = options.shots
-        ? validate(await shotLabels(panel.links || []))
-        : '';
-    const detail = lines(
-        [links, notes].filter(Boolean).join('\n'),
-        font,
-        cellWidth,
-        8,
-      ),
-      reserved = 20 + detail.length * 10;
-    if (reserved > cellHeight * 0.5)
-      throw new BadRequestException(
-        'The selected notes are too long for this layout. Choose fewer panels per page or hide notes.',
-      );
-    page.drawText(label, { x, y: top - 10, font, size: 10 });
-    const areaHeight = cellHeight - reserved - 10;
+  // Keep the original artwork/vector renderer below; only the measured paper
+  // slots and text pagination change. Dense layouts are maxima, never truncation.
+  const entries:any[]=[];
+  const bodyHeight=height-margin*2-42;
+  const maxDetail=Math.max(1,Math.floor((bodyHeight-130)/10));
+  for(const panel of panels){
+    const linked=options.shots!==false?validate(await shotLabels(panel.links||[])):'';
+    const custom=String(panel.title||panel.label||'');
+    const label=linked||(/^Panel\s*\d+$/i.test(custom.trim())?'':validate(custom));
+    const detail=options.notes!==false?lines(validate(String(panel.notes||'')),font,cellWidth,8):[];
+    for(let start=0;start<Math.max(1,detail.length);start+=maxDetail)entries.push({panel:start?{...panel,assetId:null,native:false}:panel,label:label+(start?' — description continued':''),detail:detail.slice(start,start+maxDetail),hasArtwork:!start});
+  }
+  const positions:any[]=[];let cursor=0,rowsOnPage=0,pageIndex=-1;
+  for(let start=0;start<entries.length;start+=cols){
+    const row=entries.slice(start,start+cols),rowHeight=Math.max(cellHeight,...row.map(e=>30+e.detail.length*10+(e.hasArtwork?100:0)));
+    if(!rowsOnPage||rowsOnPage>=rows||cursor+rowHeight>bodyHeight){pageIndex++;cursor=0;rowsOnPage=0}
+    row.forEach((entry,col)=>positions.push({...entry,pageIndex,cellHeight:rowHeight,x:margin+col*(cellWidth+gap),top:height-margin-32-cursor}));cursor+=rowHeight+gap;rowsOnPage++;
+  }
+  const pages=Array.from({length:pageIndex+1},()=>{const page=pdf.addPage([width,height]);page.drawText(validate(title),{x:margin,y:height-margin-10,size:11,font,color:rgb(.1,.16,.2)});return page});
+  for(const entry of positions){
+    const {panel,label,detail,cellHeight,x,top}=entry,page=pages[entry.pageIndex];
+    const reserved=20+detail.length*10;
+    if(label)page.drawText(label,{x,y:top-10,font,size:10});
+    const areaHeight=cellHeight-reserved-10;
     if (panel.assetId || panel.native) {
       const image = panel.assetId
         ? await pdf.embedPng(
@@ -326,7 +312,7 @@ export async function renderStoryboard(
         }
       page.pushOperators(popGraphicsState());
     }
-    detail.forEach((text, i) =>
+    detail.forEach((text:string, i:number) =>
       page.drawText(text, {
         x,
         y: top - cellHeight + reserved - 20 - i * 10,
@@ -335,6 +321,7 @@ export async function renderStoryboard(
       }),
     );
   }
+  pages.forEach((page,i)=>page.drawText(String(i+1),{x:width-margin-12,y:16,size:8,font,color:rgb(.4,.45,.5)}));
   if (!panels.length)
     throw new BadRequestException('No panels are selected for export.');
   return Buffer.from(await pdf.save());

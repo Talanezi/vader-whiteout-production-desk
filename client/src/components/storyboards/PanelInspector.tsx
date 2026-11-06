@@ -242,7 +242,7 @@ export default function PanelInspector({
               )}
             </section>
             <section className="sb-inspector-section">
-              <h3>Visual notes</h3>
+              <h3>Visual description</h3>
               {present ? (
                 <p>{panel.notes || '—'}</p>
               ) : (
@@ -252,7 +252,7 @@ export default function PanelInspector({
                     text={notes}
                     provider={provider}
                     undo={undo}
-                    label="Visual notes"
+                    label="Visual description"
                   />
                 </div>
               )}

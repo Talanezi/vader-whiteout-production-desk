@@ -49,6 +49,7 @@ export default function TimeMap({
     return () => o.disconnect()
   }, [])
   const [zoom, setZoom] = useState(4),
+    [peek,setPeek]=useState<FlowEvent>(),
     [drag, setDrag] = useState<{
       id: string
       delta: number
@@ -114,8 +115,7 @@ export default function TimeMap({
     ],
     first = ranges.length
       ? baseTime +
-        Math.floor(Math.min(...ranges.map((e: any) => e.minute)) / 60) *
-          3600000
+        Math.min(...ranges.map((e: any) => e.minute)) * 60000
       : baseTime,
     last = ranges.length
       ? baseTime +
@@ -123,7 +123,8 @@ export default function TimeMap({
           60000 +
         1800000
       : first + 3600000,
-    width = Math.max(700, ((last - first) / 60000) * zoom),
+    width = Math.max(1, ((last - first) / 60000) * zoom),
+    tick = [1,2,5,10,15,30,60,120,180,360,720].find(n=>n*zoom>=90)||1440,
     lanes = [{ id: 'production', name: 'Production' }, ...departments]
   return (
     <div ref={host} className="flow-time-map">
@@ -132,13 +133,13 @@ export default function TimeMap({
           <IconButton
             name="plus"
             label="Zoom in"
-            onClick={() => setZoom((v) => Math.min(12, v * 1.25))}
+            onClick={() => setZoom((v) => Math.min(120, v * 1.5))}
           />
           <small>{Math.round(zoom * 30)} px / 30 min</small>
           <IconButton
             name="minus"
             label="Zoom out"
-            onClick={() => setZoom((v) => Math.max(0.15, v / 1.25))}
+            onClick={() => setZoom((v) => Math.max(0.15, v / 1.5))}
           />
         </div>
         <Button
@@ -147,7 +148,7 @@ export default function TimeMap({
             setZoom(
               Math.max(
                 0.15,
-                available / Math.max(60, (last - first) / 60000),
+                available / Math.max(5, (last - first) / 60000),
               ),
             )
           }
@@ -175,6 +176,7 @@ export default function TimeMap({
           </>
         )}
       </div>
+      {peek&&<div className="flow-map-peek" role="status"><strong>{blockLabel(peek)}</strong><span>{clockText(peek.minute)} · {duration(peek,shots?.get(peek.shotId||''))??'Unknown'} min</span><Button icon="edit" onClick={()=>inspectBlock(peek)}>Edit timing</Button></div>}
       <div className="flow-map-scroll">
         <div
           className="flow-map-inner"
@@ -187,12 +189,12 @@ export default function TimeMap({
             <span>Production local time</span>
             <div style={{ width: Math.max(width, available) }}>
               {Array.from(
-                { length: Math.ceil((last - first) / 3600000) },
+                { length: Math.max(1,Math.ceil((last - first) / (tick*60000))) },
                 (_, i) => (
-                  <time key={i} style={{ left: i * 60 * zoom }}>
+                  <time key={i} style={{ left: i * tick * zoom }}>
                     {clockText(
                       (first +
-                        i * 3600000 -
+                        i * tick*60000 -
                         Date.parse(
                           scheduleState(doc, shots?.doc || undefined)
                             .base + 'T00:00:00Z',
@@ -252,7 +254,7 @@ export default function TimeMap({
                       parentById.has(i.eventId),
                   )
             const ends: number[] = []
-            const positioned = lane.map((e) => {
+            const positioned = [...lane].sort((a,b)=>Date.parse(a.start!)-Date.parse(b.start!)).map((e) => {
               const start = Date.parse(e.start!),
                 end =
                   start +
@@ -262,7 +264,7 @@ export default function TimeMap({
                     60000
               let track = ends.findIndex((v) => v <= start)
               if (track < 0) track = ends.length
-              ends[track] = end
+              ends[track] = Math.max(end,start+24/zoom*60000)
               return { e, track }
             })
             return (
@@ -356,6 +358,8 @@ export default function TimeMap({
                         )} · ${
                           base == null ? 'Duration unknown' : base + ' min'
                         }`}
+                        data-density={w<72?'compact':'full'}
+                        data-live={(doc.getMap('meta').get('liveState') as any)?.activeId===e.id||undefined}
                         className={`flow-time-block ${
                           selected.has(e.id) ? 'is-selected' : ''
                         } ${base == null ? 'is-point' : ''} ${
@@ -365,7 +369,9 @@ export default function TimeMap({
                       >
                         <button
                           onPointerDown={(v) => pointer(v, false)}
-                          onClick={() => onSelect(e)}
+                          onClick={() => {onSelect(e);setPeek(e)}}
+                          onFocus={()=>setPeek(e)}
+                          onMouseEnter={()=>setPeek(e)}
                           onDoubleClick={() => inspectBlock(e)}
                           aria-label={`Move ${blockLabel(e)}`}
                           onKeyDown={(v) => {

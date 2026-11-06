@@ -251,40 +251,7 @@ export default function StoryboardsPage() {
           )}
         </div>
       ) : (
-        <div className="sb-connect sb-index-empty">
-          <StoryboardIllustration />
-          <h2>Every sequence starts with an image.</h2>
-          <div className="sb-empty-choices">
-            <Button
-              icon="import"
-              onClick={() => {
-                setWorkflow('import')
-                navigate('/storyboards/new')
-              }}
-            >
-              Import artwork
-            </Button>
-            <Button
-              icon="plus"
-              variant="primary"
-              onClick={() => {
-                setWorkflow('blank')
-                navigate('/storyboards/new')
-              }}
-            >
-              Start drawing
-            </Button>
-            <Button
-              icon="shots"
-              onClick={() => {
-                setWorkflow('shots')
-                navigate('/storyboards/new')
-              }}
-            >
-              From Shot List
-            </Button>
-          </div>
-        </div>
+        <EmptyState icon="grid" title="No storyboards yet" action={<Button variant="primary" icon="plus" onClick={()=>navigate('/storyboards/new')}>Create storyboard</Button>}/>
       )}
       {(creating || rename) && (
         <Overlay

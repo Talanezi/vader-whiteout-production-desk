@@ -1,3 +1,5 @@
+import RowColor from './RowColor'
+import ADContext, {ADCell} from './ShotADContext'
 import Menu from '../whiteout/Menu'
 import DrawCheckbox from '../whiteout/DrawCheckbox'
 import { useVirtualizer, defaultRangeExtractor } from '@tanstack/react-virtual'
@@ -33,7 +35,7 @@ import {
   type ShotField,
   type RecordMap,
 } from '../../lib/shotDocument'
-import type { PrintView } from '../../lib/shotPrint'
+import type { PrintField, PrintView } from '../../lib/shotPrint'
 import { moveRecords, validAssignments, days } from '../../lib/shotSchedule'
 import {
   formatMatrix,
@@ -71,6 +73,8 @@ type Props = {
   onError: (message: string) => void
   role?: string
   department?: string
+  userName?:string
+  listId:string
   user: number
   onWaitForSaved: () => Promise<void>
   onDeleteSelected: (ids: string[]) => Promise<void>
@@ -113,6 +117,8 @@ function Row({
         s.ref(node)
         measure?.(node)
       }}
+      style={{'--shot-row-color':/^#[0-9a-f]{6}$/i.test(str(record,'rowColor'))?str(record,'rowColor'):undefined} as React.CSSProperties}
+      data-colored={/^#[0-9a-f]{6}$/i.test(str(record,'rowColor'))||undefined}
       data-index={index}
       aria-rowindex={index + 2}
       data-shot={str(record, 'id')}
@@ -137,7 +143,7 @@ export default function ShotGrid(p: Props) {
           '1stad',
           '2ndad',
         ].includes(normalizedRole)
-      ? 'AD / Planning'
+      ? 'AD / On-Set'
       : 'Essentials'
   const storageKey = preferenceKey + '.' + p.user
   const initial = useMemo(() => readColumnPreferences(storageKey), [storageKey])
@@ -632,21 +638,21 @@ export default function ShotGrid(p: Props) {
                 Math.min(anchor.col, extent.col),
                 Math.max(anchor.col, extent.col) + 1,
               )
-              .map((field) => ({ field, width: size(field) })),
+              .filter((field):field is GridField & PrintField=>!['adAllotted','adProgress','preferredTake','productionNotes'].includes(field)).map((field) => ({ field, width: size(field) })),
             label: `Rows ${Math.min(anchor.row, extent.row) + 1}–${Math.max(anchor.row, extent.row) + 1} · ${label(shown[Math.min(anchor.col, extent.col)])} → ${label(shown[Math.max(anchor.col, extent.col)])}`,
           }
         : undefined
     p.onPrintView({
       label: p.planning ? 'Planning Order' : 'Shot List view',
       rows: rows.map((row) => ({ shotId: str(row, 'id') })),
-      columns: shown.map((field) => ({ field, width: size(field) })),
+      columns: shown.filter((field):field is GridField & PrintField=>!['adAllotted','adProgress','preferredTake','productionNotes'].includes(field)).map((field) => ({ field, width: size(field) })),
       area,
       groupScenes: !p.planning,
     })
   }, [rows, shown.join(','), sizes, anchor, extent, p.planning])
   const total = 52 + 100 + shown.reduce((sum, f) => sum + size(f), 0)
   return (
-    <>
+    <ADContext listId={p.listId} user={p.user} enabled={preset==='AD / On-Set'}>
       <div className="pd-grid-layout-tools">
         <Menu
           label={preset}
@@ -734,6 +740,7 @@ export default function ShotGrid(p: Props) {
           >
             Duplicate selected
           </Button>
+          <RowColor records={selectedRecords()}/>
           <Button onClick={() => p.onMulti(new Set())}>Clear selection</Button>
           <InlineDelete
             triggerLabel="Delete selected"
@@ -1091,7 +1098,7 @@ export default function ShotGrid(p: Props) {
                                     ?.focus()
                                 }
                               >
-                                {Object.prototype.hasOwnProperty.call(
+                                {['adAllotted','adProgress','preferredTake','productionNotes'].includes(f)?<ADCell field={f} shot={record} user={{id:p.user,name:p.userName||'Collaborator'}}/>:Object.prototype.hasOwnProperty.call(
                                   fields,
                                   f,
                                 ) ? (
@@ -1160,6 +1167,6 @@ export default function ShotGrid(p: Props) {
           onClose={p.onCloseColumns}
         />
       )}
-    </>
+    </ADContext>
   )
 }

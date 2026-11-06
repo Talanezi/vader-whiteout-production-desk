@@ -210,6 +210,7 @@ export default function ShotListsPage() {
         </div>
       ) : (
         <EmptyState
+          icon="shots"
           title={error ? 'Shot lists unavailable' : 'No shot lists yet'}
           action={
             error ? (

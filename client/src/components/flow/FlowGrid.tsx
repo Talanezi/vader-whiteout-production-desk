@@ -1,3 +1,4 @@
+import {linkedTalent,type CastPerson} from '../../../../server/src/flows/talent'
 import DepartmentHeader from './DepartmentHeader'
 import { displayShot, hasShotNumberConflict } from '../../lib/shotDocument'
 import { clockText } from '../../lib/flow/model'
@@ -46,6 +47,7 @@ function Row({
   return (
     <tr
       ref={s.ref}
+      data-live={(p.doc.getMap('meta').get('liveState') as any)?.activeId===event.id||undefined}
       data-event={event.id}
       data-dragging={s.isDragging || undefined}
       className={`${event.type === 'milestone' ? 'flow-milestone' : ''} ${
@@ -131,9 +133,7 @@ function Row({
         />
         {valid && (
           <p className="flow-shot-context">
-            {[source.get('subject'), source.get('coverage')]
-              .filter(Boolean)
-              .join(' · ')}
+            {String(source.get('coverage')||'')}
           </p>
         )}
         <div className="flow-row-actions">
@@ -173,6 +173,7 @@ function Row({
       </td>
       {p.departments.map((d) => (
         <td key={d.id} data-department={d.id} tabIndex={0} data-grid-cell>
+          {/^(talent|actors?|cast)$/i.test(d.name.trim())&&<div className="flow-linked-talent">{linkedTalent(event,valid?source.toJSON():null,p.cast).map(v=><span key={v.id}>{v.roleOrDepartment||v.name}</span>)}</div>}
           <CollaborativeText
             text={instruction(p.doc, event.id, d.id)}
             provider={p.provider}
@@ -221,6 +222,7 @@ type GridProps = {
   date: string
   scope: string
   listId: string
+  cast?:CastPerson[]
   shots?: Y.Map<Y.Map<unknown>>
   selected: Set<string>
   widths: Record<string, number>

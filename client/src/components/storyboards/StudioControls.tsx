@@ -78,63 +78,33 @@ export function StudioIcon({
     </button>
   )
 }
-export function StudioColor({
-  value,
-  onChange,
-  onSample,
-}: {
-  value: string
-  onChange: (color: string) => void
-  onSample?: () => void
+export const DEFAULT_STUDIO_PALETTE=['#121923','#ffffff','#77d7ff','#ef665e','#f2b851','#83bc91','#b79cda','#4c71a8','#48ad96','#d88dba','#9caa61','#b78159']
+export function initialStudioPalette(){
+ try{const stored=JSON.parse(localStorage.getItem('whiteout:studio-palette.v2')||'null');if(Array.isArray(stored)&&stored.length===12&&stored.every(c=>/^#[0-9a-f]{6}$/i.test(c)))return stored;
+ const old=JSON.parse(localStorage.getItem('whiteout:studio-colors')||'[]');return [...new Set([...DEFAULT_STUDIO_PALETTE.slice(0,7),...(Array.isArray(old)?old.filter(c=>/^#[0-9a-f]{6}$/i.test(c)):[]),...DEFAULT_STUDIO_PALETTE])].slice(0,12)
+ }catch{return DEFAULT_STUDIO_PALETTE}
+}
+export function StudioColor({value,onChange,onSample,palette,onPaletteChange,selectedSlot,onSelectSlot}: {
+ value:string;onChange:(color:string)=>void;onSample?:(replace:(v:string)=>void)=>void;
+ palette?:string[];onPaletteChange?:(slot:number,color:string)=>void;selectedSlot?:number;onSelectSlot?:(slot:number)=>void;
 }) {
-  const [hex, setHex] = useState(value),
-    [recent, setRecent] = useState<string[]>(() => {
-      try {
-        return JSON.parse(
-          localStorage.getItem('whiteout:studio-colors') || '[]',
-        )
-      } catch {
-        return []
-      }
-    })
-  useEffect(() => setHex(value), [value])
+ const [hex,setHex]=useState(value),[localPalette,setLocalPalette]=useState(initialStudioPalette),[localSlot,setLocalSlot]=useState(0);
+ const colors=palette||localPalette,slot=selectedSlot??localSlot;
+ useEffect(()=>setHex(value),[value]);
+ const choose=(color:string)=>{
+  setHex(color);onChange(color);
+  if(onPaletteChange)onPaletteChange(slot,color);else{const next=colors.map((v,i)=>i===slot?color:v);setLocalPalette(next);localStorage.setItem('whiteout:studio-palette.v2',JSON.stringify(next))}
+ }
   const [hueValue, setHueValue] = useState(0)
   const chooseHue = (n: number) => {
     const h = Math.max(0, Math.min(360, n))
     setHueValue(h)
     choose(hue(h))
   }
-  const choose = (color: string) => {
-    setHex(color)
-    onChange(color)
-    const next = [color, ...recent.filter((c) => c !== color)].slice(0, 6)
-    setRecent(next)
-    localStorage.setItem('whiteout:studio-colors', JSON.stringify(next))
-  }
   return (
     <div className="sb-color-picker">
       <div className="sb-swatches">
-        {[
-          '#121923',
-          '#ffffff',
-          '#77d7ff',
-          '#ef665e',
-          '#f2b851',
-          '#83bc91',
-          '#b79cda',
-          ...recent,
-        ]
-          .filter((c, i, a) => a.indexOf(c) === i)
-          .map((c) => (
-            <button
-              key={c}
-              type="button"
-              style={{ background: c }}
-              aria-label={`Color ${c}`}
-              aria-pressed={value === c}
-              onClick={() => choose(c)}
-            />
-          ))}
+        {colors.map((c,i)=>(<button key={i} type="button" style={{background:c}} aria-label={`Palette color ${i+1}: ${c}`} aria-pressed={slot===i} onClick={()=>{onSelectSlot?.(i);setLocalSlot(i);setHex(c);onChange(c)}}/>))}
       </div>
       <label className="sb-hex">
         HEX{' '}
@@ -148,7 +118,7 @@ export function StudioColor({
           }}
         />
         {onSample && (
-          <StudioIcon name="pipette" label="Sample color" onClick={onSample} />
+          <StudioIcon name="pipette" label="Sample color" onClick={()=>onSample?.(choose)} />
         )}
       </label>
       <div

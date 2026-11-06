@@ -19,6 +19,7 @@ export type FlowEvent = {
   description: string
   notes?: string
   start: string | null
+  allottedMinutes?: number | null
   duration: number | null
   actualStart?: string | null
   actualEnd?: string | null
@@ -128,6 +129,7 @@ export function addEvent(d: Y.Doc, value: Partial<FlowEvent> = {}) {
   return id
 }
 export function duration(e: FlowEvent, shot?: Y.Map<unknown>) {
+  if(e.allottedMinutes!=null)return e.allottedMinutes
   if (e.duration != null) return e.duration
   const n = shot?.get('estimatedMinutes')
   return n !== '' &&

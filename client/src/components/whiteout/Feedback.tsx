@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton, Button } from './Button'
-import Icon from './Icon'
+import Icon, {type IconName} from './Icon'
 import DotsLoader from './DotsLoader'
 type ToastOptions = {
   state?: 'pending' | 'success' | 'error'
@@ -187,10 +187,12 @@ export function LoadingRows({ label }: { label: string }) {
 }
 export function EmptyState({
   kind = 'empty',
+  icon='file',
   title,
   children,
   action,
 }: {
+  icon?:IconName
   kind?: 'empty' | 'search' | 'error' | 'auth'
   title: string
   children?: ReactNode
@@ -207,7 +209,7 @@ export function EmptyState({
                 ? 'alert'
                 : kind === 'search'
                   ? 'search'
-                  : 'file'
+                  : icon
           }
         />
       </div>

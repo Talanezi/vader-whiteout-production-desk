@@ -1,3 +1,4 @@
+import {EmptyState} from '../components/whiteout/Feedback'
 import CreationChoices from '../components/whiteout/CreationChoices'
 import DatePicker from '../components/whiteout/DatePicker'
 import SelectedShots from '../components/flow/SelectedShots'
@@ -253,21 +254,11 @@ export default function FlowsPage() {
             </tbody>
           </table>
           {!filtered.length && (
-            <p className="flow-empty">No flows match your search.</p>
+            <EmptyState kind="search" title="No matching production days"/>
           )}
         </div>
       ) : (
-        <div className="flow-empty">
-          <FlowIdentity />
-          <h2>Plan the production day</h2>
-          <Button
-            icon="plus"
-            variant="primary"
-            onClick={() => navigate('/flows/new')}
-          >
-            Create Flow of the Day
-          </Button>
-        </div>
+        <EmptyState icon="calendar" title="No production days yet" action={<Button variant="primary" icon="plus" onClick={()=>navigate('/flows/new')}>Create Flow of the Day</Button>}/>
       )}
       {creating && (
         <Overlay

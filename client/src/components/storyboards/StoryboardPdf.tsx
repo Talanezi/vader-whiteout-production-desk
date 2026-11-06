@@ -23,11 +23,11 @@ export default function StoryboardPdf({
 }) {
   const [selectedScenes, setSelectedScenes] = useState<string[]>([])
   const [scope, setScope] = useState(selected.length ? 'selected' : 'all'),
-    [layout, setLayout] = useState('4'),
+    [layout, setLayout] = useState('6'),
     [paper, setPaper] = useState('letter'),
-    [orientation, setOrientation] = useState('landscape'),
-    [notes, setNotes] = useState(false),
-    [shots, setShots] = useState(false),
+    [orientation, setOrientation] = useState('portrait'),
+    [notes, setNotes] = useState(true),
+    [shots, setShots] = useState(true),
     [annotations, setAnnotations] = useState(true),
     [bytes, setBytes] = useState<Uint8Array>(),
     [ready, setReady] = useState(false),
@@ -170,7 +170,7 @@ export default function StoryboardPdf({
             label={`${layout} panels per page`}
             value={layout}
             onChange={setLayout}
-            items={['1', '2', '4', '6'].map((value) => ({
+            items={['1', '2', '4', '6','8'].map((value) => ({
               value,
               label: `${value} panel${value === '1' ? '' : 's'} per page`,
             }))}
@@ -194,7 +194,7 @@ export default function StoryboardPdf({
             ]}
           />
           {[
-            ['Notes', notes, setNotes],
+            ['Visual descriptions', notes, setNotes],
             ['Linked shots', shots, setShots],
             ['Annotations', annotations, setAnnotations],
           ].map(([label, checked, change]) => (

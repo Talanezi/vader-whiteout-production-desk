@@ -89,6 +89,9 @@ export class FlowsController {
   ) {
     return this.flows.session(id, r.user);
   }
+  @Get(':id/live') live(@Req()r:{user:Collaborator},@Param('id')id:string){return this.flows.live(id,r.user)}
+  @Post(':id/live') liveAction(@Req()r:{user:Collaborator},@Param('id')id:string,@Body()body:any){return this.flows.live(id,r.user,body)}
+  @Get(':id/cast') cast(@Param('id') id:string,@Req() r:{user:Collaborator}){return this.flows.cast(id,r.user)}
   @Get(':id/snapshot') snapshot(
     @Req() r: { user: Collaborator },
     @Param('id') id: string,
