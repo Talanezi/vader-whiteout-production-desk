@@ -4,3 +4,5 @@
 !client/qa/m03/artifacts/*.log
 /client/qa/m032/artifacts/
 /studio-engine/target/
+
+/public-monitor.json

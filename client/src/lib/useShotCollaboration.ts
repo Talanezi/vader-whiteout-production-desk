@@ -1,3 +1,4 @@
+import { pendingDocument } from './pendingDocument'
 import { useEffect, useMemo, useState } from 'react'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
@@ -25,7 +26,9 @@ export function useShotCollaboration(id: string) {
     let alive = true,
       p: HocuspocusProvider | undefined,
       persisted = '',
-      sequence = 0
+      sequence = 0,
+      initialTimer: ReturnType<typeof setTimeout> | undefined,
+      pending: ReturnType<typeof pendingDocument> | undefined
     setSession(undefined)
     setError('')
     setSaved(false)
@@ -37,11 +40,17 @@ export function useShotCollaboration(id: string) {
     const digest = async () => {
       const current = ++sequence
       const data = Y.encodeSnapshot(Y.snapshot(doc))
-      const hash = await crypto.subtle.digest('SHA-256', data as BufferSource)
+      const hash = await crypto.subtle.digest(
+        'SHA-256',
+        data as BufferSource,
+      )
       const hex = [...new Uint8Array(hash)]
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
-      if (alive && current === sequence) setSaved(hex === persisted)
+      if (alive && current === sequence) {
+        setSaved(hex === persisted)
+        if (hex === persisted) pending?.confirm()
+      }
     }
     const update = () => {
       setRevision((x) => x + 1)
@@ -53,11 +62,24 @@ export function useShotCollaboration(id: string) {
       .then((data) => {
         if (!alive) return
         setSession(data)
+        pending = pendingDocument(
+          doc,
+          'shotlists',
+          id,
+          data.user.id,
+          setError,
+        )
         const url = new URL(
           `${shotApiBase}/shotlists/collaboration`,
           window.location.href,
         )
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+        initialTimer = setTimeout(() => {
+          if (alive && !p?.synced)
+            setError(
+              'Collaboration is taking longer than expected. Check your connection, then retry. Your pending work is preserved.',
+            )
+        }, 20000)
         p = new HocuspocusProvider({
           url: url.toString(),
           name: id,
@@ -74,10 +96,22 @@ export function useShotCollaboration(id: string) {
           onSynced: ({ state }) => {
             if (alive) {
               setSynced(state)
+              if (state) {
+                clearTimeout(initialTimer)
+                setError('')
+                pending?.recover()
+              }
               if (state) p?.sendStateless('persistence-status')
             }
           },
-          onAuthenticationFailed: () => {
+          onAuthenticationFailed: ({ reason }) => {
+            if (alive && /temporarily unavailable/i.test(reason)) {
+              setSaved(false)
+              setError(
+                'The sign-in service is temporarily unavailable. Keep this window open and retry.',
+              )
+              return
+            }
             if (alive)
               setError(
                 'Your session or shot-list access is no longer valid. Sign in again or contact the production owner.',
@@ -133,6 +167,8 @@ export function useShotCollaboration(id: string) {
       window.removeEventListener('online', online)
       clearInterval(heartbeat)
       alive = false
+      clearTimeout(initialTimer)
+      pending?.destroy()
       doc.off('update', update)
       p?.destroy()
       setProvider(undefined)

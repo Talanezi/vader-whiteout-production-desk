@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton, Button } from './Button'
-import Icon, {type IconName} from './Icon'
+import Icon, { type IconName } from './Icon'
 import DotsLoader from './DotsLoader'
 type ToastOptions = {
   state?: 'pending' | 'success' | 'error'
@@ -30,7 +30,13 @@ type Notify = ((text: string, options?: ToastOptions) => number) & {
 const ToastContext = createContext<Notify>(
   Object.assign(() => 0, { promise: async <T,>(p: Promise<T>) => p }),
 )
-function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
+function ToastItem({
+  item,
+  dismiss,
+}: {
+  item: Toast
+  dismiss: () => void
+}) {
   const timer = useRef<number | undefined>(undefined)
   const stop = () => clearTimeout(timer.current)
   const resume = () => {
@@ -72,22 +78,29 @@ function ToastItem({ item, dismiss }: { item: Toast; dismiss: () => void }) {
           {item.action.label}
         </button>
       )}
-      <IconButton name="close" label="Dismiss notification" onClick={dismiss} />
+      <IconButton
+        name="close"
+        label="Dismiss notification"
+        onClick={dismiss}
+      />
     </div>
   )
 }
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]),
     sequence = useRef(0)
-  const notify = useCallback((text: string, options: ToastOptions = {}) => {
-    const id = options.id || ++sequence.current
-    setItems((old) =>
-      old.some((x) => x.id === id)
-        ? old.map((x) => (x.id === id ? { ...options, id, text } : x))
-        : [...old.slice(-2), { ...options, id, text }],
-    )
-    return id
-  }, [])
+  const notify = useCallback(
+    (text: string, options: ToastOptions = {}) => {
+      const id = options.id || ++sequence.current
+      setItems((old) =>
+        old.some((x) => x.id === id)
+          ? old.map((x) => (x.id === id ? { ...options, id, text } : x))
+          : [...old.slice(-2), { ...options, id, text }],
+      )
+      return id
+    },
+    [],
+  )
   const value = Object.assign(notify, {
     promise: async <T,>(
       operation: Promise<T>,
@@ -163,17 +176,29 @@ export function ErrorNotice({
           )}
       </div>
       {onDismiss && (
-        <IconButton name="close" label="Dismiss error" onClick={onDismiss} />
+        <IconButton
+          name="close"
+          label="Dismiss error"
+          onClick={onDismiss}
+        />
       )}
     </div>
   )
 }
 export function LoadingRows({ label }: { label: string }) {
+  const [delayed, setDelayed] = useState(false)
+  useEffect(() => {
+    setDelayed(false)
+    const timer = setTimeout(() => setDelayed(true), 8000)
+    return () => clearTimeout(timer)
+  }, [label])
   return (
     <div className="pd-loading" role="status" aria-live="polite">
       <span className="pd-loading-caption">
         <DotsLoader />
-        {label}
+        {delayed
+          ? 'Taking longer than usual. Checking the connection…'
+          : label}
       </span>
       {[0, 1, 2, 3].map((i) => (
         <div className="pd-skeleton-row" key={i}>
@@ -187,12 +212,12 @@ export function LoadingRows({ label }: { label: string }) {
 }
 export function EmptyState({
   kind = 'empty',
-  icon='file',
+  icon = 'file',
   title,
   children,
   action,
 }: {
-  icon?:IconName
+  icon?: IconName
   kind?: 'empty' | 'search' | 'error' | 'auth'
   title: string
   children?: ReactNode

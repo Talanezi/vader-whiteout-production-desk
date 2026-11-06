@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 type SchedulerMeResponse = {
   userID?: number;
@@ -23,16 +27,23 @@ export class AuthService {
   }
 
   async verifySchedulerToken(token: string) {
-    const response = await fetch(`${this.getSchedulerApiBaseUrl()}/api/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new UnauthorizedException('Invalid scheduler session');
+    let response: Response;
+    try {
+      response = await fetch(`${this.getSchedulerApiBaseUrl()}/api/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        'Authentication service is temporarily unavailable. Try again.',
+      );
     }
-
+    if (response.status === 401 || response.status === 403)
+      throw new UnauthorizedException('Invalid scheduler session');
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        'Authentication service is temporarily unavailable. Try again.',
+      );
     const user = (await response.json()) as SchedulerMeResponse;
 
     const userID = user.userID ?? user.id ?? user.ID;
@@ -53,11 +64,22 @@ export class AuthService {
     };
   }
 
-  async logout(token:string){
-    if(!token)throw new UnauthorizedException('Invalid scheduler session');
-    const response=await fetch(`${this.getSchedulerApiBaseUrl()}/api/logout?everywhere=false`,{method:'POST',headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(10000)});
-    if(!response.ok)throw new UnauthorizedException('Scheduler could not confirm sign out');
-    return {ok:true};
+  async logout(token: string) {
+    if (!token)
+      throw new UnauthorizedException('Invalid scheduler session');
+    const response = await fetch(
+      `${this.getSchedulerApiBaseUrl()}/api/logout?everywhere=false`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        'Scheduler could not confirm sign out. Please retry.',
+      );
+    return { ok: true };
   }
   async meFromToken(token: string) {
     const user = await this.verifySchedulerToken(token);

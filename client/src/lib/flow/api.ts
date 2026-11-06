@@ -1,22 +1,17 @@
+import {networkFetch,responseFailure} from '../network'
 import { getAuthToken } from '../api'
 import { shotApiBase } from '../shotApi'
 export const flowBase = shotApiBase + '/flows'
 export async function flowFetch(path: string, init: RequestInit = {}) {
-  const response = await fetch(flowBase + path, {
+  const response = await networkFetch(flowBase + path, {
     ...init,
     headers: {
       Authorization: `Bearer ${getAuthToken() || ''}`,
       ...init.headers,
     },
   })
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw Object.assign(Error(
-      response.status === 401
-        ? 'UNAUTHORIZED'
-        : error.message || 'Could not complete the Flow request.',
-    ),{status:response.status})
-  }
+  if (!response.ok) throw await responseFailure(response)
+
   return response
 }
 export async function flowRequest<T>(

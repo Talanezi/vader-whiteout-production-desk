@@ -327,12 +327,7 @@ export class ShotlistsService implements OnModuleDestroy {
             await this.authorize(doc.name, user);
             connection.context.user = user;
             connection.context.checkedAt = Date.now();
-          })().catch(() =>
-            connection.close({
-              code: 4403,
-              reason: 'Session or membership revoked',
-            }),
-          );
+          })().catch((error) => {const failure=collaborationError(error,4403);connection.close({code:failure.code,reason:failure.reason})});
         }
     }, 30000);
     this.recheck.unref();

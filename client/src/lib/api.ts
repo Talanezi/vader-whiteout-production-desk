@@ -1,10 +1,11 @@
+import {networkFetch,responseFailure} from './network'
 import type { CallSheetDraft, RosterPerson } from '../data/mockCallSheet'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
   (import.meta.env.DEV
     ? 'http://localhost:3001/api'
-    : 'https://vader-whiteout-production-desk-production.up.railway.app/api')
+    : 'https://api.vaderwhiteout.com/api')
 
 const SCHEDULER_TOKEN_KEY = 'token'
 
@@ -13,13 +14,7 @@ export function getAuthToken() {
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
-  if (response.status === 401) {
-    throw new Error('UNAUTHORIZED')
-  }
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(text || `Request failed with status ${response.status}`)
-  }
+  if (!response.ok) throw await responseFailure(response)
   return response.json() as Promise<T>
 }
 
@@ -29,7 +24,7 @@ async function authFetch(input: string, init?: RequestInit) {
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
   }
-  return fetch(input, {
+  return networkFetch(input, {
     ...init,
     headers,
   })

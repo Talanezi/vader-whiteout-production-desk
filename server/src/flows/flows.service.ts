@@ -745,12 +745,7 @@ export class FlowsService implements OnModuleDestroy {
             await this.authorize(doc.name, user);
             c.context.user = user;
             c.context.checkedAt = Date.now();
-          })().catch(() =>
-            c.close({
-              code: 4403,
-              reason: 'Session or membership revoked',
-            }),
-          );
+          })().catch((error) => {const failure=collaborationError(error,4403);c.close({code:failure.code,reason:failure.reason})});
       }
     }, 30000);
     this.recheck.unref();

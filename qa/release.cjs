@@ -7,7 +7,7 @@ const fs = require('node:fs'),
 const repo = path.resolve(__dirname, '..'),
   site = path.resolve(repo, '../vader-whiteout-site'),
   runtime = process.env.M03_RUNTIME || '/tmp/whiteout-m03-research',
-  api = 'https://vader-whiteout-production-desk-production.up.railway.app/api'
+  api = 'https://api.vaderwhiteout.com/api'
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex')
 function tree(root, skipGit = false, prefix = '') {
   const out = {}

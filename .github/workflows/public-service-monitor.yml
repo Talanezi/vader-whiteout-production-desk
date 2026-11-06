@@ -1,0 +1,27 @@
+name: Whiteout public service monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: whiteout-public-monitor
+  cancel-in-progress: false
+jobs:
+  public-reachability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: DNS, TLS, readiness, auth boundary and collaboration transport
+        run: node qa/operations/public-monitor.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-service-monitor
+          path: public-monitor.json
+          retention-days: 7
