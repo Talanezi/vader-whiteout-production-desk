@@ -172,7 +172,7 @@ export default function FlowsPage() {
       </div>
       {loading ? (
         <LoadingRows label="Loading flows…" />
-      ) : items.length ? (
+      ) : error&&!items.length ? <EmptyState kind="error" title="Production days unavailable" action={<Button icon="retry" onClick={()=>{setError('');setLoading(true);setRefresh(v=>v+1)}}>Try again</Button>}/> : items.length ? (
         <div className="pd-table-wrap">
           <table
             className="pd-table pd-documents"

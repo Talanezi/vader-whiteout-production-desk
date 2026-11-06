@@ -158,7 +158,7 @@ export default function StoryboardsPage() {
       </div>
       {loading ? (
         <LoadingRows label="Loading storyboards…" />
-      ) : items.length ? (
+      ) : error&&!items.length ? <EmptyState kind="error" title="Storyboards unavailable" action={<Button icon="retry" onClick={()=>{setError('');setLoading(true);setRefresh(v=>v+1)}}>Try again</Button>}/> : items.length ? (
         <div className="pd-table-wrap">
           <table
             className="pd-table pd-documents"

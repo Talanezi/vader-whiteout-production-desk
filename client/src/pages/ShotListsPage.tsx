@@ -211,6 +211,7 @@ export default function ShotListsPage() {
       ) : (
         <EmptyState
           icon="shots"
+          kind={error?'error':'empty'}
           title={error ? 'Shot lists unavailable' : 'No shot lists yet'}
           action={
             error ? (

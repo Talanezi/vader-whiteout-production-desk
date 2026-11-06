@@ -147,3 +147,59 @@ paired trusted-membership correction is `4d44206`. Final source/site revisions,
 Railway status, served bundle verification and read-only production hashes are
 recorded in the release evidence after publication and in the final owner report.
 No owner acceptance is claimed.
+
+## Final M03–M05 refinement and Shoot Log amendment — November 5
+
+The owner replaced the former Live Progress banner with a third, native Shoot Log
+workspace. Department Flow remains planning; Time Map remains schedule visualization.
+Shoot Log is a timestamp ledger, with direct 12-hour cells, Enter navigation,
+optional current-time action, phone cards/time sheet, tablet layout, summary,
+explicit confirmed finishes, honest start-to-start intervals, corrections/history,
+missing/skip states and a compact expandable actual-variance plot. It never derives
+lateness from the device clock before an actual checkpoint exists.
+
+Actual records use the existing authorized Flow document and bounded, server-owned
+Yjs metadata. HTTP actions are serialized, persisted before acknowledgment,
+idempotent and guarded per entry. Independent rows merge; stale same-row edits
+require review. An account-scoped local FIFO preserves pending entries through
+network interruptions/reload. Legacy imported timestamps are projected read-only;
+audited corrections overlay them without resetting original fields. Planning
+restoration preserves production records. No SQL migration or authentication
+policy change is needed for this release.
+
+M03 adds shared muted row colors, a dedicated AD / On-Set editing preset, source
+production notes and shared preferred/usable take records with Flow/occurrence/date
+provenance and retained concurrent history. DP estimate stays authoritative in M03;
+AD allotment is a separate M05 event value. AD progress uses the same ledger
+projection rather than a competing calculation. Existing Cinematography, grid,
+Shot List print presets and renderer remain intact.
+
+Flow adds production-managed Cast-derived Talent with explicit override, coverage
+without duplicate Subject, exact ten new-document departments, compact Layout,
+truthful short-shot geometry/adaptive ticks/Fit and accessible hit targets. The
+existing measured PDF engine now fits ten normal departments on one Tabloid width
+at unchanged 8.5pt, balances narrower bands, normalizes titles and optionally
+prints the production ledger. Focus/Rundown/ZIP and private source originals remain.
+
+Storyboards retains its drawing/media engine and existing notes field. The palette
+has twelve stable, shared, independently replaceable slots; HEX/hue/intentional
+sampling edit the selected slot without recoloring artwork. Visual description is
+directly accessible. Default export is six panels, Letter portrait, descriptions
+on; eight-panel/two-by-four output and full measured long-description continuation
+use the existing source-image/vector renderer. No new production dependency or
+third-party artwork was introduced; existing licensing notices remain applicable.
+
+All four indexes use the shared empty state with correct app icon/title and distinct
+error/auth states. The bottom account menu uses Scheduler's actual logout endpoint,
+clears only the session token and unloads private collaboration memory; preferences
+and account-scoped pending records are preserved. Switch account uses the existing
+Scheduler login/return route. Scheduler source is unchanged at `4d442065`.
+
+Full evidence, every original Section 42 row, the 24 amendment scenarios, prior M05
+preservation and physical-device boundaries are recorded in
+[REFINEMENT-ACCEPTANCE.md](qa/m05/REFINEMENT-ACCEPTANCE.md). Fresh production baseline:
+4 Flows, 2 Shot Lists/23 active shots, 5 Storyboards/84 assets, 7 Call Sheets,
+26 roster entries. The owner's Cave Scene additions explain differences from older
+reports. Read-only hashes are compared before/after release. Actual deployed hashes,
+Railway/Pages results and authenticated read-only smoke evidence accompany the
+release artifact and final report. No owner acceptance or M06 work is claimed.

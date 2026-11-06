@@ -59,3 +59,19 @@ UI. Current corrective scripts are `scheduling-corrections.cjs`,
 `connections.cjs`. Start `qa/m05/authority.cjs` in place of the earlier M04
 loopback authority to exercise the actual current Scheduler membership function.
 It is never imported by deployable application code.
+
+## Final cross-application contract and Shoot Log amendment
+
+See `REFINEMENT-ACCEPTANCE.md` for the full Section 42 and 24-case ledger matrices.
+Current scripts: `refinement-live.cjs`, `shoot-log-model.cjs`,
+`refinement-backend.cjs`, `shoot-log-http.cjs`, `refinement-shared.cjs`,
+`refinement-crops.cjs`, `refinement-storyboard.cjs`, `refinement-browser.cjs`,
+`shoot-log-browser.cjs`, `refinement-surfaces.cjs`, `refinement-pressure.cjs`.
+Run fixture seed/backend before storyboard and browser tests. All endpoint bases
+are fixed loopback. Never substitute production. Outputs use `/tmp/m05/refinement`
+and are copied to Git-ignored `client/qa/m032/artifacts/m05/refinement/`.
+
+`M05_BROWSER=webkit` selects the compatible isolated Playwright runtime at
+`/tmp/m05/webkit-runtime` (1.61.1/WebKit 2311). The default installed WebKit build
+crashes before application startup on this host; this is a runner limitation,
+not an application pass. Chromium uses the existing Codex runtime.

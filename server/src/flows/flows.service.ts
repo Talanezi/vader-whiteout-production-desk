@@ -88,7 +88,8 @@ export class FlowsService implements OnModuleDestroy {
         const d = new Y.Doc();
         try {
           Y.applyUpdate(d, state);
-          const meta = d.getMap('meta').toJSON();
+          const fullMeta=d.getMap('meta').toJSON();
+          const {liveState: _liveState,...meta}=fullMeta;
           return {
             ...row,
             ...meta,
@@ -262,7 +263,7 @@ export class FlowsService implements OnModuleDestroy {
     const previous=this.liveQueues.get(id)||Promise.resolve();let release!:()=>void;
     const gate=new Promise<void>(r=>release=r),tail=previous.catch(()=>{}).then(()=>gate);this.liveQueues.set(id,tail);await previous.catch(()=>{});
     try{return await this.withDocument(id,user,async(d)=>{
-      const state=capture(d),source=state.meta.listId?await this.shots.export(state.meta.listId,user):null;
+      const state=capture(d);let source:any=null;if(state.meta.listId){try{source=await this.shots.export(state.meta.listId,user)}catch{source=null}}
       let live:any;try{live=transitionLive(state.meta.liveState,p,state,source,{id:user.userID,name:user.name})}catch(e){throw new BadRequestException((e as Error).message)}
       const old=d.getMap('meta').get('liveState');validateFlow({...state,meta:{...state.meta,liveState:live}});
       d.transact(()=>d.getMap('meta').set('liveState',live),'production-log');
@@ -420,9 +421,11 @@ export class FlowsService implements OnModuleDestroy {
         await this.checkpoint(id, user, d, 'Before restoration');
         const old = new Y.Doc();
         const liveState=d.getMap('meta').get('liveState');
+        const importedActual=[...d.getMap<Y.Map<unknown>>('events')].filter(([,e])=>e.get('actualStart')).map(([id,e])=>({id,start:e.get('actualStart'),end:e.get('actualEnd')}));
         try {
           Y.applyUpdate(old, row.state);
-          const active=(liveState as any)?.activeId;if(active&&(!old.getMap<Y.Map<unknown>>('events').has(active)||old.getMap<Y.Map<unknown>>('events').get(active)?.get('deletedAt')))throw new BadRequestException('Finish the active block before restoring a plan without it.');
+          const recorded=Object.values((liveState as any)?.blocks||{}).filter((b:any)=>b.startedAt!=null) as any[];
+          if(importedActual.some(e=>!old.getMap<Y.Map<unknown>>('events').has(e.id)||old.getMap<Y.Map<unknown>>('events').get(e.id)?.get('deletedAt'))||recorded.some(b=>!old.getMap<Y.Map<unknown>>('events').has(b.eventId)||old.getMap<Y.Map<unknown>>('events').get(b.eventId)?.get('deletedAt')))throw new BadRequestException('This revision omits recorded production activities. Choose a revision that preserves them.');
           d.transact(() => {
             for (const k of [
               'meta',
@@ -439,6 +442,7 @@ export class FlowsService implements OnModuleDestroy {
                   v instanceof Y.AbstractType ? v.clone() : v,
                 );
             }
+            for(const actual of importedActual){const event=d.getMap<Y.Map<unknown>>('events').get(actual.id);if(event){event.set('actualStart',actual.start);if(actual.end!==undefined)event.set('actualEnd',actual.end);else event.delete('actualEnd')}}
             if(liveState!==undefined)d.getMap('meta').set('liveState',liveState);else d.getMap('meta').delete('liveState');
           }, 'restore');
           await this.persist(id, d);
@@ -657,6 +661,7 @@ export class FlowsService implements OnModuleDestroy {
                 if(stableJSON(candidate.getMap('meta').get('liveState'))!==stableJSON(document.getMap('meta').get('liveState')))throw new BadRequestException('Use the production log controls to change actual records.');
                 const live:any=document.getMap('meta').get('liveState');
                 if(live?.activeId&&candidate.getMap<Y.Map<unknown>>('events').get(live.activeId)?.get('deletedAt'))throw new BadRequestException('Finish the active block before removing it.');
+                for(const [eventId,record] of document.getMap<Y.Map<unknown>>('events')){const next=candidate.getMap<Y.Map<unknown>>('events').get(eventId);if(next)for(const field of ['actualStart','actualEnd'])if(stableJSON(record.get(field))!==stableJSON(next.get(field)))throw new BadRequestException('Correct imported actual times in Shoot Log.');}
                 validateFlow(capture(candidate));
               } finally {
                 candidate.destroy();

@@ -5,7 +5,7 @@ import {
   ledgerMetrics,
 } from '../../../../server/src/flows/live'
 import { clockText, type FlowEvent } from '../../lib/flow/model'
-import { useShootLog } from '../../lib/flow/useShootLog'
+import type { ProductionLog } from '../../lib/flow/useShootLog'
 import { Button, IconButton } from '../whiteout/Button'
 import Icon from '../whiteout/Icon'
 import Menu from '../whiteout/Menu'
@@ -82,6 +82,7 @@ export default function ShootLog({
   source,
   user,
   connected,
+  log,
   search,
   onInspect,
   onTiming,
@@ -90,13 +91,13 @@ export default function ShootLog({
   doc: Y.Doc
   source?: Y.Doc
   user: { id: number; name: string }
+  log: ProductionLog
   connected: boolean
   search: string
   onInspect: (e: FlowEvent, tab?: string) => void
   onTiming: (e: FlowEvent) => void
 }) {
-  const log = useShootLog(id, doc, user.id, connected),
-    state = {
+  const state = {
       ...doc.toJSON(),
       meta: { ...doc.getMap('meta').toJSON(), liveState: log.live },
     },

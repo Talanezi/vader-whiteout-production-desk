@@ -43,10 +43,16 @@ export function useShootLog(
     setLive((old) =>
       old && old.revision > r.live.revision ? old : r.live,
     )
-    state.current = r.live
+    if (!state.current || state.current.revision <= r.live.revision)
+      state.current = r.live
   }
-  async function flush() {
-    if (sending.current || !online.current || !q.current.length || review)
+  async function flush(forceReview = false) {
+    if (
+      sending.current ||
+      !online.current ||
+      !q.current.length ||
+      (review && !forceReview)
+    )
       return
     sending.current = true
     setBusy(true)
@@ -120,7 +126,7 @@ export function useShootLog(
       setReview(false)
       setError('')
       sending.current = false
-      void flush()
+      void flush(true)
     },
     discard: () => {
       if (busy) return
@@ -135,3 +141,5 @@ export function useShootLog(
       calibration.current.perf,
   }
 }
+
+export type ProductionLog = ReturnType<typeof useShootLog>

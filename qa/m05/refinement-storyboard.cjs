@@ -1,8 +1,141 @@
-const fs=require('fs'),assert=require('assert/strict'),{randomUUID}=require('crypto'),{execFileSync}=require('child_process'),Y=require('/tmp/m032/runtime/client/node_modules/yjs'),{join,until}=require('../m04/collaboration.cjs'),s=JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),f=JSON.parse(fs.readFileSync('/tmp/m05/refinement/fixture.json')),headers={Authorization:'Bearer '+s.tokens['101'],'Content-Type':'application/json'},base='http://127.0.0.1:4314/api/storyboards',out='/tmp/m05/refinement';
-async function api(path,body){const r=await fetch(base+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)});assert(r.ok,await r.clone().text());return r.headers.get('content-type')?.includes('pdf')?Buffer.from(await r.arrayBuffer()):r.json()}
-function put(d,k,id,v){const m=new Y.Map();d.getMap(k).set(id,m);Object.entries({id,...v}).forEach(([k,v])=>m.set(k,v));return m}
-(async()=>{const id=randomUUID();await api('',{id,name:'Scene 09 — refined storyboard'});const assets=[];for(const name of ['scene09-art-1.png','scene09-art-2.png','scene16-art-1.png']){const bytes=fs.readFileSync(out+'/'+name),form=new FormData();form.append('file',new Blob([bytes],{type:'image/png'}),name);const r=await fetch(base+'/'+id+'/assets',{method:'POST',headers:{Authorization:headers.Authorization},body:form});assert(r.ok,await r.clone().text());const asset=await r.json();assets.push(asset);const read=await fetch(base+'/'+id+'/assets/'+asset.id,{headers});assert.deepEqual(Buffer.from(await read.arrayBuffer()),bytes)}
-const c=await join(id,'101'),panelIds=[];c.doc.transact(()=>{for(let i=0;i<9;i++){const pid=randomUUID(),rid=randomUUID();panelIds.push(pid);put(c.doc,'revisions',rid,{panelId:pid,assetId:assets[i%3].id,uploader:101,uploaderName:'Maya Chen',createdAt:new Date().toISOString()});put(c.doc,'panels',pid,{label:'Panel '+(i+1),order:(i+1)*1024,activeRevision:rid,notes:new Y.Text(i===8?'Long description '+('A performer crosses the cave while the camera follows the choreography. '.repeat(100))+'END OF COMPLETE DESCRIPTION':i===0?'Vader enters the cave and pauses at the light.':'Visual composition '+(i+1)),links:i===1?[]:[{listId:f.listId,shotId:f.shotIds[i]}]})}},'local');await new Promise(r=>setTimeout(r,800));const before=await api('/'+id+'/snapshot');
-for(const n of [6,8]){const b=await api('/'+id+'/pdf',{panels:panelIds.slice(0,n),layout:n,annotations:true});fs.writeFileSync(out+'/storyboard-'+n+'.pdf',b);const info=execFileSync('pdfinfo',[out+'/storyboard-'+n+'.pdf']).toString(),text=execFileSync('pdftotext',[out+'/storyboard-'+n+'.pdf','-']).toString();assert(/Pages:\s+1\b/.test(info));assert(/612 x 792/.test(info));assert(text.includes('10-A'));assert(!/Panel \d/.test(text));assert(text.includes('Vader enters the cave'));}
-const long=await api('/'+id+'/pdf',{panels:[panelIds[8]],layout:8,annotations:true});fs.writeFileSync(out+'/storyboard-long.pdf',long);assert(execFileSync('pdftotext',[out+'/storyboard-long.pdf','-']).toString().replace(/\s+/g,' ').includes('END OF COMPLETE DESCRIPTION'));
-assert.equal((await fetch(base+'/'+id+'/assets/'+assets[0].id)).status,401);const after=await api('/'+id+'/snapshot');assert.deepEqual(before,after);fs.writeFileSync(out+'/storyboard.json',JSON.stringify({id,panelIds,assets:assets.map(a=>a.id)}));c.close();console.log('Actual Scene 09 and Scene 16 crop bytes preserved in private storage; six/eight-panel Letter portrait one-page PDFs; canonical linked labels, no generic unlinked labels, descriptions enabled by default; long descriptions paginate completely; unauthorized reads rejected; export leaves board state unchanged.');})().catch(e=>{console.error(e);process.exit(1)})
+const fs = require('fs'),
+  assert = require('assert/strict'),
+  { randomUUID } = require('crypto'),
+  { execFileSync } = require('child_process'),
+  Y = require('/tmp/m032/runtime/client/node_modules/yjs'),
+  { join, until } = require('../m04/collaboration.cjs'),
+  s = JSON.parse(fs.readFileSync('/tmp/m032/runtime/local-state.json')),
+  f = JSON.parse(fs.readFileSync('/tmp/m05/refinement/fixture.json')),
+  headers = {
+    Authorization: 'Bearer ' + s.tokens['101'],
+    'Content-Type': 'application/json',
+  },
+  base = 'http://127.0.0.1:4314/api/storyboards',
+  out = '/tmp/m05/refinement'
+async function api(path, body) {
+  const r = await fetch(base + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  assert(r.ok, await r.clone().text())
+  return r.headers.get('content-type')?.includes('pdf')
+    ? Buffer.from(await r.arrayBuffer())
+    : r.json()
+}
+function put(d, k, id, v) {
+  const m = new Y.Map()
+  d.getMap(k).set(id, m)
+  Object.entries({ id, ...v }).forEach(([k, v]) => m.set(k, v))
+  return m
+}
+;(async () => {
+  const id = randomUUID()
+  await api('', { id, name: 'Scene 09 — refined storyboard' })
+  const assets = []
+  for (const name of [
+    'scene09-art-1.png',
+    'scene09-art-2.png',
+    'scene16-art-1.png',
+  ]) {
+    const bytes = fs.readFileSync(out + '/' + name),
+      form = new FormData()
+    form.append('file', new Blob([bytes], { type: 'image/png' }), name)
+    const r = await fetch(base + '/' + id + '/assets', {
+      method: 'POST',
+      headers: { Authorization: headers.Authorization },
+      body: form,
+    })
+    assert(r.ok, await r.clone().text())
+    const asset = await r.json()
+    assets.push(asset)
+    const read = await fetch(base + '/' + id + '/assets/' + asset.id, {
+      headers,
+    })
+    assert.deepEqual(Buffer.from(await read.arrayBuffer()), bytes)
+  }
+  const c = await join(id, '101'),
+    panelIds = []
+  c.doc.transact(() => {
+    for (let i = 0; i < 9; i++) {
+      const pid = randomUUID(),
+        rid = randomUUID()
+      panelIds.push(pid)
+      put(c.doc, 'revisions', rid, {
+        panelId: pid,
+        assetId: assets[i % 3].id,
+        uploader: 101,
+        uploaderName: 'Maya Chen',
+        createdAt: new Date().toISOString(),
+      })
+      put(c.doc, 'panels', pid, {
+        label: 'Panel ' + (i + 1),
+        order: (i + 1) * 1024,
+        activeRevision: rid,
+        notes: new Y.Text(
+          i === 8
+            ? 'Long description ' +
+                'A performer crosses the cave while the camera follows the choreography. '.repeat(
+                  100,
+                ) +
+                'END OF COMPLETE DESCRIPTION'
+            : i === 0
+              ? 'Vader enters the cave and pauses at the light.'
+              : 'Visual composition ' + (i + 1),
+        ),
+        links: i === 1 ? [] : [{ listId: f.listId, shotId: f.shotIds[i] }],
+      })
+    }
+  }, 'local')
+  await new Promise((r) => setTimeout(r, 800))
+  const before = await api('/' + id + '/snapshot')
+  for (const n of [6, 8]) {
+    const b = await api('/' + id + '/pdf', {
+      panels: panelIds.slice(0, n),
+      layout: n,
+      annotations: true,
+    })
+    fs.writeFileSync(out + '/storyboard-' + n + '.pdf', b)
+    const info = execFileSync('pdfinfo', [
+        out + '/storyboard-' + n + '.pdf',
+      ]).toString(),
+      text = execFileSync('pdftotext', [
+        out + '/storyboard-' + n + '.pdf',
+        '-',
+      ]).toString()
+    assert(/Pages:\s+1\b/.test(info))
+    assert(/612 x 792/.test(info))
+    assert(text.includes('10-A'))
+    assert(!/Panel \d/.test(text))
+    assert(text.includes('Vader enters the cave'))
+  }
+  const long = await api('/' + id + '/pdf', {
+    panels: [panelIds[8]],
+    layout: 8,
+    annotations: true,
+  })
+  fs.writeFileSync(out + '/storyboard-long.pdf', long)
+  assert(
+    execFileSync('pdftotext', [out + '/storyboard-long.pdf', '-'])
+      .toString()
+      .replace(/\s+/g, ' ')
+      .includes('END OF COMPLETE DESCRIPTION'),
+  )
+  assert.equal(
+    (await fetch(base + '/' + id + '/assets/' + assets[0].id)).status,
+    401,
+  )
+  const after = await api('/' + id + '/snapshot')
+  assert.deepEqual(before, after)
+  fs.writeFileSync(
+    out + '/storyboard.json',
+    JSON.stringify({ id, panelIds, assets: assets.map((a) => a.id) }),
+  )
+  c.close()
+  console.log(
+    'Actual Scene 09 and Scene 16 crop bytes preserved in private storage; six/eight-panel Letter portrait one-page PDFs; canonical linked labels, no generic unlinked labels, descriptions enabled by default; long descriptions paginate completely; unauthorized reads rejected; export leaves board state unchanged.',
+  )
+})().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

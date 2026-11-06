@@ -3046,3 +3046,11 @@
 .pd-take-trigger:hover {background:#1a3242;}
 .pd-take-record {display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #2a3d49;}
 .pd-take-record small {display:block;color:#91aab7;font-size:11px;margin-top:4px;}
+.pd-pro-table .pd-cell-input {box-sizing:border-box;width:100%;min-width:0;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;padding:6px 8px;font:inherit;outline:none;}
+.pd-pro-table .pd-cell-input:hover {background:#13222e;border-color:#2b414f;}
+.pd-pro-table .pd-cell-input:focus {background:#0d1b25;border-color:#83d1f2;box-shadow:0 0 0 1px #83d1f2;}
+.pd-pro-table .pd-cell-input[type=number] {appearance:textfield;max-width:100px;}
+.pd-pro-table .pd-cell-input::-webkit-inner-spin-button,.pd-pro-table .pd-cell-input::-webkit-outer-spin-button {appearance:none;margin:0;}
+.pd-ad-progress {display:inline-flex;gap:6px;align-items:center;}
+.pd-ad-progress::before {content:'';width:5px;height:5px;flex:0 0 5px;border-radius:50%;background:#7c939f;}
+.pd-ad-progress.is-green::before {background:#84b69a;}.pd-ad-progress.is-yellow::before {background:#d7b75f;}.pd-ad-progress.is-red::before {background:#df8d8d;}

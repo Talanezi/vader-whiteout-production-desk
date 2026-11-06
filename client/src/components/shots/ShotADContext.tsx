@@ -1,3 +1,4 @@
+import { ledgerMetrics } from '../../../../server/src/flows/live'
 import {
   createContext,
   useContext,
@@ -103,7 +104,7 @@ export function ADCell({
       events.find((e) => e.get('id') === occurrence) ||
       (events.length === 1 ? events[0] : undefined),
     eventId = String(event?.get('id') || ''),
-    live = c.doc?.getMap('meta').get('liveState') as any
+    date = String(c.doc?.getMap('meta').get('date') || '')
   if (field === 'productionNotes')
     return (
       <input
@@ -134,6 +135,8 @@ export function ADCell({
         onChange={setOccurrence}
       />
     ) : null
+  if (field === 'preferredTake' && c.id && !events.length)
+    return <small>Not scheduled</small>
   if (field === 'preferredTake')
     return (
       <>
@@ -149,7 +152,7 @@ export function ADCell({
                 ? {
                     flowId: c.id,
                     eventId,
-                    date: String(c.doc?.getMap('meta').get('date') || ''),
+                    date,
                   }
                 : undefined
             }
@@ -167,13 +170,25 @@ export function ADCell({
         </small>
       </>
     )
-  if (field === 'adProgress')
+  if (field === 'adProgress') {
+    const record = c.doc
+      ? ledgerMetrics(c.doc.toJSON(), shot.doc?.toJSON()).rows.find(
+          (r: any) => r.event.id === eventId,
+        )
+      : undefined
     return (
       <>
         {picker}
-        <span>{({recorded:'Start recorded',active:'Start recorded',completed:'Confirmed finish',skipped:'Skipped'} as Record<string,string>)[live?.blocks?.[eventId]?.status]||'Not recorded'}</span>
+        <span
+          className={
+            'pd-ad-progress is-' + (record?.performance.zone || 'unknown')
+          }
+        >
+          {record?.performance.label || 'Not recorded'}
+        </span>
       </>
     )
+  }
   return (
     <>
       {picker}

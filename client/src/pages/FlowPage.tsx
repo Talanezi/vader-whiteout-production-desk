@@ -1,3 +1,4 @@
+import {useShootLog} from '../lib/flow/useShootLog'
 import FlowLayout from '../components/flow/FlowLayout'
 import type {CastPerson} from '../../../server/src/flows/talent'
 import ShootLog from '../components/flow/ShootLog'
@@ -86,9 +87,9 @@ export default function FlowPage() {
     )
   const listId = String(c.doc.getMap('meta').get('listId') || '')
   return listId ? (
-    <Connected key={listId} c={c} id={id} listId={listId} />
+    <Connected key={id+':'+listId} c={c} id={id} listId={listId} />
   ) : (
-    <Workspace c={c} id={id} />
+    <Workspace key={id} c={c} id={id} />
   )
 }
 function Workspace({
@@ -103,7 +104,7 @@ function Workspace({
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       c.synced &&
-      (!c.connected || !c.saved) &&
+      (!c.connected || !c.saved || Boolean(localStorage.getItem(`whiteout:shoot-log-pending:${c.session?.user.id}:${id}`))) &&
       currentLocation.pathname !== nextLocation.pathname,
   )
   const doc = c.doc,
@@ -161,7 +162,9 @@ function Workspace({
       anchorId: string
     }>()
   useEffect(()=>localStorage.setItem(modeKey,mode),[mode,modeKey])
+  const shootLog=useShootLog(id,doc,c.session!.user.id,c.connected)
   const allSaved =
+    shootLog.queue.length===0 &&
     c.saved &&
     !durationBusy &&
     (!source || source.saved || Boolean(source.error))
@@ -671,7 +674,7 @@ function Workspace({
       >
         <div className={`flow-content ${rail&&mode!=='log' ? 'has-rail' : ''}`}>
           <main className="flow-editor">
-            {mode === 'log' ? <ShootLog id={id} doc={doc} source={source?.synced?source.doc:undefined} user={c.session!.user} connected={c.connected} search={search} onInspect={inspect} onTiming={e=>setTime(e.id)}/> : mode === 'flow' ? (
+            {mode === 'log' ? <ShootLog log={shootLog} id={id} doc={doc} source={source?.synced?source.doc:undefined} user={c.session!.user} connected={c.connected} search={search} onInspect={inspect} onTiming={e=>setTime(e.id)}/> : mode === 'flow' ? (
               <FlowGrid
                 cast={cast}
                 doc={doc}

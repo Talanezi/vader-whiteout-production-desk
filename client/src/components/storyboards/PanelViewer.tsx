@@ -1,5 +1,5 @@
 import VisualDescription from './VisualDescription'
-import {initialStudioPalette} from './StudioControls'
+import { initialStudioPalette } from './StudioControls'
 import useDocumentScrollLock from '../../lib/useDocumentScrollLock'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type * as Y from 'yjs'
@@ -54,7 +54,9 @@ export default function PanelViewer({
 }) {
   useDocumentScrollLock()
   const [closing, setClosing] = useState(false),
-    closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
+    )
   const requestClose = () => {
     if (closeTimer.current) return
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -109,7 +111,9 @@ export default function PanelViewer({
     [inspectorTab, setInspectorTab] = useState<InspectorTab>(
       commentsRequested ? 'comments' : 'details',
     ),
-    [snapshots, setSnapshots] = useState<Record<string, LinkedSnapshot>>({})
+    [snapshots, setSnapshots] = useState<Record<string, LinkedSnapshot>>(
+      {},
+    )
   const revisions = values<ArtworkRevision & { panelId: string }>(
       doc,
       'revisions',
@@ -117,7 +121,8 @@ export default function PanelViewer({
       .filter((r) => r.panelId === panel.id)
       .sort(
         (a, b) =>
-          b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id),
+          b.createdAt.localeCompare(a.createdAt) ||
+          a.id.localeCompare(b.id),
       ),
     revision = revisions.find(
       (r) => r.id === (viewRevision || panel.activeRevision),
@@ -190,7 +195,10 @@ export default function PanelViewer({
           return
         }
         if (present && viewerZoom <= 1)
-          swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+          swipe.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+          }
       }}
       onTouchEnd={(e) => {
         const start = swipe.current
@@ -212,7 +220,11 @@ export default function PanelViewer({
     >
       <div className="sb-viewer-frame">
         <header>
-          <StudioIcon name="previous" label="Back" onClick={requestClose} />
+          <StudioIcon
+            name="previous"
+            label="Back"
+            onClick={requestClose}
+          />
           <h2>{panelIdentity(panel, index, snapshots)}</h2>
           <span>
             {index + 1} / {all.length}
@@ -238,7 +250,8 @@ export default function PanelViewer({
                   aria-pressed={annotating}
                   disabled={
                     !revision ||
-                    (!!viewRevision && viewRevision !== panel.activeRevision)
+                    (!!viewRevision &&
+                      viewRevision !== panel.activeRevision)
                   }
                   onClick={() => setAnnotating((v) => !v)}
                 >
@@ -311,7 +324,9 @@ export default function PanelViewer({
               disabled={!document.fullscreenEnabled}
               onClick={() => {
                 const frame =
-                  dialog.current?.querySelector<HTMLElement>('.sb-viewer-frame')
+                  dialog.current?.querySelector<HTMLElement>(
+                    '.sb-viewer-frame',
+                  )
                 void (
                   document.fullscreenElement
                     ? document.exitFullscreen()
@@ -347,11 +362,25 @@ export default function PanelViewer({
               </div>
             ) : media.url || revision?.kind === 'native' ? (
               <Studio
-                palette={((doc.getMap('meta').get('studioPaletteBase') as string[])||initialStudioPalette()).map((color,i)=>String(doc.getMap('meta').get('studioPalette'+i)||color))}
-                onPaletteChange={(index,color)=>doc.transact(()=>{
-                  const meta=doc.getMap('meta');if(!meta.has('studioPaletteBase'))meta.set('studioPaletteBase',initialStudioPalette());
-                  meta.set('studioPalette'+index,color)
+                palette={initialStudioPalette().map((fallback, i) => {
+                  const meta = doc.getMap('meta'),
+                    base = meta.get('studioPaletteBase')
+                  const color =
+                    meta.get('studioPalette' + i) ||
+                    (Array.isArray(base) ? base[i] : fallback)
+                  return typeof color === 'string' &&
+                    /^#[0-9a-f]{6}$/i.test(color)
+                    ? color
+                    : fallback
                 })}
+                onPaletteChange={(index, color) =>
+                  doc.transact(() => {
+                    const meta = doc.getMap('meta')
+                    if (!meta.has('studioPaletteBase'))
+                      meta.set('studioPaletteBase', initialStudioPalette())
+                    meta.set('studioPalette' + index, color)
+                  })
+                }
                 key={revision?.id}
                 url={media.url}
                 nativeHeight={revision?.height || 562.5}
@@ -374,7 +403,9 @@ export default function PanelViewer({
                 onBatch={(remove, add) => {
                   undo.stopCapturing()
                   doc.transact(() => {
-                    remove.forEach((id) => doc.getMap('annotations').delete(id))
+                    remove.forEach((id) =>
+                      doc.getMap('annotations').delete(id),
+                    )
                     add.forEach((a) =>
                       put(doc, 'annotations', a.id, {
                         ...a,
@@ -420,7 +451,9 @@ export default function PanelViewer({
                           uploaderName: user.name,
                           createdAt: new Date().toISOString(),
                         })
-                        put(doc, 'panels', panel.id, { activeRevision: id })
+                        put(doc, 'panels', panel.id, {
+                          activeRevision: id,
+                        })
                       })
                       setAnnotating(true)
                     }}
@@ -434,7 +467,16 @@ export default function PanelViewer({
               </div>
             )}
           </div>
-          {!present&&<div className="sb-viewer-description"><VisualDescription doc={doc} id={panel.id} provider={provider} undo={undo}/></div>}
+          {!present && (
+            <div className="sb-viewer-description">
+              <VisualDescription
+                doc={doc}
+                id={panel.id}
+                provider={provider}
+                undo={undo}
+              />
+            </div>
+          )}
           {showCommentIndicator && (
             <div className="sb-viewer-comment-rail">
               <CommentIndicator

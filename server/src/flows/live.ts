@@ -95,6 +95,56 @@ export function clockInstant(
     );
   return candidates[fold || 0] + fraction;
 }
+/** Read-only compatibility for actual timestamps already imported by M05.
+ * An audited server record, including an explicit clear, always takes precedence. */
+function legacyActual(
+  event: any,
+  meta: any,
+  source: any,
+): ActualBlock | undefined {
+  if (
+    !event?.actualStart ||
+    !Number.isFinite(Date.parse(event.actualStart))
+  )
+    return;
+  const shot =
+      event.sourceListId === meta.listId
+        ? source?.shots?.[event.shotId]
+        : null,
+    estimate =
+      shot &&
+      shot.estimatedMinutes !== '' &&
+      shot.estimatedMinutes != null &&
+      Number.isFinite(Number(shot.estimatedMinutes))
+        ? Number(shot.estimatedMinutes)
+        : null;
+  const startedAt = Date.parse(event.actualStart),
+    parsedEnd = event.actualEnd ? Date.parse(event.actualEnd) : NaN,
+    endedAt = Number.isFinite(parsedEnd) ? parsedEnd : undefined;
+  return {
+    id: 'imported:' + event.id,
+    eventId: event.id,
+    kind: event.type,
+    label:
+      event.label || event.reference || event.description || 'Activity',
+    status: endedAt == null ? 'recorded' : 'completed',
+    startedAt,
+    ...(endedAt == null
+      ? {}
+      : { endedAt, endMinute: actualMinute(endedAt, meta) }),
+    startMinute: actualMinute(startedAt, meta),
+    date: meta.date,
+    zone: meta.zone,
+    plannedMinute: event.minute ?? null,
+    plannedEnd:
+      event.minute != null && event.effectiveDuration != null
+        ? event.minute + event.effectiveDuration
+        : null,
+    estimate,
+    allotted: event.allottedMinutes ?? event.duration ?? null,
+    by: { id: 0, name: 'Imported timestamp' },
+  };
+}
 /** Pure transition. The service serializes and durably saves it before acknowledging. */
 export function transitionLive(
   previous: LiveState | undefined,
@@ -113,7 +163,18 @@ export function transitionLive(
   )
     throw Error('A stable action ID is required.');
   if (old.audit.some((a) => a.id === p.id)) return old;
-  const prior = old.blocks[p.eventId];
+  if (p.reason !== undefined && (typeof p.reason !== 'string' || p.reason.length > 500))
+    throw Error('Use a correction reason up to 500 characters.');
+  const legacy = state.events?.[p.eventId]?.actualStart
+    ? legacyActual(
+        resolveSchedule(state, source).events.find(
+          (e: any) => e.id === p.eventId,
+        ),
+        state.meta,
+        source,
+      )
+    : undefined;
+  const prior = old.blocks[p.eventId] || legacy;
   const guardedStamp =
     p.type === 'stamp' &&
     Object.prototype.hasOwnProperty.call(p, 'expectedStartedAt') &&
@@ -138,7 +199,7 @@ export function transitionLive(
       blocks: {} as Record<string, ActualBlock | null>,
     };
   const event = state.events?.[p.eventId],
-    existing = next.blocks[p.eventId];
+    existing = next.blocks[p.eventId] || legacy;
   if (!['undo'].includes(p.type) && (!event || event.deletedAt))
     throw Error('This activity is unavailable.');
   const occurred = p.occurredAt ?? now;
@@ -214,13 +275,21 @@ export function transitionLive(
           allotted: event.allottedMinutes ?? event.duration ?? null,
           by: user,
         };
-    if(b.plannedMinute==null){b.plannedMinute=planned?.minute??null;b.plannedEnd=planned?.minute!=null&&planned.effectiveDuration!=null?planned.minute+planned.effectiveDuration:null;b.estimate=Number.isFinite(estimate)?estimate:null;b.allotted=event.allottedMinutes??event.duration??null}
+    if (b.plannedMinute == null) {
+      b.plannedMinute = planned?.minute ?? null;
+      b.plannedEnd =
+        planned?.minute != null && planned.effectiveDuration != null
+          ? planned.minute + planned.effectiveDuration
+          : null;
+      b.estimate = Number.isFinite(estimate) ? estimate : null;
+      b.allotted = event.allottedMinutes ?? event.duration ?? null;
+    }
     const context = {
       date: b.date || state.meta.date,
       zone: b.zone || state.meta.zone,
     };
     if (p.field !== 'end') {
-      if (p.minute === null) {
+      if (p.minute === null && !p.useCurrent) {
         if (b.endedAt != null)
           throw Error(
             'Clear the confirmed finish before clearing its start.',
@@ -237,7 +306,7 @@ export function transitionLive(
         b.startedAt = at.instant;
         b.startMinute = at.minute;
       }
-    } else if (p.minute === null) {
+    } else if (p.minute === null && !p.useCurrent) {
       delete b.endedAt;
       delete b.endMinute;
     } else {
@@ -328,7 +397,7 @@ export function transitionLive(
       throw Error('Only the active block can be finished.');
     finish(p.eventId, stamp(p.clockMinute));
   } else if (p.type === 'skip') {
-    if (existing?.startedAt!=null)
+    if (existing?.startedAt != null)
       throw Error(
         'Clear or correct the actual timestamp before skipping this occurrence.',
       );
@@ -355,7 +424,7 @@ export function transitionLive(
       p.reason.length > 500
     )
       throw Error('Add a concise reason for this correction.');
-    const b = next.blocks[p.eventId];
+    const b = next.blocks[p.eventId] = structuredClone(existing);
     for (const [k, field] of [
       ['startMinute', 'startedAt'],
       ['endMinute', 'endedAt'],
@@ -416,7 +485,8 @@ export function transitionLive(
     ...Object.keys(next.blocks),
   ]))
     if (JSON.stringify(old.blocks[id]) !== JSON.stringify(next.blocks[id]))
-      before.blocks[id] = old.blocks[id] || null;
+      before.blocks[id] =
+        old.blocks[id] || (id === p.eventId ? legacy : null) || null;
   next.revision++;
   next.audit.push({
     id: p.id,
@@ -499,8 +569,14 @@ export function ledgerMetrics(state: any, source: any) {
     planned = resolveSchedule(state, source).events.filter(
       (e: any) => e.type !== 'department',
     );
+  const effective = { ...live.blocks };
+  for (const event of planned)
+    if (!effective[event.id]) {
+      const old = legacyActual(event, state.meta, source);
+      if (old) effective[event.id] = old;
+    }
   const rows = planned.map((event: any, index: number) => {
-    const block = live.blocks[event.id],
+    const block = effective[event.id],
       shot =
         event.sourceListId === state.meta.listId
           ? source?.shots?.[event.shotId]
@@ -519,11 +595,11 @@ export function ledgerMetrics(state: any, source: any) {
     let nextIndex = index + 1;
     while (
       nextIndex < planned.length &&
-      live.blocks[planned[nextIndex].id]?.status === 'skipped'
+      effective[planned[nextIndex].id]?.status === 'skipped'
     )
       nextIndex++;
     const nextEvent = planned[nextIndex],
-      next = nextEvent ? live.blocks[nextEvent.id] : undefined;
+      next = nextEvent ? effective[nextEvent.id] : undefined;
     let seconds: number | null = null,
       kind = '',
       issue = '';
@@ -542,7 +618,7 @@ export function ledgerMetrics(state: any, source: any) {
       const previous = planned
         .slice(0, index)
         .reverse()
-        .map((e: any) => live.blocks[e.id])
+        .map((e: any) => effective[e.id])
         .find((b: any) => b?.startedAt != null);
       if (previous && block.startedAt < previous.startedAt!)
         issue = 'Start precedes an earlier recorded activity';
@@ -556,21 +632,33 @@ export function ledgerMetrics(state: any, source: any) {
     // Never classify a shot using a following break's duration or a missing start.
     const budgetIssue =
       estimate != null && allotted != null && allotted < estimate;
-    const performance = event.type!=='shot'?{zone:'unknown',label:issue?'Review timestamps':block?.status==='skipped'?'Skipped':block?.startedAt==null?'Not recorded':'Activity logged'}:budgetIssue
-      ? { zone: 'inconsistent', label: 'Allotment below estimate' }
-      : issue
-        ? { zone: 'unknown', label: 'Review timestamps' }
-        : seconds == null
-          ? {
-              zone: 'unknown',
-              label:
-                block?.status === 'skipped'
-                  ? 'Skipped'
-                  : block?.startedAt == null
-                    ? 'Not recorded'
-                    : 'Awaiting next timestamp',
-            }
-          : timingZone(seconds, estimate, allotted);
+    const performance =
+      event.type !== 'shot'
+        ? {
+            zone: 'unknown',
+            label: issue
+              ? 'Review timestamps'
+              : block?.status === 'skipped'
+                ? 'Skipped'
+                : block?.startedAt == null
+                  ? 'Not recorded'
+                  : 'Activity logged',
+          }
+        : budgetIssue
+          ? { zone: 'inconsistent', label: 'Allotment below estimate' }
+          : issue
+            ? { zone: 'unknown', label: 'Review timestamps' }
+            : seconds == null
+              ? {
+                  zone: 'unknown',
+                  label:
+                    block?.status === 'skipped'
+                      ? 'Skipped'
+                      : block?.startedAt == null
+                        ? 'Not recorded'
+                        : 'Awaiting next timestamp',
+                }
+              : timingZone(seconds, estimate, allotted);
     return {
       event,
       block,
