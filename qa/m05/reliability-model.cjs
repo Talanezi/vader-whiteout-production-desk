@@ -26,6 +26,15 @@ const { networkFetch, responseFailure } = require(out + '/network.cjs'),
   const calls = {}
   const server = http.createServer((req, res) => {
     calls[req.url] = (calls[req.url] || 0) + 1
+    if (req.url === '/slow') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.write('{')
+      return setTimeout(() => res.end('}'), 120)
+    }
+    if (req.url === '/limited' && calls[req.url] < 3) {
+      res.writeHead(429, { 'Retry-After': '0' })
+      return res.end('{}')
+    }
     if (req.url === '/hang') return
     if (req.url === '/flaky' && calls[req.url] < 3) {
       res.writeHead(503)
@@ -44,6 +53,12 @@ const { networkFetch, responseFailure } = require(out + '/network.cjs'),
     let r = await networkFetch('http://127.0.0.1:4329/flaky')
     assert(r.ok)
     assert.equal(calls['/flaky'], 3)
+    r = await networkFetch('http://127.0.0.1:4329/slow', {}, { timeout: 500 })
+    assert.deepEqual(await r.json(), {})
+    assert.equal(calls['/slow'], 1)
+    r = await networkFetch('http://127.0.0.1:4329/limited')
+    assert(r.ok)
+    assert.equal(calls['/limited'], 3)
     await assert.rejects(
       networkFetch(
         'http://127.0.0.1:4329/hang',
