@@ -11,3 +11,15 @@ Local test infrastructure recovery: temporary PostgreSQL files were partially re
 Production baseline captured read-only at `/tmp/m05/refinement/production-before.json`: 4 Flows, 2 Shot Lists / 23 active shots, 5 Storyboards / 84 assets, 7 Call Sheets, 26 roster entries. Owner's Cave Scene work accounts for changes since old milestones. Preserve all records.
 
 Remaining: complete targeted browser interactions and visual review, fix defects, check every Section 42 matrix row, preserve M03/M04 regressions, review final diff, commit/push validated source, await Railway health, publish fresh site build, commit/push website, authenticate read-only live smoke and compare baseline. No M06.
+
+## Owner Shoot Log amendment (active)
+
+The owner superseded the Live Progress banner during this pass. It is removed;
+Shoot Log is now the third workspace, using the accepted shared segmented control.
+New timestamp `stamp` transitions preserve the same server log/audit/HTTP/WS model
+and support out-of-order backfilling with per-entry optimistic preconditions.
+The UI uses a desktop ledger, phone cards/time sheet, optional confirmed finishes,
+shared takes, a compact summary and an expandable actual-variance graph.
+`qa/m05/shoot-log-model.cjs` passes. Browser acceptance and final release are pending.
+Do not run the old banner-oriented tests as current product acceptance; retain
+existing valid evidence for unaffected work. No new release has been pushed.

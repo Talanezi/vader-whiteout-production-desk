@@ -1,6 +1,7 @@
 import FlowLayout from '../components/flow/FlowLayout'
 import type {CastPerson} from '../../../server/src/flows/talent'
-import LiveProgress from '../components/flow/LiveProgress'
+import ShootLog from '../components/flow/ShootLog'
+import ViewSwitcher from '../components/storyboards/ViewSwitcher'
 import DatePicker from '../components/whiteout/DatePicker'
 import InstructionTiming from '../components/flow/InstructionTiming'
 import { change, displayShot } from '../lib/shotDocument'
@@ -121,7 +122,8 @@ function Workspace({
     location = useLocation()
   const [cast,setCast]=useState<CastPerson[]>([])
   useEffect(()=>{flowRequest<CastPerson[]>(`/${id}/cast`).then(setCast).catch(()=>{})},[id])
-  const [mode, setMode] = useState('flow'),
+  const modeKey=`whiteout:flow:${id}:user:${c.session!.user.id}:view`
+  const [mode, setMode] = useState(()=>{const saved=localStorage.getItem(modeKey);return saved&&['flow','map','log'].includes(saved)?saved:'flow'}),
     [rail, setRail] = useState(true),
     [search, setSearch] = useState(''),
     [selected, setSelected] = useState(new Set<string>()),
@@ -158,6 +160,7 @@ function Workspace({
       eventId: string
       anchorId: string
     }>()
+  useEffect(()=>localStorage.setItem(modeKey,mode),[mode,modeKey])
   const allSaved =
     c.saved &&
     !durationBusy &&
@@ -253,6 +256,8 @@ function Workspace({
     setSelected(new Set([id]))
   }
   async function remove() {
+    const active=(meta.get('liveState') as any)?.activeId;
+    if(active&&deleting.includes(active)){toast('Finish the active production block before removing it.',{state:'error'});return}
     try {
       await flowRequest(`/${id}/manage`, {
         action: 'checkpoint',
@@ -512,23 +517,8 @@ function Workspace({
           value={search}
           onChange={setSearch}
         />
-        <div className="flow-segments" aria-label="Flow view">
-          <button
-            aria-pressed={mode === 'flow'}
-            onClick={() => setMode('flow')}
-          >
-            <Icon name="columns" />
-            Department Flow
-          </button>
-          <button
-            aria-pressed={mode === 'map'}
-            onClick={() => setMode('map')}
-          >
-            <Icon name="calendar" />
-            Time Map
-          </button>
-        </div>
-        <div className="flow-toolbar-actions">
+        <ViewSwitcher label="Flow view" value={mode} onChange={setMode} items={[{id:'flow',label:'Department Flow',icon:'columns'},{id:'map',label:'Time Map',icon:'calendar'},{id:'log',label:'Shoot Log',icon:'check'}]}/>
+        {mode!=='log'&&<div className="flow-toolbar-actions">
           <IconButton
             name="undo"
             label="Undo"
@@ -552,10 +542,9 @@ function Workspace({
           >
             Shot Rail
           </Button>
-        </div>
+        </div>}
       </div>
-      <LiveProgress id={id} doc={doc} events={events} shots={sourceShots} user={c.session!.user} connected={c.connected}/>
-      {selected.size > 0 && (
+      {selected.size > 0 && mode!=='log' && (
         <div className="flow-selection">
           <strong>{selected.size} selected</strong>
           <Button
@@ -680,9 +669,9 @@ function Workspace({
           moveEvent(doc, event, target)
         }}
       >
-        <div className={`flow-content ${rail ? 'has-rail' : ''}`}>
+        <div className={`flow-content ${rail&&mode!=='log' ? 'has-rail' : ''}`}>
           <main className="flow-editor">
-            {mode === 'flow' ? (
+            {mode === 'log' ? <ShootLog id={id} doc={doc} source={source?.synced?source.doc:undefined} user={c.session!.user} connected={c.connected} search={search} onInspect={inspect} onTiming={e=>setTime(e.id)}/> : mode === 'flow' ? (
               <FlowGrid
                 cast={cast}
                 doc={doc}
@@ -775,7 +764,7 @@ function Workspace({
               />
             )}
           </main>
-          {rail && (
+          {rail && mode!=='log' && (
             <ShotRail
               onAttention={(e) =>
                 e.sourceMissing ? inspect(e) : setTime(e.id)
@@ -1017,6 +1006,7 @@ function Workspace({
           source={sourceShots?.get(
             events.find((e) => e.id === inspector.id)?.shotId || '',
           )}
+          flowId={id}
           sourceDoc={source?.doc}
           cast={cast}
           listId={listId}

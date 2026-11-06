@@ -120,8 +120,7 @@ export default function TimeMap({
     last = ranges.length
       ? baseTime +
         Math.max(...ranges.map((e: any) => e.minute + (e.duration || 0))) *
-          60000 +
-        1800000
+          60000
       : first + 3600000,
     width = Math.max(1, ((last - first) / 60000) * zoom),
     tick = [1,2,5,10,15,30,60,120,180,360,720].find(n=>n*zoom>=90)||1440,
@@ -308,10 +307,7 @@ export default function TimeMap({
                       left =
                         ((Date.parse(e.start!) - first) / 60000) * zoom +
                         (resize ? 0 : delta * zoom),
-                      w = Math.max(
-                        base == null ? 12 : 2,
-                        ((base || 0) + (resize ? delta : 0)) * zoom,
-                      )
+                      w = base==null?12:base===0?2:Math.max(0,((base || 0) + (resize ? delta : 0)) * zoom)
                     function pointer(
                       event: React.PointerEvent,
                       resize: boolean,
@@ -325,7 +321,7 @@ export default function TimeMap({
                       let delta = 0
                       el.onpointermove = (v) => {
                         delta =
-                          Math.round((v.clientX - start) / zoom / 5) * 5
+                          Math.round((v.clientX - start) / zoom / (zoom>=8?1:5)) * (zoom>=8?1:5)
                         if (resize) delta = Math.max(-(base || 0), delta)
                         setDrag({ id: e.id, delta, resize })
                       }

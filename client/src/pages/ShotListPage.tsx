@@ -1,4 +1,3 @@
-import RowColor from '../components/shots/RowColor'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router-dom'
 import * as Y from 'yjs'
@@ -850,7 +849,6 @@ export default function ShotListPage() {
                   }
                   actions={(s, index) => (
                     <div>
-                      <RowColor records={[s]}/>
                       <IconButton
                         name="expand"
                         label={`Inspect shot ${str(s, 'number')}`}

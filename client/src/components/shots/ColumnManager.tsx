@@ -25,6 +25,7 @@ export default function ColumnManager(p: Props) {
     all = [
       ...new Set([
         ...p.order,
+        'adAllotted','adProgress','preferredTake','productionNotes',
         'scene',
         'shootDates',
         'assignmentCount',

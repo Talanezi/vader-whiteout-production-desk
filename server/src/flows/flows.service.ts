@@ -422,6 +422,7 @@ export class FlowsService implements OnModuleDestroy {
         const liveState=d.getMap('meta').get('liveState');
         try {
           Y.applyUpdate(old, row.state);
+          const active=(liveState as any)?.activeId;if(active&&(!old.getMap<Y.Map<unknown>>('events').has(active)||old.getMap<Y.Map<unknown>>('events').get(active)?.get('deletedAt')))throw new BadRequestException('Finish the active block before restoring a plan without it.');
           d.transact(() => {
             for (const k of [
               'meta',

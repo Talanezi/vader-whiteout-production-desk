@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type * as Y from 'yjs'
 import {
+  editTake,
   preferredTake,
   recordTake,
   selectTake,
@@ -82,9 +83,10 @@ export default function PreferredTake({
                 >
                   Take {t.label}
                 </Button>
+                <label className="flow-check"><DrawCheckbox checked={t.usable} onChange={e=>editTake(shot,{...t,usable:e.target.checked},user)}/>Usable</label>
                 <span>
                   {t.usable ? 'Usable · ' : ''}
-                  {t.note}
+                  <input aria-label={'Note for take '+t.label} defaultValue={t.note} maxLength={500} onBlur={e=>{if(e.target.value!==t.note)editTake(shot,{...t,note:e.target.value},user)}}/>
                   <small>
                     {t.by.name} · {t.context.date || 'No day assigned'}
                   </small>

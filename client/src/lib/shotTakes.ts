@@ -13,10 +13,8 @@ export type TakeRecord = {
   by: { id: number; name: string }
   context: TakeContext
 }
-export function takeRecords(shot: Y.Map<unknown>) {
-  const map = shot.get('takes')
-  return map instanceof Y.Map ? ([...map.values()] as TakeRecord[]) : []
-}
+export function takeRecords(shot:Y.Map<unknown>):TakeRecord[]{const map=shot.get('takes'),revisions=shot.get('takeRevisions');const edits=revisions instanceof Y.Map?[...revisions.values()].sort((a:any,b:any)=>a.at-b.at||a.id.localeCompare(b.id)):[];return map instanceof Y.Map?([...map.values()] as TakeRecord[]).map(t=>edits.filter((e:any)=>e.takeId===t.id).reduce((v:any,e:any)=>({...v,note:e.note,usable:e.usable}),t)):[]}
+export function editTake(shot:Y.Map<unknown>,take:TakeRecord,by:TakeRecord['by']){if(take.note.length>500)throw Error('Use a note up to 500 characters.');shot.doc!.transact(()=>{let revisions=shot.get('takeRevisions') as Y.Map<unknown>;if(!(revisions instanceof Y.Map)){revisions=new Y.Map();shot.set('takeRevisions',revisions)}if(revisions.size>=2000)throw Error('Take history limit reached.');const id=crypto.randomUUID();revisions.set(id,{id,takeId:take.id,by,at:Date.now(),note:take.note,usable:take.usable})},'local')}
 export function takeSelections(shot: Y.Map<unknown>) {
   const map = shot.get('takeSelections')
   return map instanceof Y.Map ? ([...map.values()] as any[]) : []

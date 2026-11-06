@@ -1,3 +1,4 @@
+import {ledgerMetrics} from './live';
 import {linkedTalent} from './talent';
 import { resolveSchedule, clockText, sourceLabel } from './scheduling';
 import { PDFDocument, rgb } from 'pdf-lib';
@@ -26,6 +27,7 @@ export async function renderFlow(
   validateFlow(state);
   if (
     !raw ||
+    (raw.productionLog!==undefined&&typeof raw.productionLog!=='boolean') ||
     !['master', 'department', 'rundown'].includes(raw.product) ||
     !['letter', 'a4', 'tabloid', 'a3'].includes(raw.paper) ||
     !['landscape', 'portrait'].includes(raw.orientation) ||
@@ -341,15 +343,14 @@ export async function renderFlow(
       draw(String(vi * bands.length + bi + 1), W - margin - 12, 20, 8);
     }
   if(raw.productionLog){
-    const records=Object.values(state.meta.liveState?.blocks||{}) as any[];
-    let page:any,y=0;const heading=()=>{page=pdf.addPage([W,H]);y=H-margin;page.drawText(printedTitle+' — Production log',{x:margin,y:y-12,size:13,font,color:ink});y-=36;page.drawText('Activity / Actual start / Actual finish / Elapsed / DP estimate / AD allotted / Budget variance',{x:margin,y,size:9,font,color:ink});y-=24};heading();
-    for(const b of records.sort((a,b)=>(a.startedAt||Infinity)-(b.startedAt||Infinity))){
-      const elapsed=b.status==='completed'?(b.endedAt-b.startedAt)/60000:null;
-      const text=[b.label,b.status==='skipped'?'Skipped':clockText(b.startMinute),b.status==='active'?'In progress':b.status==='skipped'?'—':clockText(b.endMinute),elapsed==null?'—':elapsed.toFixed(1)+' min',b.estimate==null?'—':b.estimate+' min',b.allotted==null?'—':b.allotted+' min',elapsed!=null&&b.kind==='shot'&&b.allotted!=null?(elapsed-b.allotted).toFixed(1)+' min':'—'].join(' / ');
+    const ledger=ledgerMetrics(state,source),records=ledger.rows.filter((r:any)=>r.block?.startedAt!=null||r.block?.status==='skipped');
+    let page:any,y=0;const heading=()=>{page=pdf.addPage([W,H]);y=H-margin;page.drawText(printedTitle+' — Production log',{x:margin,y:y-12,size:13,font,color:ink});y-=36;page.drawText('Activity / Actual start / Confirmed finish / Interval / Basis / DP estimate / AD allotted',{x:margin,y,size:9,font,color:ink});y-=24};heading();
+    for(const r of records){const b=r.block;
+      const text=[b.label,b.status==='skipped'?'Skipped':clockText(b.startMinute),b.endedAt==null?'—':clockText(b.endMinute),r.seconds==null?'—':(r.seconds/60).toFixed(1)+' min',r.issue||r.kind||'Awaiting next timestamp',r.estimate==null?'—':r.estimate+' min',r.allotted==null?'—':r.allotted+' min'].join(' / ');
       for(const line of wrapCell(text,usable,font,size)){if(y<margin+25)heading();page.drawText(line,{x:margin,y,size,font,color:ink});y-=leading}y-=12;
     }
     if(!records.length)page.drawText('No recorded production blocks.',{x:margin,y,size,font,color:ink});
-    for(const audit of state.meta.liveState?.audit||[]){if(!['correct','undo'].includes(audit.type))continue;for(const line of wrapCell(`${audit.type} · ${audit.by.name} · ${new Date(audit.at).toISOString()} · ${audit.reason||'Previous action restored'}`,usable,font,size)){if(y<margin+25)heading();page.drawText(line,{x:margin,y,size,font,color:ink});y-=leading}y-=8}
+    for(const audit of state.meta.liveState?.audit||[]){if(!['stamp','correct','undo'].includes(audit.type))continue;for(const line of wrapCell(`${audit.type} · ${audit.by.name} · ${new Date(audit.at).toISOString()} · ${audit.reason||'Previous action restored'}`,usable,font,size)){if(y<margin+25)heading();page.drawText(line,{x:margin,y,size,font,color:ink});y-=leading}y-=8}
     pdf.getPages().slice(pages.length*bands.length).forEach((p,i)=>p.drawText(String(pages.length*bands.length+i+1),{x:W-margin-12,y:20,font,size:8,color:ink}));
   }
   pdf.setTitle(printedTitle);

@@ -171,7 +171,7 @@ export function ADCell({
     return (
       <>
         {picker}
-        <span>{live?.blocks?.[eventId]?.status || 'Not started'}</span>
+        <span>{({recorded:'Start recorded',active:'Start recorded',completed:'Confirmed finish',skipped:'Skipped'} as Record<string,string>)[live?.blocks?.[eventId]?.status]||'Not recorded'}</span>
       </>
     )
   return (

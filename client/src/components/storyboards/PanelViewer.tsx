@@ -347,9 +347,9 @@ export default function PanelViewer({
               </div>
             ) : media.url || revision?.kind === 'native' ? (
               <Studio
-                palette={initialStudioPalette().map((color,i)=>String(doc.getMap('meta').get('studioPalette'+i)||color))}
+                palette={((doc.getMap('meta').get('studioPaletteBase') as string[])||initialStudioPalette()).map((color,i)=>String(doc.getMap('meta').get('studioPalette'+i)||color))}
                 onPaletteChange={(index,color)=>doc.transact(()=>{
-                  const meta=doc.getMap('meta');for(const [i,c]of initialStudioPalette().entries())if(!meta.has('studioPalette'+i))meta.set('studioPalette'+i,c);
+                  const meta=doc.getMap('meta');if(!meta.has('studioPaletteBase'))meta.set('studioPaletteBase',initialStudioPalette());
                   meta.set('studioPalette'+index,color)
                 })}
                 key={revision?.id}

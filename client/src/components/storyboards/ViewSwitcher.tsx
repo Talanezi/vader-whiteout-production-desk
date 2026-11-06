@@ -8,21 +8,25 @@ const modes = [
 export default function ViewSwitcher({
   value,
   onChange,
+  items=modes,
+  label="Storyboard view",
 }: {
+  items?:readonly {id:string;label:string;icon:IconName}[]
+  label?:string
   value: string
   onChange: (value: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null),
     index = Math.max(
       0,
-      modes.findIndex((m) => m.id === value),
+      items.findIndex((m) => m.id === value),
     )
   return (
     <div
       ref={ref}
       className="sb-view-switch"
       role="radiogroup"
-      aria-label="Storyboard view"
+      aria-label={label}
       style={{ '--view-index': index } as CSSProperties}
       onKeyDown={(e) => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
@@ -33,12 +37,12 @@ export default function ViewSwitcher({
             : e.key === 'End'
               ? 2
               : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3
-        onChange(modes[next].id)
+        onChange(items[next].id)
         ref.current?.querySelectorAll<HTMLButtonElement>('button')[next].focus()
       }}
     >
       <span className="sb-view-active" aria-hidden="true" />
-      {modes.map((m) => (
+      {items.map((m) => (
         <button
           role="radio"
           aria-checked={value === m.id}

@@ -1,3 +1,4 @@
+import {wrapCell} from '../../shotlists/pdf/spreadsheet';
 import { getStroke } from 'perfect-freehand';
 import {
   PDFDocument,
@@ -25,21 +26,7 @@ export type BoardPrint = {
   shots?: boolean;
   annotations?: boolean;
 };
-function lines(text: string, font: PDFFont, width: number, size: number) {
-  const out: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    let line = '';
-    for (const char of paragraph) {
-      if (line && font.widthOfTextAtSize(line + char, size) > width) {
-        out.push(line);
-        line = '';
-      }
-      line += char;
-    }
-    out.push(line);
-  }
-  return out;
-}
+function lines(text:string,font:PDFFont,width:number,size:number){return wrapCell(text,width,font,size)}
 export async function renderStoryboard(
   title: string,
   panels: any[],
@@ -90,15 +77,15 @@ export async function renderStoryboard(
   }
   const positions:any[]=[];let cursor=0,rowsOnPage=0,pageIndex=-1;
   for(let start=0;start<entries.length;start+=cols){
-    const row=entries.slice(start,start+cols),rowHeight=Math.max(cellHeight,...row.map(e=>30+e.detail.length*10+(e.hasArtwork?100:0)));
+    const row=entries.slice(start,start+cols),rowHeight=Math.max(cellHeight,...row.map(e=>Math.max(20,lines(e.label,font,cellWidth,10).length*12+8)+10+e.detail.length*10+(e.hasArtwork?100:0)));
     if(!rowsOnPage||rowsOnPage>=rows||cursor+rowHeight>bodyHeight){pageIndex++;cursor=0;rowsOnPage=0}
     row.forEach((entry,col)=>positions.push({...entry,pageIndex,cellHeight:rowHeight,x:margin+col*(cellWidth+gap),top:height-margin-32-cursor}));cursor+=rowHeight+gap;rowsOnPage++;
   }
   const pages=Array.from({length:pageIndex+1},()=>{const page=pdf.addPage([width,height]);page.drawText(validate(title),{x:margin,y:height-margin-10,size:11,font,color:rgb(.1,.16,.2)});return page});
   for(const entry of positions){
     const {panel,label,detail,cellHeight,x,top}=entry,page=pages[entry.pageIndex];
-    const reserved=20+detail.length*10;
-    if(label)page.drawText(label,{x,y:top-10,font,size:10});
+    const labelLines=lines(label,font,cellWidth,10),labelHeight=Math.max(20,labelLines.length*12+8),reserved=labelHeight+detail.length*10;
+    labelLines.forEach((line,i)=>{if(line)page.drawText(line,{x,y:top-10-i*12,font,size:10})});
     const areaHeight=cellHeight-reserved-10;
     if (panel.assetId || panel.native) {
       const image = panel.assetId
@@ -141,7 +128,7 @@ export async function renderStoryboard(
         frameW = dimensions.width * scale,
         frameH = framePixels * scale,
         fx = x + (cellWidth - frameW) / 2,
-        fy = top - 20 - frameH,
+        fy = top - labelHeight - frameH,
         w = dimensions.width * scale * fit,
         h = dimensions.height * scale * fit,
         ix = fx + (frameW - w) / 2,
@@ -315,7 +302,7 @@ export async function renderStoryboard(
     detail.forEach((text:string, i:number) =>
       page.drawText(text, {
         x,
-        y: top - cellHeight + reserved - 20 - i * 10,
+        y: top - cellHeight + detail.length*10 - i * 10,
         font,
         size: 8,
       }),

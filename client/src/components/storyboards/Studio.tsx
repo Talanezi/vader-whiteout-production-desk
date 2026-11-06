@@ -407,6 +407,7 @@ export default function Studio({
       }
       if (e.key === 'Escape') {
         clearTimeout(hold.current)
+        sampleReplacement.current=undefined
         setSampling(false)
         sampler.current = undefined
         erasing.current = undefined
@@ -1569,6 +1570,7 @@ export default function Studio({
                 erasing.current = undefined
                 setEraseView(undefined)
                 setDraft(undefined)
+                sampleReplacement.current=undefined
                 setSampling(false)
                 if (penPath.current) finishPen()
                 setTool(id)

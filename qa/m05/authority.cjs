@@ -9,6 +9,7 @@ const fs = require('node:fs'),
   revoked = new Set()
 http
   .createServer((req, res) => {
+    if(req.method==='POST'&&req.url==='/api/logout?everywhere=false'){const token=(req.headers.authorization||'').replace(/^Bearer /,'');const valid=s.users.some(u=>s.tokens[String(u.userID)]===token&&!revoked.has(u.userID));res.writeHead(valid?204:401);res.end();return}
     if (req.url === '/api/me') {
       const token = (req.headers.authorization || '').replace(
           /^Bearer /,

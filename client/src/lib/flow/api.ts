@@ -11,11 +11,11 @@ export async function flowFetch(path: string, init: RequestInit = {}) {
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw Error(
+    throw Object.assign(Error(
       response.status === 401
         ? 'UNAUTHORIZED'
         : error.message || 'Could not complete the Flow request.',
-    )
+    ),{status:response.status})
   }
   return response
 }
