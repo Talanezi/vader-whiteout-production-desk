@@ -90,7 +90,8 @@ configured development origins; credentials and permissions are not weakened.
 - `reliability-browser.cjs`, Chromium/WebKit: real browser503 and DNS failures,
   bounded attempts,403 no retry, preserved token, successful recovery; M03 offline
   edit survives reload/authorization/confirmation; Scheduler DNS failure and Retry
-  preserve login return destination.
+  preserve login return destination; invalid callback is rejected with a recoverable
+  sign-in message and no acceptance of the supplied token (both browsers).
 - `reliability-drafts.cjs`: actual offline Flow instruction and completed VectorCraft
   brush stroke survive reload and merge; browser coverage is reported per result.
 - Existing `shoot-log-http.cjs` and `refinement-shared.cjs` rerun: authoritative
@@ -129,3 +130,7 @@ Production write/destructive tests remain isolated locally. Baseline4 Flows,
 must be compared without changing records. No SQL migration is introduced here.
 No M06 or owner-acceptance claim. Final actual deployed revisions/monitor outcomes
 are saved with the release evidence and final report, not assumed from a build.
+
+Final transport smoke: Chromium actual M03 PDF and Flow production-log preview/download
+byte consistency, shared empty/error states and phone account menu pass after the
+shared request helper was wired into PDF and sign-out. Both Desk typechecks pass.

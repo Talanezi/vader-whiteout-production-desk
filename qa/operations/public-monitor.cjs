@@ -43,7 +43,7 @@ async function request(name, url, status) {
       url,
       status: r.status,
       ms: Date.now() - at,
-      pass: r.status === status && (!body || body.ok === true),
+      pass: r.status === status && (!body || body.ok === true) && (name!=='desk-ready'||!process.env.GITHUB_SHA||body?.revision===process.env.GITHUB_SHA) && (!name.includes('private-boundary')||r.headers.get('cf-cache-status')!=='HIT'),
       revision: body?.revision || null,
       cache: r.headers.get('cf-cache-status'),
       requestId: r.headers.get('x-request-id'),

@@ -1,3 +1,4 @@
+import {networkFetch,responseFailure} from '../lib/network'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePopover } from './whiteout/Popover'
@@ -20,7 +21,7 @@ export default function AccountMenu({
     [error, setError] = useState('')
   useEffect(() => {
     if (getAuthToken())
-      fetch(shotApiBase + '/auth/me', {
+      networkFetch(shotApiBase + '/auth/me', {
         headers: { Authorization: 'Bearer ' + getAuthToken() },
       })
         .then((r) => (r.ok ? r.json() : null))
@@ -39,12 +40,12 @@ export default function AccountMenu({
     setBusy(true)
     setError('')
     try {
-      const r = await fetch(shotApiBase + '/auth/logout', {
+      const r = await networkFetch(shotApiBase + '/auth/logout', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + getAuthToken() },
       })
       if (!r.ok && r.status !== 401)
-        throw Error('Sign out could not be confirmed. Retry.')
+        throw await responseFailure(r)
       localStorage.removeItem('token')
       window.location.assign(
         switching

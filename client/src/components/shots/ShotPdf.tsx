@@ -1,3 +1,4 @@
+import {networkFetch,responseFailure} from '../../lib/network'
 import DrawCheckbox from '../whiteout/DrawCheckbox'
 import {
   Component,
@@ -231,7 +232,7 @@ export default function ShotPdf({
         try {
           let bytes = cache.current.get(signature)
           if (!bytes) {
-            const response = await fetch(`${shotApiBase}/shotlists/${id}/pdf`, {
+            const response = await networkFetch(`${shotApiBase}/shotlists/${id}/pdf`, {
               method: 'POST',
               signal: controller.signal,
               headers: {
@@ -240,10 +241,7 @@ export default function ShotPdf({
               },
               body: JSON.stringify(spec),
             })
-            if (!response.ok) {
-              const result = await response.json().catch(() => ({}))
-              throw Error(result.message || 'PDF preview failed.')
-            }
+            if (!response.ok) throw await responseFailure(response)
             if (
               !response.headers.get('content-type')?.includes('application/pdf')
             )

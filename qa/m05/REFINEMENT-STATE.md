@@ -1,25 +1,32 @@
-# Cross-application refinement checkpoint
+# Final M03–M05 release checkpoint
 
-Baseline: `75cdd370` on `ui/m05-cross-application-refinement`. No new release yet.
+The complete product implementation is preserved in `7fcf4723`, pushed to main and
+running on Railway deployment `889f505e-774f-4875-8b1b-40f2bdf79c95`.
+The product acceptance matrix is `REFINEMENT-ACCEPTANCE.md`; its earlier pending
+statements are superseded by the completed evidence there. No M06.
 
-Implemented in progress: separate AD allotted duration; bounded server-owned actual-production log with durable acknowledgment, revision concurrency, idempotence, interval validation, correction audit and undo; live UI with calibrated clock and persisted pending requests; AD / On-Set preset with explicit production-day/occurrence selection; shared source-shot take records and preference history; row coloring; cast-derived Talent with explicit override; compact Layout controls; adaptive Time Map; ten-department Tabloid width allocation and optional production log; stable twelve-slot shared Studio palette; direct visual-description editing; six/eight-panel description-first PDFs; shared empty states; Scheduler-backed account sign-out.
+The owner's later connectivity contract is copied in `RELIABILITY-SPECIFICATION.md`.
+Desk recovery checkpoint `90ce0b25` and Scheduler checkpoint `9836947` preserve the
+new hardening. Final callback failure recovery, AccountMenu and M03 PDF request
+transport changes have passed focused Chromium/WebKit recovery tests and Chromium
+PDF preview/download/empty-state regression. Both Desk TypeScript checks and the
+request/auth model regressions pass. Scheduler uses its own locked compiler and
+isolated fresh frontend/backend builds. Existing broad product evidence is reused.
+See `RELIABILITY-REVIEW.md` for incident findings, changes and honest limits.
 
-Validation so far: client and backend TypeScript; isolated production build; focused pure live-model regression. Browser, HTTP concurrency/durability/security, actual PDF visual inspection and full new acceptance matrix remain required. Do not claim these passed yet.
+First-party API/Scheduler domains have valid Railway certificates and Cloudflare
+proxying. DNS-only uploads preserve the existing 128MiB upload limit; no public
+bucket or weakened permissions. Existing Google callback retains its registered
+Railway URL. The original residential failure cannot be independently reproduced.
 
-Local test infrastructure recovery: temporary PostgreSQL files were partially removed outside this task. Old incomplete files preserved; new disposable database at `../.local-qa-m05/pg-data`, loopback 55432. Production untouched. Existing local fixture IDs need reseeding; preserved original PDFs/workbook and historical QA evidence remain available. Local application uses existing `qa/m04/local.cjs`, membership authority `qa/m05/authority.cjs`, and `/tmp/m032/runtime` dependencies.
+Next: commit/push final reliability branches; fast-forward Scheduler master and
+verify new readiness/revision, then Desk main and readiness/revision; run external
+GitHub monitor; freshly build/publish both frontends to the site main branch;
+verify served hashes; authenticated read-only UI/PDF/collaboration smoke; compare
+production hashes and save final deployed revision evidence. Do not publish the
+older prepared site bundle. No production test writes or migrations.
 
-Production baseline captured read-only at `/tmp/m05/refinement/production-before.json`: 4 Flows, 2 Shot Lists / 23 active shots, 5 Storyboards / 84 assets, 7 Call Sheets, 26 roster entries. Owner's Cave Scene work accounts for changes since old milestones. Preserve all records.
-
-Remaining: complete targeted browser interactions and visual review, fix defects, check every Section 42 matrix row, preserve M03/M04 regressions, review final diff, commit/push validated source, await Railway health, publish fresh site build, commit/push website, authenticate read-only live smoke and compare baseline. No M06.
-
-## Owner Shoot Log amendment (active)
-
-The owner superseded the Live Progress banner during this pass. It is removed;
-Shoot Log is now the third workspace, using the accepted shared segmented control.
-New timestamp `stamp` transitions preserve the same server log/audit/HTTP/WS model
-and support out-of-order backfilling with per-entry optimistic preconditions.
-The UI uses a desktop ledger, phone cards/time sheet, optional confirmed finishes,
-shared takes, a compact summary and an expandable actual-variance graph.
-`qa/m05/shoot-log-model.cjs` passes. Browser acceptance and final release are pending.
-Do not run the old banner-oriented tests as current product acceptance; retain
-existing valid evidence for unaffected work. No new release has been pushed.
+Baseline: 4 Flows, 2 Shot Lists/23 active shots, 5 Storyboards/84 assets,
+7 Call Sheets, 26 roster entries. Read-only snapshots in
+`/tmp/m05/refinement/production-before.json` and `production-pre-release.json`
+match. Temporary local fixtures/runtimes are preserved in `.local-qa-m05`.

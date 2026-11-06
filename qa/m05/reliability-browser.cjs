@@ -92,7 +92,7 @@ const fs = require('fs'),
     await p.screenshot({ path: out + '/reliability-recovered.png' })
     const c = await browser.newContext()
     await c.addInitScript(
-      (t) => localStorage.setItem('token', t),
+      (t) => {if(!sessionStorage.getItem('qa-scheduler-auth')){localStorage.setItem('token',t);sessionStorage.setItem('qa-scheduler-auth','yes')}},
       auth.tokens['103'],
     )
     const q = await c.newPage()
@@ -163,6 +163,12 @@ const fs = require('fs'),
       await q.getByRole('textbox', { name: /email/i }).waitFor()
       assert((await q.url()).includes('returnTo='))
       await q.screenshot({ path: out + '/scheduler-recovery.png' })
+      await q.evaluate(()=>localStorage.removeItem('token'))
+      await q.goto('about:blank')
+      await q.goto('http://127.0.0.1:5178/scheduler/#/login?returnTo=%2Fproductiondesk%2F&token=invalid-fixture&nonce=wrong-fixture')
+      await q.getByRole('alert').filter({hasText:'Sign-in could not be verified. Please try again.'}).waitFor()
+      assert.equal(await q.evaluate(()=>localStorage.getItem('token')),null)
+      assert(!(await q.url()).includes('invalid-fixture'))
     } finally {
       server.closeAllConnections()
       server.close()
